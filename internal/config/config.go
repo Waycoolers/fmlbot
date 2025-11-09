@@ -1,24 +1,43 @@
 package config
 
 import (
+	"errors"
 	"os"
 
-	dotenv "github.com/joho/godotenv"
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
 	Token string
+	DB    DatabaseConfig
+}
+
+type DatabaseConfig struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	Name     string
 }
 
 func Load() (*Config, error) {
-	_ = dotenv.Load()
+	_ = godotenv.Load()
 
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
 	if token == "" {
-		return nil, ErrMissingToken
+		return nil, errors.New("не найден TELEGRAM_BOT_TOKEN")
 	}
 
-	return &Config{Token: token}, nil
-}
+	db := DatabaseConfig{
+		Host:     os.Getenv("DB_HOST"),
+		Port:     os.Getenv("DB_PORT"),
+		User:     os.Getenv("DB_USER"),
+		Password: os.Getenv("DB_PASSWORD"),
+		Name:     os.Getenv("DB_NAME"),
+	}
 
-var ErrMissingToken = os.ErrNotExist
+	return &Config{
+		Token: token,
+		DB:    db,
+	}, nil
+}
