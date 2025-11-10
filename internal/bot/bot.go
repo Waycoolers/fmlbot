@@ -43,7 +43,7 @@ func (b *Bot) Run() {
 		switch update.Message.Text {
 		case "/start":
 			log.Print("Клиент вызвал: /start")
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Привет! Я твой fmlbot 💖")
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Привет! Я твой fmlbot 💖") // ПОМЕНЯТЬ
 			log.Printf("Бот ответил: %s", msg.Text)
 			_, err := b.api.Send(msg)
 			if err != nil {
@@ -70,7 +70,7 @@ func (b *Bot) Run() {
 			}
 
 			if !canSend {
-				msg := tgbotapi.NewMessage(userID, "Комплименты на сегодня закончились.")
+				msg := tgbotapi.NewMessage(userID, "Комплименты на сегодня закончились.") // ПОМЕНЯТЬ
 				log.Printf("Бот ответил: %s", msg.Text)
 				_, err := b.api.Send(msg)
 				if err != nil {
@@ -81,7 +81,7 @@ func (b *Bot) Run() {
 
 			complimentID, text, err := b.store.GetNextCompliment(ctx)
 			if err != nil {
-				text = "😅 У меня сейчас нет комплиментов, но ты всё равно чудесная!"
+				text = "😅 У меня сейчас нет комплиментов, но ты всё равно чудесная!" // ПОМЕНЯТЬ
 			}
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
 			log.Printf("Бот ответил: %s", msg.Text)
