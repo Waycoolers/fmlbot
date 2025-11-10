@@ -20,7 +20,7 @@ func main() {
 	}
 	defer store.DB.Close()
 
-	b, err := bot.New(cfg)
+	b, err := bot.New(cfg, store)
 	if err != nil {
 		log.Fatalf("Ошибка создания бота: %v", err)
 	}
