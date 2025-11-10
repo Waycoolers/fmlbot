@@ -82,7 +82,7 @@ func (b *Bot) Run() {
 			complimentID, text, err := b.store.GetNextCompliment(ctx)
 			if err != nil {
 				text = "😅 У меня сейчас нет комплиментов, но ты всё равно чудесная!" // ПОМЕНЯТЬ
-			}
+			} // ПОМЕНЯТЬ
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
 			log.Printf("Бот ответил: %s", msg.Text)
 
