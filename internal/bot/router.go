@@ -36,12 +36,6 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 
 	log.Printf("Клиент %v написал: %v", username, text)
 
-	if text == "/start" {
-		_ = r.h.Store.SetUserState(context.Background(), userID, "")
-		r.h.Start(msg)
-		return
-	}
-
 	state, err := r.h.Store.GetUserState(context.Background(), userID)
 	if err != nil {
 		log.Printf("Ошибка при получении состояния: %v", err)
@@ -49,22 +43,30 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 		return
 	}
 
-	if state == "awaiting_partner" {
+	if state == "awaiting_partner" && !strings.HasPrefix(text, "/") {
 		r.h.ProcessPartnerUsername(msg)
 		return
 	}
 
 	switch {
+	case strings.HasPrefix(text, "/start"):
+		_ = r.h.Store.SetUserState(context.Background(), userID, "")
+		r.h.Start(msg)
+		return
 	case strings.HasPrefix(text, "/setpartner"):
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.SetPartner(msg)
+		return
 	case strings.HasPrefix(text, "/delete"):
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.DeleteAccount(msg)
+		return
 	case strings.HasPrefix(text, "/compliment"):
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.Compliment(msg)
+		return
 	default:
 		r.h.Reply(msg.Chat.ID, "Некорректный ввод")
+		return
 	}
 }
