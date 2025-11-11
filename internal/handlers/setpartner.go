@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -26,10 +27,10 @@ func (h *Handler) SetPartner(msg *tgbotapi.Message) {
 	}
 
 	if partnerUsername == "" {
-		h.Reply(msg.Chat.ID, "Отправь username своей половинки без @. \nP.S. Не забудь соблюдать регистр!")
+		h.Reply(msg.Chat.ID, "Отправь username своей половинки")
 	} else {
 		h.Reply(msg.Chat.ID, "Твой партнер - @"+partnerUsername+"\nЕсли хочешь изменить аккаунт партнёра, "+
-			"то отправь username своей половинки без @. \nP.S. Не забудь соблюдать регистр!")
+			"то отправь username своей половинки")
 	}
 }
 
@@ -38,6 +39,10 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	partnerUsername := msg.Text
 	userUsername := msg.From.UserName
+
+	if strings.HasPrefix(partnerUsername, "@") {
+		partnerUsername = partnerUsername[1:]
+	}
 
 	exists, err := h.Store.IsUserExistsByUsername(ctx, partnerUsername)
 	if err != nil {
@@ -57,9 +62,10 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 		h.Reply(msg.Chat.ID, "Ошибка при проверке партнёра 😔")
 		log.Printf("Ошибка при получении ID партнера: %v", err)
 	}
+	correctPartnerUsername, _ := h.Store.GetUsername(ctx, partnerID)
 
 	// Сохраняем связь user → partner
-	err = h.Store.SetPartner(ctx, userID, partnerUsername)
+	err = h.Store.SetPartner(ctx, userID, correctPartnerUsername)
 	if err != nil {
 		h.Reply(msg.Chat.ID, "Не удалось сохранить партнёра 😔")
 		log.Printf("Ошибка при попытке сохранения связи user → partner: %v", err)
@@ -77,5 +83,5 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 
 	_ = h.Store.SetUserState(ctx, userID, "")
 
-	h.Reply(msg.Chat.ID, fmt.Sprintf("Партнёр успешно добавлен! 💖 (@%s)", partnerUsername))
+	h.Reply(msg.Chat.ID, fmt.Sprintf("Партнёр успешно добавлен! 💖 (@%s)", correctPartnerUsername))
 }
