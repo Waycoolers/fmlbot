@@ -18,7 +18,19 @@ func (h *Handler) SetPartner(msg *tgbotapi.Message) {
 		return
 	}
 
-	h.Reply(msg.Chat.ID, "Отправь username своей половинки без @. \nP.S. Не забудь соблюдать регистр!")
+	partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
+	if err != nil {
+		h.Reply(msg.Chat.ID, "Ошибка при получении информации о партнёре 😔")
+		log.Printf("Ошибка при получении информации о партнёре: %v", err)
+		return
+	}
+
+	if partnerUsername == "" {
+		h.Reply(msg.Chat.ID, "Отправь username своей половинки без @. \nP.S. Не забудь соблюдать регистр!")
+	} else {
+		h.Reply(msg.Chat.ID, "Твой партнер - @"+partnerUsername+"\nЕсли хочешь изменить аккаунт партнёра, "+
+			"то отправь username своей половинки без @. \nP.S. Не забудь соблюдать регистр!")
+	}
 }
 
 func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {

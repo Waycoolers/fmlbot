@@ -30,20 +30,26 @@ func New(cfg *config.Config, store *storage.Storage) (*Bot, error) {
 func (b *Bot) Run() {
 	log.Printf("Бот %s запущен", b.api.Self.UserName)
 
+	for {
+		updates, err := b.api.GetUpdates(tgbotapi.UpdateConfig{
+			Offset:  0,
+			Limit:   100,
+			Timeout: 0,
+		})
+		if err != nil || len(updates) == 0 {
+			break
+		}
+
+		lastUpdateID := updates[len(updates)-1].UpdateID
+		_, err = b.api.GetUpdates(tgbotapi.UpdateConfig{Offset: lastUpdateID + 1})
+		if err != nil {
+			log.Printf("Ошибка при запуске бота: %v", err)
+		}
+	}
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates := b.api.GetUpdatesChan(u)
-
-	go func() {
-		for {
-			select {
-			case <-updates:
-				// просто прогоняем все старые updates
-			default:
-				return
-			}
-		}
-	}()
 
 	for update := range updates {
 		if update.CallbackQuery != nil {

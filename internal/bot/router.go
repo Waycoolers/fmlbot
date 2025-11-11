@@ -36,6 +36,12 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 
 	log.Printf("Клиент %v написал: %v", username, text)
 
+	if text == "/start" {
+		_ = r.h.Store.SetUserState(context.Background(), userID, "")
+		r.h.Start(msg)
+		return
+	}
+
 	state, err := r.h.Store.GetUserState(context.Background(), userID)
 	if err != nil {
 		log.Printf("Ошибка при получении состояния: %v", err)
@@ -49,10 +55,6 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 	}
 
 	switch {
-	case strings.HasPrefix(text, "/start"):
-		_ = r.h.Store.SetUserState(context.Background(), userID, "")
-		r.h.Start(msg)
-		return
 	case strings.HasPrefix(text, "/setpartner"):
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.SetPartner(msg)
