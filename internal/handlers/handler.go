@@ -22,6 +22,6 @@ func (h *Handler) Reply(chatID int64, text string) {
 	_, err := h.api.Send(msg)
 	log.Printf("Бот ответил: %v", msg.Text)
 	if err != nil {
-		log.Fatalf("Ошибка при отправке ответа: %v", err)
+		log.Printf("Ошибка при отправке ответа: %v", err)
 	}
 }

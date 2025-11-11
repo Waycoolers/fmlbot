@@ -80,6 +80,23 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 		}
 	}
 
+	userPartnerExists, err := h.Store.GetPartnerUsername(ctx, userID)
+	if err != nil {
+		h.Reply(msg.Chat.ID, "Ошибка при проверке партнёра 😔")
+		log.Printf("Ошибка при проверке на существование партнёра: %v", err)
+	}
+
+	if userPartnerExists != "" {
+		userPartnerID, err := h.Store.GetUserIDByUsername(ctx, userPartnerExists)
+		if err != nil {
+			h.Reply(msg.Chat.ID, "Ошибка при проверке партнёра 😔")
+			log.Printf("Ошибка при получении ID партнёра: %v", err)
+		}
+
+		err = h.Store.SetPartner(ctx, userPartnerID, "")
+		h.Reply(userPartnerID, "Твой партнёр добавил другого партнёра 💔")
+	}
+
 	// Сохраняем связь user → partner
 	err = h.Store.SetPartner(ctx, userID, correctPartnerUsername)
 	if err != nil {
