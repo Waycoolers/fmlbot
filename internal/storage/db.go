@@ -23,16 +23,16 @@ func New(cfg *config.DatabaseConfig) (*Storage, error) {
 		cfg.Name,
 	)
 
-	dbpool, err := pgxpool.New(context.Background(), dsn)
+	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
 		return nil, err
 	}
 
 	// Проверим подключение
-	if err := dbpool.Ping(context.Background()); err != nil {
+	if err := pool.Ping(context.Background()); err != nil {
 		return nil, err
 	}
 
 	log.Println("БД успешно подключена")
-	return &Storage{DB: dbpool}, nil
+	return &Storage{DB: pool}, nil
 }
