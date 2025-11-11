@@ -73,7 +73,7 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 		log.Printf("Ошибка при попытке сохранения связи partner → user: %v", err)
 		return
 	}
-	h.Reply(partnerID, "💞 Ура! Теперь вы и @"+partnerUsername+" — официально пара в боте 💌")
+	h.Reply(partnerID, "💞 Ура! Теперь вы и @"+userUsername+" — официально пара в боте 💌")
 
 	_ = h.Store.SetUserState(ctx, userID, "")
 
