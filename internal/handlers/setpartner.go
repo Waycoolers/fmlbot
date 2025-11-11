@@ -53,7 +53,6 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 
 	if !exists {
 		h.Reply(msg.Chat.ID, "Партнёр не найден. Попросите его сначала написать боту /start 😅")
-		log.Printf("Ошибка. Партнёр не найден: %v", err)
 		return
 	}
 
@@ -63,6 +62,23 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 		log.Printf("Ошибка при получении ID партнера: %v", err)
 	}
 	correctPartnerUsername, _ := h.Store.GetUsername(ctx, partnerID)
+
+	partnerExists, err := h.Store.GetPartnerUsername(ctx, partnerID)
+	if err != nil {
+		h.Reply(msg.Chat.ID, "Ошибка при проверке партнёра 😔")
+		log.Printf("Ошибка при проверке на существование партнёра: %v", err)
+	}
+
+	if partnerExists != "" {
+		if partnerExists == userUsername {
+			h.Reply(msg.Chat.ID, "@"+correctPartnerUsername+" и так ваш партнёр. Приятного времяпрепровождения!")
+			_ = h.Store.SetUserState(context.Background(), userID, "")
+			return
+		} else {
+			h.Reply(msg.Chat.ID, "У данного пользователя уже есть партнёр 😔")
+			return
+		}
+	}
 
 	// Сохраняем связь user → partner
 	err = h.Store.SetPartner(ctx, userID, correctPartnerUsername)
