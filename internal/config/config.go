@@ -28,16 +28,14 @@ func Load() (*Config, error) {
 		return nil, errors.New("не найден TELEGRAM_BOT_TOKEN")
 	}
 
-	db := DatabaseConfig{
-		Host:     os.Getenv("DB_HOST"),
-		Port:     os.Getenv("DB_PORT"),
-		User:     os.Getenv("DB_USER"),
-		Password: os.Getenv("DB_PASSWORD"),
-		Name:     os.Getenv("DB_NAME"),
-	}
-
 	return &Config{
 		Token: token,
-		DB:    db,
+		DB: DatabaseConfig{
+			Host:     os.Getenv("DB_HOST"),
+			Port:     os.Getenv("DB_PORT"),
+			User:     os.Getenv("DB_USER"),
+			Password: os.Getenv("DB_PASSWORD"),
+			Name:     os.Getenv("DB_NAME"),
+		},
 	}, nil
 }
