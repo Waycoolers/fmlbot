@@ -15,7 +15,7 @@ func (s *Storage) AddUser(ctx context.Context, telegramID int64, username string
 
 func (s *Storage) GetUserIDByUsername(ctx context.Context, username string) (int64, error) {
 	var id int64
-	err := s.DB.QueryRow(ctx, `SELECT telegram_id FROM users WHERE username=$1`, username).Scan(&id)
+	err := s.DB.QueryRow(ctx, `SELECT telegram_id FROM users WHERE LOWER(username)=LOWER($1)`, username).Scan(&id)
 	return id, err
 }
 
@@ -27,7 +27,7 @@ func (s *Storage) IsUserExists(ctx context.Context, userID int64) (bool, error) 
 
 func (s *Storage) IsUserExistsByUsername(ctx context.Context, username string) (bool, error) {
 	var exists bool
-	err := s.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE username=$1)`, username).Scan(&exists)
+	err := s.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(username)=LOWER($1))`, username).Scan(&exists)
 	return exists, err
 }
 
