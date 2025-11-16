@@ -113,6 +113,7 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 		return
 	}
 	h.Reply(partnerID, "💞 Ура! Теперь вы и @"+userUsername+" — официально пара в боте 💌")
+	_ = h.Store.SetUserState(context.Background(), partnerID, "")
 
 	_ = h.Store.SetUserState(ctx, userID, "")
 
