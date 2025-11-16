@@ -27,10 +27,10 @@ func (h *Handler) SetPartner(msg *tgbotapi.Message) {
 	}
 
 	if partnerUsername == "" {
-		h.Reply(msg.Chat.ID, "Отправь username своей половинки")
+		h.Reply(msg.Chat.ID, "Отправь username своей половинки\n(Пропиши /cancel чтобы отменить это действие)")
 	} else {
 		h.Reply(msg.Chat.ID, "Твой партнер - @"+partnerUsername+"\nЕсли хочешь изменить аккаунт партнёра, "+
-			"то отправь username своей половинки")
+			"то отправь username своей половинки\n(Пропиши /cancel чтобы отменить это действие)")
 	}
 }
 
