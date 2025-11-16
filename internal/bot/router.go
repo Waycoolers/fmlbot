@@ -59,6 +59,9 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.SetPartner(msg)
 		return
+	case strings.HasPrefix(text, "/cancel"):
+		r.h.Cancel(msg)
+		return
 	case strings.HasPrefix(text, "/delete"):
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.DeleteAccount(msg)
@@ -68,7 +71,7 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 		r.h.Compliment(msg)
 		return
 	default:
-		r.h.Reply(msg.Chat.ID, "Некорректный ввод")
+		r.h.Reply(msg.Chat.ID, "Я не знаю такую команду")
 		return
 	}
 }
