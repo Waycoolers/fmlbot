@@ -12,7 +12,7 @@ func (s *Storage) CanSendCompliment(ctx context.Context, userID int64, limit int
 	FROM compliment_history
 	WHERE user_id = $1 AND created_at >= current_date
 	`
-	err := s.DB.QueryRow(ctx, query, userID).Scan(&count)
+	err := s.DB.QueryRowContext(ctx, query, userID).Scan(&count)
 	if err != nil {
 		return false, err
 	}
@@ -24,7 +24,7 @@ func (s *Storage) RecordCompliment(ctx context.Context, userID int64, compliment
 	INSERT INTO compliment_history (user_id, compliment_id)
 	VALUES ($1, $2)
 	`
-	_, err := s.DB.Exec(ctx, query, userID, complimentID)
+	_, err := s.DB.ExecContext(ctx, query, userID, complimentID)
 	return err
 }
 
@@ -46,7 +46,7 @@ func (s *Storage) GetNextCompliment(ctx context.Context) (int, string, error) {
 	var id int
 	var text string
 
-	err := s.DB.QueryRow(ctx, query).Scan(&id, &text)
+	err := s.DB.QueryRowContext(ctx, query).Scan(&id, &text)
 	if err != nil {
 		log.Fatalf("Ошибка при получении комплимента: %v", err)
 	}
