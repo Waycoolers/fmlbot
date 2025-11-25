@@ -6,6 +6,7 @@ import (
 	"github.com/Waycoolers/fmlbot/internal/bot"
 	"github.com/Waycoolers/fmlbot/internal/config"
 	"github.com/Waycoolers/fmlbot/internal/storage"
+	"github.com/jmoiron/sqlx"
 )
 
 func main() {
@@ -18,7 +19,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("Ошибка подключения к БД: %v", err)
 	}
-	defer store.DB.Close()
+	defer func(DB *sqlx.DB) {
+		err := DB.Close()
+		if err != nil {
+			log.Printf("Ошибка при закрытии подключения к БД: %v", err)
+		}
+	}(store.DB)
+
+	err = store.Migrate()
+	if err != nil {
+		log.Fatalf("Ошибка при запуске миграций: %v", err)
+	}
 
 	b, err := bot.New(cfg, store)
 	if err != nil {

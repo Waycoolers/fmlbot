@@ -1,21 +1,20 @@
 package storage
 
 import (
-	"context"
 	"fmt"
 	"log"
 
 	"github.com/Waycoolers/fmlbot/internal/config"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 type Storage struct {
-	DB *pgxpool.Pool
+	DB *sqlx.DB
 }
 
 func New(cfg *config.DatabaseConfig) (*Storage, error) {
 	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s",
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		cfg.User,
 		cfg.Password,
 		cfg.Host,
@@ -23,16 +22,15 @@ func New(cfg *config.DatabaseConfig) (*Storage, error) {
 		cfg.Name,
 	)
 
-	pool, err := pgxpool.New(context.Background(), dsn)
+	db, err := sqlx.Connect("postgres", dsn)
 	if err != nil {
-		return nil, err
+		log.Fatalf("Ошибка подключения к БД: %v", err)
 	}
 
-	// Проверим подключение
-	if err := pool.Ping(context.Background()); err != nil {
-		return nil, err
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Ошибка пинга в БД: %v", err)
 	}
 
 	log.Println("БД успешно подключена")
-	return &Storage{DB: pool}, nil
+	return &Storage{DB: db}, nil
 }
