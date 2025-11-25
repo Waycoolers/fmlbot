@@ -56,7 +56,7 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 	}
 
 	switch {
-	case strings.HasPrefix(text, string(models.Setpartner)):
+	case strings.HasPrefix(text, string(models.SetPartner)):
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.SetPartner(msg)
 		return
