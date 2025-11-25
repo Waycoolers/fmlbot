@@ -18,10 +18,10 @@ func New(api *tgbotapi.BotAPI, store *storage.Storage) *Handler {
 
 func (h *Handler) Reply(chatID int64, text string) {
 	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ParseMode = "Markdown"
+	msg.ParseMode = "HTML"
 	_, err := h.api.Send(msg)
-	log.Printf("Бот ответил: %v", msg.Text)
 	if err != nil {
 		log.Printf("Ошибка при отправке ответа: %v", err)
 	}
+	log.Printf("Бот ответил: %v", msg.Text)
 }
