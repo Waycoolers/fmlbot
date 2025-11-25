@@ -47,6 +47,7 @@ func (h *Handler) HandleDeleteCallback(cb *tgbotapi.CallbackQuery) error {
 
 		if partnerUsername != "" {
 			partnerID, err := h.Store.GetUserIDByUsername(ctx, partnerUsername)
+			_ = h.Store.SetPartner(ctx, partnerID, "")
 			if err == nil {
 				h.Reply(partnerID, "Твой партнёр удалил свой аккаунт 💔")
 			}
