@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Waycoolers/fmlbot/internal/handlers"
+	"github.com/Waycoolers/fmlbot/internal/models"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -36,7 +37,7 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 
 	log.Printf("Клиент %v написал: %v", username, text)
 
-	if text == "/start" {
+	if text == string(models.Start) {
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.Start(msg)
 		return
@@ -55,18 +56,18 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 	}
 
 	switch {
-	case strings.HasPrefix(text, "/setpartner"):
+	case strings.HasPrefix(text, string(models.Setpartner)):
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.SetPartner(msg)
 		return
-	case strings.HasPrefix(text, "/cancel"):
+	case strings.HasPrefix(text, string(models.Cancel)):
 		r.h.Cancel(msg)
 		return
-	case strings.HasPrefix(text, "/delete"):
+	case strings.HasPrefix(text, string(models.Delete)):
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.DeleteAccount(msg)
 		return
-	case strings.HasPrefix(text, "/compliment"):
+	case strings.HasPrefix(text, string(models.AddCompliment)):
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.Compliment(msg)
 		return
