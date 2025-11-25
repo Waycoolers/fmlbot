@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/Waycoolers/fmlbot/internal/models"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -26,7 +27,7 @@ func (h *Handler) Start(msg *tgbotapi.Message) {
 			log.Printf("Ошибка при регистрации: %v", err)
 			return
 		}
-		h.Reply(msg.Chat.ID, "Привет! 💖 Ты зарегистрирован в fmlbot. Добавь партнёра с помощью /setpartner \n"+
+		h.Reply(msg.Chat.ID, "Привет! 💖 Ты зарегистрирован в fmlbot. Добавь партнёра с помощью "+string(models.Setpartner)+"\n"+
 			"(Не забудь, что партнер должен тоже зарегистрироваться в боте)")
 	} else {
 		partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
@@ -36,7 +37,7 @@ func (h *Handler) Start(msg *tgbotapi.Message) {
 		}
 
 		if partnerUsername == "" {
-			h.Reply(msg.Chat.ID, "Ты уже зарегистрирован! Используй /setpartner, чтобы добавить партнёра 💌")
+			h.Reply(msg.Chat.ID, "Ты уже зарегистрирован! Используй "+string(models.Setpartner)+", чтобы добавить партнёра 💌")
 		} else {
 			text := "Ты уже зарегистрирован! Твой партнер - @" + partnerUsername
 			h.Reply(msg.Chat.ID, text)
