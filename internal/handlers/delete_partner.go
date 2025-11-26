@@ -8,11 +8,16 @@ import (
 )
 
 func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
+	userID := msg.From.ID
 	chatID := msg.Chat.ID
-	partnerUsername, err := h.Store.GetPartnerUsername(context.Background(), chatID)
+	partnerUsername, err := h.Store.GetPartnerUsername(context.Background(), userID)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при получении юзернейма партнера")
+		h.handleErr(chatID, "Ошибка при получении юзернейма партнера", err)
+		return
+	}
+
+	if partnerUsername == "" {
+		h.Reply(userID, "У тебя ещё не добавлен партнер")
 		return
 	}
 
@@ -28,8 +33,7 @@ func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
 
 	_, err = h.api.Send(message)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при отправке подтверждения: %v", err)
+		h.handleErr(chatID, "Ошибка при отправке подтверждения", err)
 		return
 	}
 	log.Printf("Бот ответил: %v", message.Text)
@@ -37,50 +41,37 @@ func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
 
 func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error {
 	userID := cb.From.ID
+	chatID := cb.Message.Chat.ID
 
 	switch cb.Data {
 	case "delete_partner_confirm":
 		ctx := context.Background()
 		partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
 		if err != nil {
-			h.Reply(userID, "Произошла ошибка 😔")
-			log.Printf("Ошибка при попытке получить username партнера: %v", err)
+			h.handleErr(chatID, "Ошибка при попытке получить username партнера", err)
 			break
 		}
 
-		if partnerUsername == "" {
-			h.Reply(userID, "У тебя ещё не добавлен партнер")
-			break
-		}
 		partnerID, _ := h.Store.GetUserIDByUsername(ctx, partnerUsername)
 
-		err = h.Store.SetPartner(ctx, userID, "")
+		err = h.Store.SetPartners(ctx, userID, partnerID, "", "")
 		if err != nil {
-			h.Reply(userID, "Произошла ошибка 😔")
-			log.Printf("Ошибка при удалении партнера у юзера: %v", err)
+			h.handleErr(chatID, "Ошибка при удалении партнеров", err)
 			break
 		}
 
-		err = h.Store.SetPartner(ctx, partnerID, "")
-		if err != nil {
-			h.Reply(userID, "Произошла ошибка 😔")
-			log.Printf("Ошибка при удалении партнера у партнера: %v", err)
-			_ = h.Store.SetPartner(ctx, userID, partnerUsername)
-			break
-		}
-
-		h.Reply(userID, "Партнёр успешно удалён 💔")
+		h.Reply(chatID, "Партнёр успешно удалён 💔")
 		h.Reply(partnerID, "Твой партнёр отписался от тебя 💔")
 
 	case "delete_partner_cancel":
-		h.Reply(userID, "Удаление партнёра отменено ✅")
+		h.Reply(chatID, "Удаление партнёра отменено ✅")
 	}
 
 	emptyMarkup := tgbotapi.InlineKeyboardMarkup{
 		InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{},
 	}
 
-	edit := tgbotapi.NewEditMessageReplyMarkup(userID, cb.Message.MessageID, emptyMarkup)
+	edit := tgbotapi.NewEditMessageReplyMarkup(chatID, cb.Message.MessageID, emptyMarkup)
 	_, err := h.api.Request(edit)
 	if err != nil {
 		log.Printf("Ошибка при убирании кнопок: %v", err)

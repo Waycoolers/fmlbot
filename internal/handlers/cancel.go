@@ -2,18 +2,17 @@ package handlers
 
 import (
 	"context"
-	"log"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (h *Handler) Cancel(msg *tgbotapi.Message) {
 	ctx := context.Background()
-	userID := msg.Chat.ID
+	userID := msg.From.ID
+	chatID := msg.Chat.ID
 	userState, err := h.Store.GetUserState(ctx, userID)
 	if err != nil {
-		h.Reply(userID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при получении состояния пользователя: %v", err)
+		h.handleErr(chatID, "Ошибка при получении состояния пользователя", err)
 		return
 	}
 
@@ -23,9 +22,8 @@ func (h *Handler) Cancel(msg *tgbotapi.Message) {
 
 	err = h.Store.SetUserState(ctx, userID, "")
 	if err != nil {
-		h.Reply(userID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при сбросе состояния пользователя: %v", err)
+		h.handleErr(chatID, "Ошибка при сбросе состояния пользователя", err)
 		return
 	}
-	h.Reply(msg.Chat.ID, "Действие отменено")
+	h.Reply(chatID, "Действие отменено")
 }

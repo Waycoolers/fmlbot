@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/Waycoolers/fmlbot/internal/models"
@@ -13,25 +12,24 @@ import (
 func (h *Handler) SetPartner(msg *tgbotapi.Message) {
 	ctx := context.Background()
 	userID := msg.From.ID
+	chatID := msg.Chat.ID
 
 	err := h.Store.SetUserState(ctx, userID, "awaiting_partner")
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при установке состояния awaiting_partner: %v", err)
+		h.handleErr(chatID, "Ошибка при установке состояния awaiting_partner", err)
 		return
 	}
 
 	partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при получении информации о партнёре: %v", err)
+		h.handleErr(chatID, "Ошибка при получении информации о партнёре", err)
 		return
 	}
 
 	if partnerUsername == "" {
-		h.Reply(msg.Chat.ID, "Отправь username своей половинки\n(Напиши "+string(models.Cancel)+" чтобы отменить это действие)")
+		h.Reply(chatID, "Отправь username своей половинки\n(Напиши "+string(models.Cancel)+" чтобы отменить это действие)")
 	} else {
-		h.Reply(msg.Chat.ID, "Твой партнер - @"+partnerUsername+"\nЕсли хочешь изменить аккаунт партнёра, "+
+		h.Reply(chatID, "Твой партнер - @"+partnerUsername+"\nЕсли хочешь изменить аккаунт партнёра, "+
 			"то отправь username своей половинки\n(Напиши "+string(models.Cancel)+" чтобы отменить это действие)")
 	}
 }
@@ -39,6 +37,7 @@ func (h *Handler) SetPartner(msg *tgbotapi.Message) {
 func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 	ctx := context.Background()
 	userID := msg.From.ID
+	chatID := msg.Chat.ID
 	partnerUsername := msg.Text
 	userUsername := msg.From.UserName
 
@@ -48,89 +47,89 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 
 	exists, err := h.Store.IsUserExistsByUsername(ctx, partnerUsername)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при проверке партнёра: %v", err)
+		h.handleErr(chatID, "Ошибка при проверке партнёра", err)
+		return
+	}
+
+	if strings.ToLower(partnerUsername) == strings.ToLower(userUsername) {
+		h.Reply(chatID, "Ты не можешь добавить самого себя 😅")
 		return
 	}
 
 	if !exists {
-		h.Reply(msg.Chat.ID, "Партнёр не найден. Попросите его сначала написать боту "+string(models.Start)+" 😅"+
+		h.Reply(chatID, "Партнёр не найден. Попроси его сначала написать боту "+string(models.Start)+" 😅"+
 			"\n(Напиши "+string(models.Cancel)+" чтобы отменить это действие)")
 		return
 	}
 
 	partnerID, err := h.Store.GetUserIDByUsername(ctx, partnerUsername)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при получении ID партнера: %v", err)
+		h.handleErr(chatID, "Ошибка при получении ID партнера", err)
 		return
 	}
 	correctPartnerUsername, _ := h.Store.GetUsername(ctx, partnerID)
 
 	partnerExists, err := h.Store.GetPartnerUsername(ctx, partnerID)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при проверке на существование партнёра: %v", err)
+		h.handleErr(chatID, "Ошибка при проверке на существование партнёра", err)
 		return
 	}
 
 	if partnerExists != "" {
 		if partnerExists == userUsername {
-			h.Reply(msg.Chat.ID, "@"+correctPartnerUsername+" и так ваш партнёр. Приятного времяпрепровождения!")
-			_ = h.Store.SetUserState(context.Background(), userID, "")
+			h.Reply(chatID, "@"+correctPartnerUsername+" и так ваш партнёр. Приятного времяпрепровождения!")
+			err = h.Store.SetUserState(ctx, userID, "")
+			if err != nil {
+				h.handleErr(chatID, "Ошибка при сбросе состояния", err)
+				return
+			}
 			return
 		} else {
-			h.Reply(msg.Chat.ID, "У данного пользователя уже есть партнёр 😔")
+			h.Reply(chatID, "У данного пользователя уже есть партнёр 😔")
+			err = h.Store.SetUserState(ctx, userID, "")
+			if err != nil {
+				h.handleErr(chatID, "Ошибка при сбросе состояния", err)
+				return
+			}
 			return
 		}
 	}
 
 	userPartnerExists, err := h.Store.GetPartnerUsername(ctx, userID)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при проверке на существование партнёра: %v", err)
+		h.handleErr(chatID, "Ошибка при проверке на существование партнёра", err)
 		return
 	}
 
 	if userPartnerExists != "" {
-		userPartnerID, err := h.Store.GetUserIDByUsername(ctx, userPartnerExists)
-		if err != nil {
-			h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-			log.Printf("Ошибка при получении ID партнёра: %v", err)
+		userPartnerID, er := h.Store.GetUserIDByUsername(ctx, userPartnerExists)
+		if er != nil {
+			h.handleErr(chatID, "Ошибка при получении ID партнёра", er)
 			return
 		}
 
-		err = h.Store.SetPartner(ctx, userPartnerID, "")
+		er = h.Store.SetPartner(ctx, userPartnerID, "")
 		h.Reply(userPartnerID, "Твой партнёр добавил другого партнёра 💔")
 	}
 
-	previousPartnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
+	err = h.Store.SetUserState(ctx, partnerID, "")
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при получении юзернейма предыдущего партнера: %v", err)
+		h.handleErr(chatID, "Ошибка при сбросе состояния", err)
 		return
 	}
 
-	// Сохраняем связь user → partner
-	err = h.Store.SetPartner(ctx, userID, correctPartnerUsername)
+	err = h.Store.SetUserState(ctx, userID, "")
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при попытке сохранения связи user → partner: %v", err)
+		h.handleErr(chatID, "Ошибка при сбросе состояния", err)
 		return
 	}
 
-	// Сохраняем связь partner → user
-	err = h.Store.SetPartner(ctx, partnerID, userUsername)
+	err = h.Store.SetPartners(ctx, userID, partnerID, userUsername, correctPartnerUsername)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при попытке сохранения связи partner → user: %v", err)
-		_ = h.Store.SetPartner(ctx, userID, previousPartnerUsername)
+		h.handleErr(chatID, "Ошибка при связи партнеров", err)
 		return
 	}
+
 	h.Reply(partnerID, "💞 Ура! Теперь вы и @"+userUsername+" — официально пара в боте 💌")
-	_ = h.Store.SetUserState(context.Background(), partnerID, "")
-
-	_ = h.Store.SetUserState(ctx, userID, "")
-
-	h.Reply(msg.Chat.ID, fmt.Sprintf("Партнёр успешно добавлен! 💖 (@%s)", correctPartnerUsername))
+	h.Reply(chatID, fmt.Sprintf("Партнёр успешно добавлен! 💖 (@%s)", correctPartnerUsername))
 }

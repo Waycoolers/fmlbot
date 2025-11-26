@@ -36,20 +36,21 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 		return
 	}
 
+	ctx := context.Background()
 	msg := update.Message
 	text := msg.Text
 	userID := msg.From.ID
-	username, _ := r.h.Store.GetUsername(context.Background(), userID)
+	username, _ := r.h.Store.GetUsername(ctx, userID)
 
 	log.Printf("Клиент %v написал: %v", username, text)
 
 	if text == string(models.Start) {
-		_ = r.h.Store.SetUserState(context.Background(), userID, "")
+		_ = r.h.Store.SetUserState(ctx, userID, "")
 		r.h.Start(msg)
 		return
 	}
 
-	state, err := r.h.Store.GetUserState(context.Background(), userID)
+	state, err := r.h.Store.GetUserState(ctx, userID)
 	if err != nil {
 		log.Printf("Ошибка при получении состояния: %v", err)
 		r.h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
@@ -63,23 +64,22 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 
 	switch {
 	case strings.HasPrefix(text, string(models.SetPartner)):
-		_ = r.h.Store.SetUserState(context.Background(), userID, "")
+		_ = r.h.Store.SetUserState(ctx, userID, "")
 		r.h.SetPartner(msg)
 		return
 	case strings.HasPrefix(text, string(models.DeletePartner)):
-		_ = r.h.Store.SetUserState(context.Background(), userID, "")
+		_ = r.h.Store.SetUserState(ctx, userID, "")
 		r.h.DeletePartner(msg)
 		return
 	case strings.HasPrefix(text, string(models.Cancel)):
 		r.h.Cancel(msg)
 		return
 	case strings.HasPrefix(text, string(models.Delete)):
-		_ = r.h.Store.SetUserState(context.Background(), userID, "")
+		_ = r.h.Store.SetUserState(ctx, userID, "")
 		r.h.DeleteAccount(msg)
 		return
 	case strings.HasPrefix(text, string(models.AddCompliment)):
-		_ = r.h.Store.SetUserState(context.Background(), userID, "")
-		r.h.Compliment(msg)
+		_ = r.h.Store.SetUserState(ctx, userID, "")
 		return
 	default:
 		r.h.Reply(msg.Chat.ID, "Я не знаю такую команду")
