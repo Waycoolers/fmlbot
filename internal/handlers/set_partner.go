@@ -16,13 +16,14 @@ func (h *Handler) SetPartner(msg *tgbotapi.Message) {
 
 	err := h.Store.SetUserState(ctx, userID, "awaiting_partner")
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Ошибка при установке состояния")
+		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
+		log.Printf("Ошибка при установке состояния awaiting_partner: %v", err)
 		return
 	}
 
 	partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Ошибка при получении информации о партнёре 😔")
+		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
 		log.Printf("Ошибка при получении информации о партнёре: %v", err)
 		return
 	}
@@ -47,7 +48,7 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 
 	exists, err := h.Store.IsUserExistsByUsername(ctx, partnerUsername)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Ошибка при проверке партнёра 😔")
+		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
 		log.Printf("Ошибка при проверке партнёра: %v", err)
 		return
 	}
@@ -60,15 +61,17 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 
 	partnerID, err := h.Store.GetUserIDByUsername(ctx, partnerUsername)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Ошибка при проверке партнёра 😔")
+		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
 		log.Printf("Ошибка при получении ID партнера: %v", err)
+		return
 	}
 	correctPartnerUsername, _ := h.Store.GetUsername(ctx, partnerID)
 
 	partnerExists, err := h.Store.GetPartnerUsername(ctx, partnerID)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Ошибка при проверке партнёра 😔")
+		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
 		log.Printf("Ошибка при проверке на существование партнёра: %v", err)
+		return
 	}
 
 	if partnerExists != "" {
@@ -84,25 +87,34 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 
 	userPartnerExists, err := h.Store.GetPartnerUsername(ctx, userID)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Ошибка при проверке партнёра 😔")
+		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
 		log.Printf("Ошибка при проверке на существование партнёра: %v", err)
+		return
 	}
 
 	if userPartnerExists != "" {
 		userPartnerID, err := h.Store.GetUserIDByUsername(ctx, userPartnerExists)
 		if err != nil {
-			h.Reply(msg.Chat.ID, "Ошибка при проверке партнёра 😔")
+			h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
 			log.Printf("Ошибка при получении ID партнёра: %v", err)
+			return
 		}
 
 		err = h.Store.SetPartner(ctx, userPartnerID, "")
 		h.Reply(userPartnerID, "Твой партнёр добавил другого партнёра 💔")
 	}
 
+	previousPartnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
+	if err != nil {
+		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
+		log.Printf("Ошибка при получении юзернейма предыдущего партнера: %v", err)
+		return
+	}
+
 	// Сохраняем связь user → partner
 	err = h.Store.SetPartner(ctx, userID, correctPartnerUsername)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Не удалось сохранить партнёра 😔")
+		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
 		log.Printf("Ошибка при попытке сохранения связи user → partner: %v", err)
 		return
 	}
@@ -110,8 +122,9 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 	// Сохраняем связь partner → user
 	err = h.Store.SetPartner(ctx, partnerID, userUsername)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Не удалось сохранить партнёра 😔")
+		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
 		log.Printf("Ошибка при попытке сохранения связи partner → user: %v", err)
+		_ = h.Store.SetPartner(ctx, userID, previousPartnerUsername)
 		return
 	}
 	h.Reply(partnerID, "💞 Ура! Теперь вы и @"+userUsername+" — официально пара в боте 💌")

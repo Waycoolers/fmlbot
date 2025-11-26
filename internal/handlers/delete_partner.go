@@ -9,6 +9,12 @@ import (
 
 func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
+	partnerUsername, err := h.Store.GetPartnerUsername(context.Background(), chatID)
+	if err != nil {
+		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
+		log.Printf("Ошибка при получении юзернейма партнера")
+		return
+	}
 
 	buttons := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -17,12 +23,14 @@ func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
 		),
 	)
 
-	message := tgbotapi.NewMessage(chatID, "Вы уверены, что хотите удалить партнёра?")
+	message := tgbotapi.NewMessage(chatID, "Вы уверены, что хотите удалить партнёра @"+partnerUsername+"?")
 	message.ReplyMarkup = buttons
 
-	_, err := h.api.Send(message)
+	_, err = h.api.Send(message)
 	if err != nil {
+		h.Reply(msg.Chat.ID, "Произошла ошибка 😔")
 		log.Printf("Ошибка при отправке подтверждения: %v", err)
+		return
 	}
 	log.Printf("Бот ответил: %v", message.Text)
 }
@@ -35,7 +43,9 @@ func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error 
 		ctx := context.Background()
 		partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
 		if err != nil {
+			h.Reply(userID, "Произошла ошибка 😔")
 			log.Printf("Ошибка при попытке получить username партнера: %v", err)
+			break
 		}
 
 		if partnerUsername == "" {
@@ -46,12 +56,17 @@ func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error 
 
 		err = h.Store.SetPartner(ctx, userID, "")
 		if err != nil {
+			h.Reply(userID, "Произошла ошибка 😔")
 			log.Printf("Ошибка при удалении партнера у юзера: %v", err)
+			break
 		}
 
 		err = h.Store.SetPartner(ctx, partnerID, "")
 		if err != nil {
+			h.Reply(userID, "Произошла ошибка 😔")
 			log.Printf("Ошибка при удалении партнера у партнера: %v", err)
+			_ = h.Store.SetPartner(ctx, userID, partnerUsername)
+			break
 		}
 
 		h.Reply(userID, "Партнёр успешно удалён 💔")

@@ -22,7 +22,9 @@ func (h *Handler) DeleteAccount(msg *tgbotapi.Message) {
 
 	_, err := h.api.Send(message)
 	if err != nil {
+		h.Reply(chatID, "Произошла ошибка 😔")
 		log.Printf("Ошибка при отправке подтверждения: %v", err)
+		return
 	}
 	log.Printf("Бот ответил: %v", message.Text)
 }
@@ -38,7 +40,9 @@ func (h *Handler) HandleDeleteCallback(cb *tgbotapi.CallbackQuery) error {
 		partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
 		log.Print(partnerUsername)
 		if err != nil {
+			h.Reply(userID, "Произошла ошибка 😔")
 			log.Printf("Ошибка при попытке получить username партнера: %v", err)
+			break
 		}
 
 		_ = h.Store.ClearPartnerReferences(ctx, userID)
