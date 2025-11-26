@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 
+	"github.com/Waycoolers/fmlbot/internal/models"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -16,11 +17,11 @@ func (h *Handler) Cancel(msg *tgbotapi.Message) {
 		return
 	}
 
-	if userState == "" {
+	if userState == models.Empty {
 		return
 	}
 
-	err = h.Store.SetUserState(ctx, userID, "")
+	err = h.Store.SetUserState(ctx, userID, models.Empty)
 	if err != nil {
 		h.handleErr(chatID, "Ошибка при сбросе состояния пользователя", err)
 		return

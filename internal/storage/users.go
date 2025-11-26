@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"log"
+
+	"github.com/Waycoolers/fmlbot/internal/models"
 )
 
 func (s *Storage) AddUser(ctx context.Context, telegramID int64, username string) error {
@@ -60,15 +62,15 @@ func (s *Storage) GetPartnerUsername(ctx context.Context, userID int64) (string,
 	return partner, nil
 }
 
-func (s *Storage) SetUserState(ctx context.Context, userID int64, state string) error {
+func (s *Storage) SetUserState(ctx context.Context, userID int64, state models.State) error {
 	_, err := s.DB.ExecContext(ctx, `
 		UPDATE users SET state=$1 WHERE telegram_id=$2;
 	`, state, userID)
 	return err
 }
 
-func (s *Storage) GetUserState(ctx context.Context, userID int64) (string, error) {
-	var state string
+func (s *Storage) GetUserState(ctx context.Context, userID int64) (models.State, error) {
+	var state models.State
 	err := s.DB.QueryRowContext(ctx, `
 		SELECT state FROM users WHERE telegram_id=$1;
 	`, userID).Scan(&state)

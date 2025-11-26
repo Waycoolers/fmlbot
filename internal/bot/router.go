@@ -45,7 +45,7 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 	log.Printf("Клиент %v написал: %v", username, text)
 
 	if text == string(models.Start) {
-		_ = r.h.Store.SetUserState(ctx, userID, "")
+		_ = r.h.Store.SetUserState(ctx, userID, models.Empty)
 		r.h.Start(msg)
 		return
 	}
@@ -57,29 +57,29 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 		return
 	}
 
-	if state == "awaiting_partner" && !strings.HasPrefix(text, "/") {
+	if state == models.AwaitingPartner && !strings.HasPrefix(text, "/") {
 		r.h.ProcessPartnerUsername(msg)
 		return
 	}
 
 	switch {
 	case strings.HasPrefix(text, string(models.SetPartner)):
-		_ = r.h.Store.SetUserState(ctx, userID, "")
+		_ = r.h.Store.SetUserState(ctx, userID, models.Empty)
 		r.h.SetPartner(msg)
 		return
 	case strings.HasPrefix(text, string(models.DeletePartner)):
-		_ = r.h.Store.SetUserState(ctx, userID, "")
+		_ = r.h.Store.SetUserState(ctx, userID, models.Empty)
 		r.h.DeletePartner(msg)
 		return
 	case strings.HasPrefix(text, string(models.Cancel)):
 		r.h.Cancel(msg)
 		return
 	case strings.HasPrefix(text, string(models.Delete)):
-		_ = r.h.Store.SetUserState(ctx, userID, "")
+		_ = r.h.Store.SetUserState(ctx, userID, models.Empty)
 		r.h.DeleteAccount(msg)
 		return
 	case strings.HasPrefix(text, string(models.AddCompliment)):
-		_ = r.h.Store.SetUserState(ctx, userID, "")
+		_ = r.h.Store.SetUserState(ctx, userID, models.Empty)
 		return
 	default:
 		r.h.Reply(msg.Chat.ID, "Я не знаю такую команду")
