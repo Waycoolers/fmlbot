@@ -24,7 +24,13 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 		if data == "delete_confirm" || data == "delete_cancel" {
 			err := r.h.HandleDeleteCallback(update.CallbackQuery)
 			if err != nil {
-				log.Printf("Ошибка при обработке callback: %v", err)
+				log.Printf("Ошибка при обработке callback на удаление аккаунта: %v", err)
+			}
+		}
+		if data == "delete_partner_confirm" || data == "delete_partner_cancel" {
+			err := r.h.HandleDeletePartnerCallback(update.CallbackQuery)
+			if err != nil {
+				log.Printf("Ошибка при обработке callback на удаление партнера: %v", err)
 			}
 		}
 		return
@@ -59,6 +65,10 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 	case strings.HasPrefix(text, string(models.SetPartner)):
 		_ = r.h.Store.SetUserState(context.Background(), userID, "")
 		r.h.SetPartner(msg)
+		return
+	case strings.HasPrefix(text, string(models.DeletePartner)):
+		_ = r.h.Store.SetUserState(context.Background(), userID, "")
+		r.h.DeletePartner(msg)
 		return
 	case strings.HasPrefix(text, string(models.Cancel)):
 		r.h.Cancel(msg)
