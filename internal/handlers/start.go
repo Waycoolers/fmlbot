@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"log"
 
 	"github.com/Waycoolers/fmlbot/internal/models"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -11,37 +10,35 @@ import (
 func (h *Handler) Start(msg *tgbotapi.Message) {
 	ctx := context.Background()
 	userID := msg.From.ID
+	chatID := msg.Chat.ID
 	username := msg.From.UserName
 
 	exists, err := h.Store.IsUserExists(ctx, userID)
 	if err != nil {
-		h.Reply(userID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при проверке пользователя: %v", err)
+		h.handleErr(chatID, "Ошибка при проверке пользователя", err)
 		return
 	}
 
 	if !exists {
 		er := h.Store.AddUser(ctx, userID, username)
 		if er != nil {
-			h.Reply(userID, "Произошла ошибка 😔")
-			log.Printf("Ошибка при регистрации: %v", er)
+			h.handleErr(chatID, "Ошибка при регистрации", err)
 			return
 		}
-		h.Reply(msg.Chat.ID, "Привет! 💖 Ты зарегистрирован в fmlbot. Добавь партнёра с помощью "+string(models.SetPartner)+"\n"+
+		h.Reply(chatID, "Привет! 💖 Ты зарегистрирован в fmlbot. Добавь партнёра с помощью "+string(models.SetPartner)+"\n"+
 			"(Не забудь, что партнер должен тоже зарегистрироваться в боте)")
 	} else {
 		partnerUsername, er := h.Store.GetPartnerUsername(ctx, userID)
 		if er != nil {
-			h.Reply(userID, "Произошла ошибка 😔")
-			log.Printf("Ошибка при попытке получить username партнера: %v", er)
+			h.handleErr(chatID, "Ошибка при попытке получить username партнера", err)
 			return
 		}
 
 		if partnerUsername == "" {
-			h.Reply(msg.Chat.ID, "Ты уже зарегистрирован! Используй "+string(models.SetPartner)+", чтобы добавить партнёра 💌")
+			h.Reply(chatID, "Ты уже зарегистрирован! Используй "+string(models.SetPartner)+", чтобы добавить партнёра 💌")
 		} else {
 			text := "Ты уже зарегистрирован! Твой партнер - @" + partnerUsername
-			h.Reply(msg.Chat.ID, text)
+			h.Reply(chatID, text)
 		}
 	}
 }

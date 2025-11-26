@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"log"
 )
 
 func (s *Storage) AddUser(ctx context.Context, telegramID int64, username string) error {
@@ -75,4 +76,37 @@ func (s *Storage) GetUserState(ctx context.Context, userID int64) (string, error
 		return "", err
 	}
 	return state, nil
+}
+
+func (s *Storage) SetPartners(ctx context.Context, userID, partnerID int64, userUsername, partnerUsername string) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// user -> partner
+	_, err = tx.ExecContext(ctx, `
+        UPDATE users SET partner_username = $1 WHERE telegram_id = $2
+    `, partnerUsername, userID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			log.Printf("Ошибка отката транзакции: %v", er)
+		}
+		return err
+	}
+
+	// partner -> user
+	_, err = tx.ExecContext(ctx, `
+        UPDATE users SET partner_username = $1 WHERE telegram_id = $2
+    `, userUsername, partnerID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			log.Printf("Ошибка отката транзакции: %v", er)
+		}
+		return err
+	}
+
+	return tx.Commit()
 }

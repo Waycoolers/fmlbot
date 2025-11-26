@@ -22,8 +22,7 @@ func (h *Handler) DeleteAccount(msg *tgbotapi.Message) {
 
 	_, err := h.api.Send(message)
 	if err != nil {
-		h.Reply(chatID, "Произошла ошибка 😔")
-		log.Printf("Ошибка при отправке подтверждения: %v", err)
+		h.handleErr(chatID, "Ошибка при отправке подтверждения", err)
 		return
 	}
 	log.Printf("Бот ответил: %v", message.Text)
@@ -40,8 +39,7 @@ func (h *Handler) HandleDeleteCallback(cb *tgbotapi.CallbackQuery) error {
 		partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
 		log.Print(partnerUsername)
 		if err != nil {
-			h.Reply(userID, "Произошла ошибка 😔")
-			log.Printf("Ошибка при попытке получить username партнера: %v", err)
+			h.handleErr(chatID, "Ошибка при попытке получить username партнера", err)
 			break
 		}
 
@@ -50,9 +48,9 @@ func (h *Handler) HandleDeleteCallback(cb *tgbotapi.CallbackQuery) error {
 		_ = h.Store.DeleteUser(ctx, userID)
 
 		if partnerUsername != "" {
-			partnerID, err := h.Store.GetUserIDByUsername(ctx, partnerUsername)
+			partnerID, er := h.Store.GetUserIDByUsername(ctx, partnerUsername)
 			_ = h.Store.SetPartner(ctx, partnerID, "")
-			if err == nil {
+			if er == nil {
 				h.Reply(partnerID, "Твой партнёр удалил свой аккаунт 💔")
 			}
 		}
