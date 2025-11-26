@@ -5,6 +5,7 @@ import (
 
 	"github.com/Waycoolers/fmlbot/internal/config"
 	"github.com/Waycoolers/fmlbot/internal/handlers"
+	"github.com/Waycoolers/fmlbot/internal/models"
 	"github.com/Waycoolers/fmlbot/internal/storage"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -19,6 +20,20 @@ func New(cfg *config.Config, store *storage.Storage) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Token)
 	if err != nil {
 		return nil, err
+	}
+
+	commands := []tgbotapi.BotCommand{
+		{Command: string(models.Start), Description: "Запустить бота и зарегистрироваться"},
+		{Command: string(models.SetPartner), Description: "Добавить партнера"},
+		{Command: string(models.DeletePartner), Description: "Удалить партнера"},
+		{Command: string(models.Delete), Description: "Удалить аккаунт"},
+		{Command: string(models.AddCompliment), Description: "Добавить комплимент"},
+		{Command: string(models.Cancel), Description: "Отмена"},
+	}
+
+	_, err = api.Request(tgbotapi.NewSetMyCommands(commands...))
+	if err != nil {
+		log.Printf("Ошибка установки команд: %v", err)
 	}
 
 	handler := handlers.New(api, store)
