@@ -15,24 +15,25 @@ func (h *Handler) Start(msg *tgbotapi.Message) {
 
 	exists, err := h.Store.IsUserExists(ctx, userID)
 	if err != nil {
-		h.Reply(msg.Chat.ID, "Ошибка при проверке пользователя 😔")
+		h.Reply(userID, "Произошла ошибка 😔")
 		log.Printf("Ошибка при проверке пользователя: %v", err)
 		return
 	}
 
 	if !exists {
-		err := h.Store.AddUser(ctx, userID, username)
-		if err != nil {
-			h.Reply(msg.Chat.ID, "Ошибка при регистрации 😔")
-			log.Printf("Ошибка при регистрации: %v", err)
+		er := h.Store.AddUser(ctx, userID, username)
+		if er != nil {
+			h.Reply(userID, "Произошла ошибка 😔")
+			log.Printf("Ошибка при регистрации: %v", er)
 			return
 		}
 		h.Reply(msg.Chat.ID, "Привет! 💖 Ты зарегистрирован в fmlbot. Добавь партнёра с помощью "+string(models.SetPartner)+"\n"+
 			"(Не забудь, что партнер должен тоже зарегистрироваться в боте)")
 	} else {
-		partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
-		if err != nil {
-			log.Printf("Ошибка при попытке получить username партнера: %v", err)
+		partnerUsername, er := h.Store.GetPartnerUsername(ctx, userID)
+		if er != nil {
+			h.Reply(userID, "Произошла ошибка 😔")
+			log.Printf("Ошибка при попытке получить username партнера: %v", er)
 			return
 		}
 
