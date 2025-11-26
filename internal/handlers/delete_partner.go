@@ -39,8 +39,8 @@ func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error 
 		}
 
 		if partnerUsername == "" {
-			h.Reply(userID, "У тебя и так не добавлен партнер")
-			return nil
+			h.Reply(userID, "У тебя ещё не добавлен партнер")
+			break
 		}
 		partnerID, _ := h.Store.GetUserIDByUsername(ctx, partnerUsername)
 
