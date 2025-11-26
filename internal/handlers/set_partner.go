@@ -14,7 +14,7 @@ func (h *Handler) SetPartner(msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 
-	err := h.Store.SetUserState(ctx, userID, "awaiting_partner")
+	err := h.Store.SetUserState(ctx, userID, models.AwaitingPartner)
 	if err != nil {
 		h.handleErr(chatID, "Ошибка при установке состояния awaiting_partner", err)
 		return
@@ -78,7 +78,7 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 	if partnerExists != "" {
 		if partnerExists == userUsername {
 			h.Reply(chatID, "@"+correctPartnerUsername+" и так ваш партнёр. Приятного времяпрепровождения!")
-			err = h.Store.SetUserState(ctx, userID, "")
+			err = h.Store.SetUserState(ctx, userID, models.Empty)
 			if err != nil {
 				h.handleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
@@ -86,7 +86,7 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 			return
 		} else {
 			h.Reply(chatID, "У данного пользователя уже есть партнёр 😔")
-			err = h.Store.SetUserState(ctx, userID, "")
+			err = h.Store.SetUserState(ctx, userID, models.Empty)
 			if err != nil {
 				h.handleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
@@ -112,13 +112,13 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 		h.Reply(userPartnerID, "Твой партнёр добавил другого партнёра 💔")
 	}
 
-	err = h.Store.SetUserState(ctx, partnerID, "")
+	err = h.Store.SetUserState(ctx, partnerID, models.Empty)
 	if err != nil {
 		h.handleErr(chatID, "Ошибка при сбросе состояния", err)
 		return
 	}
 
-	err = h.Store.SetUserState(ctx, userID, "")
+	err = h.Store.SetUserState(ctx, userID, models.Empty)
 	if err != nil {
 		h.handleErr(chatID, "Ошибка при сбросе состояния", err)
 		return
