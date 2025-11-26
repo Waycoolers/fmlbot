@@ -5,51 +5,40 @@ import (
 	"log"
 )
 
-func (s *Storage) CanSendCompliment(ctx context.Context, userID int64, limit int) (bool, error) {
-	var count int
-	query := `
-	SELECT COUNT(*) 
-	FROM compliment_history
-	WHERE user_id = $1 AND created_at >= current_date
-	`
-	err := s.DB.QueryRowContext(ctx, query, userID).Scan(&count)
+func (s *Storage) AddCompliment(ctx context.Context, telegramID int64, text string) error {
+	tx, err := s.DB.BeginTxx(ctx, nil)
 	if err != nil {
-		return false, err
-	}
-	return count < limit, nil
-}
-
-func (s *Storage) RecordCompliment(ctx context.Context, userID int64, complimentID int) error {
-	query := `
-	INSERT INTO compliment_history (user_id, compliment_id)
-	VALUES ($1, $2)
-	`
-	_, err := s.DB.ExecContext(ctx, query, userID, complimentID)
-	return err
-}
-
-func (s *Storage) GetNextCompliment(ctx context.Context) (int, string, error) {
-	query := `
-	WITH next AS (
-	    SELECT id, text
-	    FROM compliments
-	    WHERE count = (SELECT MIN(count) FROM compliments)
-	    ORDER BY random()
-	    LIMIT 1
-	)
-	UPDATE compliments c
-	SET count = count + 1
-	FROM next n
-	WHERE c.id = n.id
-	RETURNING n.id, n.text;
-	`
-	var id int
-	var text string
-
-	err := s.DB.QueryRowContext(ctx, query).Scan(&id, &text)
-	if err != nil {
-		log.Fatalf("Ошибка при получении комплимента: %v", err)
+		log.Printf("Ошибка начала транзакции: %v", err)
+		return err
 	}
 
-	return id, text, nil
+	var complimentID int64
+	err = tx.QueryRowContext(ctx, `
+        INSERT INTO compliments (text)
+        VALUES ($1)
+        RETURNING id
+    `, text).Scan(&complimentID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			log.Printf("Ошибка отката транзакции: %v", er)
+		}
+		log.Printf("Ошибка добавления комплимента: %v", err)
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+        INSERT INTO user_compliment (telegram_id, compliment_id)
+        VALUES ($1, $2)
+    `, telegramID, complimentID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			log.Printf("Ошибка отката транзакции: %v", er)
+		}
+		log.Printf("Ошибка добавления user_compliment: %v", err)
+		return err
+	}
+
+	return tx.Commit()
 }
