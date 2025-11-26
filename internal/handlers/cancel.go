@@ -8,9 +8,21 @@ import (
 )
 
 func (h *Handler) Cancel(msg *tgbotapi.Message) {
-	err := h.Store.SetUserState(context.Background(), msg.Chat.ID, "")
+	ctx := context.Background()
+	userID := msg.Chat.ID
+	userState, err := h.Store.GetUserState(ctx, userID)
 	if err != nil {
-		log.Printf("Ошибка при сброса состояния пользователя: %v", err)
+		log.Printf("Ошибка при получении состояния пользователя: %v", err)
+		return
+	}
+
+	if userState == "" {
+		return
+	}
+
+	err = h.Store.SetUserState(ctx, userID, "")
+	if err != nil {
+		log.Printf("Ошибка при сбросе состояния пользователя: %v", err)
 		return
 	}
 	h.Reply(msg.Chat.ID, "Действие отменено")
