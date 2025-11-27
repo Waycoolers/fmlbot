@@ -16,13 +16,13 @@ func (h *Handler) SetPartner(msg *tgbotapi.Message) {
 
 	err := h.Store.SetUserState(ctx, userID, models.AwaitingPartner)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при установке состояния awaiting_partner", err)
+		h.HandleErr(chatID, "Ошибка при установке состояния awaiting_partner", err)
 		return
 	}
 
 	partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при получении информации о партнёре", err)
+		h.HandleErr(chatID, "Ошибка при получении информации о партнёре", err)
 		return
 	}
 
@@ -47,7 +47,7 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 
 	exists, err := h.Store.IsUserExistsByUsername(ctx, partnerUsername)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при проверке партнёра", err)
+		h.HandleErr(chatID, "Ошибка при проверке партнёра", err)
 		return
 	}
 
@@ -64,14 +64,14 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 
 	partnerID, err := h.Store.GetUserIDByUsername(ctx, partnerUsername)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при получении ID партнера", err)
+		h.HandleErr(chatID, "Ошибка при получении ID партнера", err)
 		return
 	}
 	correctPartnerUsername, _ := h.Store.GetUsername(ctx, partnerID)
 
 	partnerExists, err := h.Store.GetPartnerUsername(ctx, partnerID)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при проверке на существование партнёра", err)
+		h.HandleErr(chatID, "Ошибка при проверке на существование партнёра", err)
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 			h.Reply(chatID, "@"+correctPartnerUsername+" и так ваш партнёр. Приятного времяпрепровождения!")
 			err = h.Store.SetUserState(ctx, userID, models.Empty)
 			if err != nil {
-				h.handleErr(chatID, "Ошибка при сбросе состояния", err)
+				h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
 			}
 			return
@@ -88,7 +88,7 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 			h.Reply(chatID, "У данного пользователя уже есть партнёр 😔")
 			err = h.Store.SetUserState(ctx, userID, models.Empty)
 			if err != nil {
-				h.handleErr(chatID, "Ошибка при сбросе состояния", err)
+				h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
 			}
 			return
@@ -97,14 +97,14 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 
 	userPartnerExists, err := h.Store.GetPartnerUsername(ctx, userID)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при проверке на существование партнёра", err)
+		h.HandleErr(chatID, "Ошибка при проверке на существование партнёра", err)
 		return
 	}
 
 	if userPartnerExists != "" {
 		userPartnerID, er := h.Store.GetUserIDByUsername(ctx, userPartnerExists)
 		if er != nil {
-			h.handleErr(chatID, "Ошибка при получении ID партнёра", er)
+			h.HandleErr(chatID, "Ошибка при получении ID партнёра", er)
 			return
 		}
 
@@ -114,19 +114,19 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 
 	err = h.Store.SetUserState(ctx, partnerID, models.Empty)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при сбросе состояния", err)
+		h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 		return
 	}
 
 	err = h.Store.SetUserState(ctx, userID, models.Empty)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при сбросе состояния", err)
+		h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 		return
 	}
 
 	err = h.Store.SetPartners(ctx, userID, partnerID, userUsername, correctPartnerUsername)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при связи партнеров", err)
+		h.HandleErr(chatID, "Ошибка при связи партнеров", err)
 		return
 	}
 
