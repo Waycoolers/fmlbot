@@ -15,14 +15,14 @@ func (h *Handler) Start(msg *tgbotapi.Message) {
 
 	exists, err := h.Store.IsUserExists(ctx, userID)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при проверке пользователя", err)
+		h.HandleErr(chatID, "Ошибка при проверке пользователя", err)
 		return
 	}
 
 	if !exists {
 		er := h.Store.AddUser(ctx, userID, username)
 		if er != nil {
-			h.handleErr(chatID, "Ошибка при регистрации", err)
+			h.HandleErr(chatID, "Ошибка при регистрации", err)
 			return
 		}
 		h.Reply(chatID, "Привет! 💖 Ты зарегистрирован в fmlbot. Добавь партнёра с помощью "+string(models.SetPartner)+"\n"+
@@ -30,7 +30,7 @@ func (h *Handler) Start(msg *tgbotapi.Message) {
 	} else {
 		partnerUsername, er := h.Store.GetPartnerUsername(ctx, userID)
 		if er != nil {
-			h.handleErr(chatID, "Ошибка при попытке получить username партнера", err)
+			h.HandleErr(chatID, "Ошибка при попытке получить username партнера", err)
 			return
 		}
 

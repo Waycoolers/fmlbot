@@ -12,7 +12,7 @@ func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 	partnerUsername, err := h.Store.GetPartnerUsername(context.Background(), userID)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при получении юзернейма партнера", err)
+		h.HandleErr(chatID, "Ошибка при получении юзернейма партнера", err)
 		return
 	}
 
@@ -33,7 +33,7 @@ func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
 
 	_, err = h.api.Send(message)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при отправке подтверждения", err)
+		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
 		return
 	}
 	log.Printf("Бот ответил: %v", message.Text)
@@ -48,7 +48,6 @@ func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error 
 		ctx := context.Background()
 		partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
 		if err != nil {
-			h.handleErr(chatID, "Ошибка при попытке получить username партнера", err)
 			break
 		}
 
@@ -56,7 +55,6 @@ func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error 
 
 		err = h.Store.SetPartners(ctx, userID, partnerID, "", "")
 		if err != nil {
-			h.handleErr(chatID, "Ошибка при удалении партнеров", err)
 			break
 		}
 
@@ -64,7 +62,7 @@ func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error 
 		h.Reply(partnerID, "Твой партнёр отписался от тебя 💔")
 
 	case "delete_partner_cancel":
-		h.Reply(chatID, "Удаление партнёра отменено ✅")
+		h.Reply(chatID, "Удаление партнёра отменено")
 	}
 
 	emptyMarkup := tgbotapi.InlineKeyboardMarkup{
@@ -74,7 +72,7 @@ func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error 
 	edit := tgbotapi.NewEditMessageReplyMarkup(chatID, cb.Message.MessageID, emptyMarkup)
 	_, err := h.api.Request(edit)
 	if err != nil {
-		log.Printf("Ошибка при убирании кнопок: %v", err)
+		return err
 	}
 	return err
 }

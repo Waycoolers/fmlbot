@@ -26,7 +26,7 @@ func (h *Handler) Reply(chatID int64, text string) {
 	log.Printf("Бот ответил: %v", msg.Text)
 }
 
-func (h *Handler) handleErr(chatID int64, msg string, err error) {
+func (h *Handler) HandleErr(chatID int64, msg string, err error) {
 	h.Reply(chatID, "Произошла ошибка 😔")
 	log.Printf("%s: %v", msg, err)
 }

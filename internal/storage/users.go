@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"log"
 
 	"github.com/Waycoolers/fmlbot/internal/models"
 )
@@ -75,7 +74,7 @@ func (s *Storage) GetUserState(ctx context.Context, userID int64) (models.State,
 		SELECT state FROM users WHERE telegram_id=$1;
 	`, userID).Scan(&state)
 	if err != nil {
-		return "", err
+		return models.Empty, err
 	}
 	return state, nil
 }
@@ -93,7 +92,7 @@ func (s *Storage) SetPartners(ctx context.Context, userID, partnerID int64, user
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {
-			log.Printf("Ошибка отката транзакции: %v", er)
+			return er
 		}
 		return err
 	}
@@ -105,7 +104,7 @@ func (s *Storage) SetPartners(ctx context.Context, userID, partnerID int64, user
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {
-			log.Printf("Ошибка отката транзакции: %v", er)
+			return er
 		}
 		return err
 	}

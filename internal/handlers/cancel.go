@@ -13,7 +13,7 @@ func (h *Handler) Cancel(msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 	userState, err := h.Store.GetUserState(ctx, userID)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при получении состояния пользователя", err)
+		h.HandleErr(chatID, "Ошибка при получении состояния пользователя", err)
 		return
 	}
 
@@ -23,7 +23,7 @@ func (h *Handler) Cancel(msg *tgbotapi.Message) {
 
 	err = h.Store.SetUserState(ctx, userID, models.Empty)
 	if err != nil {
-		h.handleErr(chatID, "Ошибка при сбросе состояния пользователя", err)
+		h.HandleErr(chatID, "Ошибка при сбросе состояния пользователя", err)
 		return
 	}
 	h.Reply(chatID, "Действие отменено")
