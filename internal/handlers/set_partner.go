@@ -109,6 +109,10 @@ func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
 		}
 
 		er = h.Store.SetPartner(ctx, userPartnerID, "")
+		if er != nil {
+			h.HandleErr(chatID, "Ошибка при сбросе партнера у партнера", er)
+			return
+		}
 		h.Reply(userPartnerID, "Твой партнёр добавил другого партнёра 💔")
 	}
 

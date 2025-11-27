@@ -30,3 +30,15 @@ func (h *Handler) HandleErr(chatID int64, msg string, err error) {
 	h.Reply(chatID, "Произошла ошибка 😔")
 	log.Printf("%s: %v", msg, err)
 }
+
+func (h *Handler) RemoveButtons(chatID int64, message int) {
+	emptyMarkup := tgbotapi.InlineKeyboardMarkup{
+		InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{},
+	}
+
+	edit := tgbotapi.NewEditMessageReplyMarkup(chatID, message, emptyMarkup)
+	_, err := h.api.Request(edit)
+	if err != nil {
+		log.Printf("Ошибка при убирании кнопок: %v", err)
+	}
+}
