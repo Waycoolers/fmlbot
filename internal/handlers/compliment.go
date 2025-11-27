@@ -156,6 +156,7 @@ func (h *Handler) HandleDeleteComplimentCallback(cb *tgbotapi.CallbackQuery) err
 
 		err := h.Store.DeleteCompliment(context.Background(), cb.From.ID, index)
 		if err != nil {
+			h.RemoveButtons(chatID, messageID)
 			return err
 		}
 
@@ -163,15 +164,6 @@ func (h *Handler) HandleDeleteComplimentCallback(cb *tgbotapi.CallbackQuery) err
 	} else if data == "cancel_deletion" {
 		h.Reply(chatID, "Удаление комплимента отменено")
 	}
-
-	emptyMarkup := tgbotapi.InlineKeyboardMarkup{
-		InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{},
-	}
-
-	edit := tgbotapi.NewEditMessageReplyMarkup(chatID, messageID, emptyMarkup)
-	_, err := h.api.Request(edit)
-	if err != nil {
-		return err
-	}
+	h.RemoveButtons(chatID, messageID)
 	return nil
 }

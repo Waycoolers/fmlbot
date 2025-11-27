@@ -42,20 +42,23 @@ func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
 func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error {
 	userID := cb.From.ID
 	chatID := cb.Message.Chat.ID
+	messageID := cb.Message.MessageID
 
 	switch cb.Data {
 	case "delete_partner_confirm":
 		ctx := context.Background()
 		partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
 		if err != nil {
-			break
+			h.RemoveButtons(chatID, messageID)
+			return err
 		}
 
 		partnerID, _ := h.Store.GetUserIDByUsername(ctx, partnerUsername)
 
 		err = h.Store.SetPartners(ctx, userID, partnerID, "", "")
 		if err != nil {
-			break
+			h.RemoveButtons(chatID, messageID)
+			return err
 		}
 
 		h.Reply(chatID, "Партнёр успешно удалён 💔")
@@ -64,15 +67,6 @@ func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error 
 	case "delete_partner_cancel":
 		h.Reply(chatID, "Удаление партнёра отменено")
 	}
-
-	emptyMarkup := tgbotapi.InlineKeyboardMarkup{
-		InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{},
-	}
-
-	edit := tgbotapi.NewEditMessageReplyMarkup(chatID, cb.Message.MessageID, emptyMarkup)
-	_, err := h.api.Request(edit)
-	if err != nil {
-		return err
-	}
-	return err
+	h.RemoveButtons(chatID, messageID)
+	return nil
 }
