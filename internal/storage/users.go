@@ -111,3 +111,10 @@ func (s *Storage) SetPartners(ctx context.Context, userID, partnerID int64, user
 
 	return tx.Commit()
 }
+
+func (s *Storage) DeleteUser(ctx context.Context, userID int64) error {
+	_, err := s.DB.ExecContext(ctx, `
+		DELETE FROM users WHERE telegram_id=$1
+	`, userID)
+	return err
+}
