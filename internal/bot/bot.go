@@ -26,7 +26,7 @@ func New(cfg *config.Config, store *storage.Storage) (*Bot, error) {
 		{Command: string(models.Start), Description: "Запустить бота и зарегистрироваться"},
 		{Command: string(models.SetPartner), Description: "Добавить партнера"},
 		{Command: string(models.DeletePartner), Description: "Удалить партнера"},
-		{Command: string(models.Delete), Description: "Удалить аккаунт"},
+		{Command: string(models.DeleteAccount), Description: "Удалить аккаунт"},
 		{Command: string(models.AddCompliment), Description: "Добавить комплимент"},
 		{Command: string(models.GetCompliments), Description: "Получить свои комплименты"},
 		{Command: string(models.DeleteCompliment), Description: "Удалить комплимент"},

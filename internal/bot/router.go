@@ -106,7 +106,7 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 		case strings.HasPrefix(text, string(models.Cancel)):
 			r.h.Cancel(msg)
 			return
-		case strings.HasPrefix(text, string(models.Delete)):
+		case strings.HasPrefix(text, string(models.DeleteAccount)):
 			err = r.h.Store.SetUserState(ctx, userID, models.Empty)
 			if err != nil {
 				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)

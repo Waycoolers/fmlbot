@@ -17,7 +17,7 @@ func (h *Handler) DeleteAccount(msg *tgbotapi.Message) {
 		),
 	)
 
-	message := tgbotapi.NewMessage(chatID, "Вы уверены, что хотите удалить аккаунт? Это действие нельзя отменить.")
+	message := tgbotapi.NewMessage(chatID, "Ты уверен, что хочешь удалить аккаунт? Все твои пользовательские данные тоже будут удалены.")
 	message.ReplyMarkup = buttons
 
 	_, err := h.api.Send(message)
