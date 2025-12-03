@@ -7,8 +7,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) Cancel(msg *tgbotapi.Message) {
-	ctx := context.Background()
+func (h *Handler) Cancel(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 	userState, err := h.Store.GetUserState(ctx, userID)

@@ -7,8 +7,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
-	ctx := context.Background()
+func (h *Handler) DeletePartner(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 	partnerID, err := h.Store.GetPartnerID(ctx, userID)
@@ -46,14 +45,13 @@ func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
 	log.Printf("Бот ответил: %v", message.Text)
 }
 
-func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error {
+func (h *Handler) HandleDeletePartnerCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) error {
 	userID := cb.From.ID
 	chatID := cb.Message.Chat.ID
 	messageID := cb.Message.MessageID
 
 	switch cb.Data {
 	case "delete_partner_confirm":
-		ctx := context.Background()
 		partnerID, err := h.Store.GetPartnerID(ctx, userID)
 		if err != nil {
 			h.RemoveButtons(chatID, messageID)

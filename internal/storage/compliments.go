@@ -2,161 +2,93 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 	"log"
+
+	"github.com/Waycoolers/fmlbot/internal/models"
 )
 
-func (s *Storage) AddCompliment(ctx context.Context, telegramID int64, text string) error {
+func (s *Storage) AddCompliment(ctx context.Context, telegramID int64, text string) (*models.Compliment, error) {
 	tx, err := s.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		log.Printf("Ошибка начала транзакции: %v", err)
-		return err
+		return nil, err
 	}
 
-	var complimentID int64
+	var compliment models.Compliment
 	err = tx.QueryRowContext(ctx, `
         INSERT INTO compliments (text)
         VALUES ($1)
-        RETURNING id
-    `, text).Scan(&complimentID)
+        RETURNING id, text, is_sent, created_at
+    `, text).Scan(&compliment.ID, &compliment.Text, &compliment.IsSent, &compliment.CreatedAt)
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {
 			log.Printf("Ошибка отката транзакции: %v", er)
 		}
 		log.Printf("Ошибка добавления комплимента: %v", err)
-		return err
+		return nil, err
 	}
 
 	_, err = tx.ExecContext(ctx, `
         INSERT INTO user_compliment (telegram_id, compliment_id)
         VALUES ($1, $2)
-    `, telegramID, complimentID)
+    `, telegramID, compliment.ID)
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {
 			log.Printf("Ошибка отката транзакции: %v", er)
 		}
 		log.Printf("Ошибка добавления user_compliment: %v", err)
-		return err
+		return nil, err
 	}
 
-	return tx.Commit()
+	return &compliment, tx.Commit()
 }
 
-func (s *Storage) GetCompliments(ctx context.Context, telegramID int64) (compliments []string, isSentList []bool, err error) {
-	compliments = make([]string, 0)
-	isSentList = make([]bool, 0)
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT c.text, c.is_sent FROM compliments AS c 
+func (s *Storage) GetCompliments(ctx context.Context, telegramID int64) (compliments []models.Compliment, err error) {
+	compliments = []models.Compliment{}
+	err = s.DB.SelectContext(ctx, &compliments, `
+		SELECT c.id, c.text, c.is_sent, c.created_at
+		FROM compliments AS c
 		JOIN user_compliment AS uc ON c.id = uc.compliment_id
-		WHERE uc.telegram_id = $1 ORDER BY c.created_at;
-	`, telegramID)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer func(rows *sql.Rows) {
-		er := rows.Close()
-		if er != nil {
-			log.Printf("Ошибка при закрытии соединения: %v", er)
-		}
-	}(rows)
-
-	for rows.Next() {
-		var compliment string
-		var isSent bool
-		if er := rows.Scan(&compliment, &isSent); er != nil {
-			return nil, nil, er
-		}
-		compliments = append(compliments, compliment)
-		isSentList = append(isSentList, isSent)
-	}
-
-	return compliments, isSentList, nil
-}
-
-func (s *Storage) GetActiveCompliments(ctx context.Context, telegramID int64) (compliments []string, err error) {
-	compliments = make([]string, 0)
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT c.text FROM compliments AS c 
-		JOIN user_compliment AS uc ON c.id = uc.compliment_id
-		WHERE uc.telegram_id = $1 
-		AND c.is_sent = false
+		WHERE uc.telegram_id = $1
 		ORDER BY c.created_at;
 	`, telegramID)
 	if err != nil {
+		log.Printf("Ошибка получения списка комплиментов: %v", err)
 		return nil, err
 	}
-	defer func(rows *sql.Rows) {
-		er := rows.Close()
-		if er != nil {
-			log.Printf("Ошибка при закрытии соединения: %v", er)
-		}
-	}(rows)
-
-	for rows.Next() {
-		var compliment string
-		if er := rows.Scan(&compliment); er != nil {
-			return nil, er
-		}
-		compliments = append(compliments, compliment)
-	}
-
 	return compliments, nil
 }
 
-func (s *Storage) getComplimentID(ctx context.Context, telegramID int64, complimentIndex int) (int64, error) {
-	var complimentID int64
-	err := s.DB.QueryRowContext(ctx, `
-        SELECT c.id 
-        FROM compliments AS c 
-        JOIN user_compliment AS uc ON c.id = uc.compliment_id 
-        WHERE uc.telegram_id = $1 
-        AND c.is_sent = false
-        ORDER BY c.created_at 
-        LIMIT 1 OFFSET $2
-    `, telegramID, complimentIndex).Scan(&complimentID)
-	if err != nil {
-		return 0, err
-	}
-
-	return complimentID, nil
-}
-
-func (s *Storage) DeleteCompliment(ctx context.Context, telegramID int64, complimentIndex int) error {
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-
-	complimentID, err := s.getComplimentID(ctx, telegramID, complimentIndex)
+func (s *Storage) DeleteCompliment(ctx context.Context, telegramID int64, complimentID int64) error {
+	tx, err := s.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
 	_, err = tx.ExecContext(ctx, `
-        DELETE FROM user_compliment 
-        WHERE telegram_id = $1 AND compliment_id = $2
-    `, telegramID, complimentID)
+		DELETE FROM user_compliment WHERE telegram_id=$1 AND compliment_id=$2
+	`, telegramID, complimentID)
 	if err != nil {
-		er := tx.Rollback()
-		if er != nil {
-			return er
-		}
+		_ = tx.Rollback()
 		return err
 	}
 
 	_, err = tx.ExecContext(ctx, `
-        DELETE FROM compliments 
-        WHERE id = $1
-    `, complimentID)
+		DELETE FROM compliments WHERE id=$1
+	`, complimentID)
 	if err != nil {
-		er := tx.Rollback()
-		if er != nil {
-			return er
-		}
+		_ = tx.Rollback()
 		return err
 	}
 
 	return tx.Commit()
+}
+
+func (s *Storage) MarkComplimentSent(ctx context.Context, complimentID int64) error {
+	_, err := s.DB.ExecContext(ctx, `
+		UPDATE compliments SET is_sent=true WHERE id=$1;
+	`, complimentID)
+	return err
 }
