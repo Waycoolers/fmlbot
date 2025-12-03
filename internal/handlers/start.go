@@ -28,15 +28,20 @@ func (h *Handler) Start(msg *tgbotapi.Message) {
 		h.Reply(chatID, "Привет! 💖 Ты зарегистрирован в fmlbot. Добавь партнёра с помощью "+string(models.SetPartner)+"\n"+
 			"(Не забудь, что партнер должен тоже зарегистрироваться в боте)")
 	} else {
-		partnerUsername, er := h.Store.GetPartnerUsername(ctx, userID)
+		partnerID, er := h.Store.GetPartnerID(ctx, userID)
 		if er != nil {
-			h.HandleErr(chatID, "Ошибка при попытке получить username партнера", err)
+			h.HandleErr(chatID, "Ошибка при попытке получить id партнера", err)
 			return
 		}
 
-		if partnerUsername == "" {
+		if partnerID == 0 {
 			h.Reply(chatID, "Ты уже зарегистрирован! Используй "+string(models.SetPartner)+", чтобы добавить партнёра 💌")
 		} else {
+			partnerUsername, err2 := h.Store.GetUsername(ctx, partnerID)
+			if err2 != nil {
+				h.HandleErr(chatID, "Ошибка при попытке получить username партнера", err2)
+				return
+			}
 			text := "Ты уже зарегистрирован! Твой партнер - @" + partnerUsername
 			h.Reply(chatID, text)
 		}

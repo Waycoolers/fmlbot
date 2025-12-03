@@ -37,20 +37,14 @@ func (h *Handler) HandleDeleteCallback(cb *tgbotapi.CallbackQuery) error {
 	case "delete_confirm":
 		ctx := context.Background()
 
-		partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
+		partnerID, err := h.Store.GetPartnerID(ctx, userID)
 		if err != nil {
 			h.RemoveButtons(chatID, messageID)
 			return err
 		}
 
-		if partnerUsername != "" {
-			partnerID, er := h.Store.GetUserIDByUsername(ctx, partnerUsername)
-			if er != nil {
-				h.RemoveButtons(chatID, messageID)
-				return er
-			}
-
-			err = h.Store.SetPartners(ctx, userID, partnerID, "", "")
+		if partnerID != 0 {
+			err = h.Store.RemovePartners(ctx, userID, partnerID)
 			if err != nil {
 				h.RemoveButtons(chatID, messageID)
 				return err
