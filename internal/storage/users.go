@@ -33,10 +33,10 @@ func (s *Storage) IsUserExistsByUsername(ctx context.Context, username string) (
 	return exists, err
 }
 
-func (s *Storage) SetPartner(ctx context.Context, telegramID int64, partnerUsername string) error {
+func (s *Storage) SetPartner(ctx context.Context, telegramID int64, partnerID int64) error {
 	_, err := s.DB.ExecContext(ctx, `
-        UPDATE users SET partner_username = $1 WHERE telegram_id = $2;
-    `, partnerUsername, telegramID)
+        UPDATE users SET partner_id = $1 WHERE telegram_id = $2;
+    `, partnerID, telegramID)
 	return err
 }
 
@@ -49,16 +49,15 @@ func (s *Storage) GetUsername(ctx context.Context, userID int64) (string, error)
 	return username, nil
 }
 
-func (s *Storage) GetPartnerUsername(ctx context.Context, userID int64) (string, error) {
-	var partner string
-	query := `SELECT partner_username FROM users WHERE telegram_id = $1;`
+func (s *Storage) GetPartnerID(ctx context.Context, userID int64) (int64, error) {
+	var id int64
+	query := `SELECT partner_id FROM users WHERE telegram_id = $1;`
 
-	err := s.DB.QueryRowContext(ctx, query, userID).Scan(&partner)
+	err := s.DB.QueryRowContext(ctx, query, userID).Scan(&id)
 	if err != nil {
-		// если нет записи, просто вернём пустую строку
-		return "", nil
+		return 0, nil
 	}
-	return partner, nil
+	return id, nil
 }
 
 func (s *Storage) SetUserState(ctx context.Context, userID int64, state models.State) error {
@@ -79,7 +78,7 @@ func (s *Storage) GetUserState(ctx context.Context, userID int64) (models.State,
 	return state, nil
 }
 
-func (s *Storage) SetPartners(ctx context.Context, userID, partnerID int64, userUsername, partnerUsername string) error {
+func (s *Storage) SetPartners(ctx context.Context, userID, partnerID int64) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -87,8 +86,8 @@ func (s *Storage) SetPartners(ctx context.Context, userID, partnerID int64, user
 
 	// user -> partner
 	_, err = tx.ExecContext(ctx, `
-        UPDATE users SET partner_username = $1 WHERE telegram_id = $2
-    `, partnerUsername, userID)
+        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+    `, partnerID, userID)
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {
@@ -99,8 +98,41 @@ func (s *Storage) SetPartners(ctx context.Context, userID, partnerID int64, user
 
 	// partner -> user
 	_, err = tx.ExecContext(ctx, `
-        UPDATE users SET partner_username = $1 WHERE telegram_id = $2
-    `, userUsername, partnerID)
+        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+    `, userID, partnerID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *Storage) RemovePartners(ctx context.Context, userID, partnerID int64) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// user -> partner
+	_, err = tx.ExecContext(ctx, `
+        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+    `, 0, userID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	// partner -> user
+	_, err = tx.ExecContext(ctx, `
+        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+    `, 0, partnerID)
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {

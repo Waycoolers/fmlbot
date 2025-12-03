@@ -8,15 +8,16 @@ import (
 )
 
 func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
+	ctx := context.Background()
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
-	partnerUsername, err := h.Store.GetPartnerUsername(context.Background(), userID)
+	partnerID, err := h.Store.GetPartnerID(ctx, userID)
 	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении юзернейма партнера", err)
+		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
 		return
 	}
 
-	if partnerUsername == "" {
+	if partnerID == 0 {
 		h.Reply(userID, "У тебя ещё не добавлен партнер")
 		return
 	}
@@ -27,6 +28,12 @@ func (h *Handler) DeletePartner(msg *tgbotapi.Message) {
 			tgbotapi.NewInlineKeyboardButtonData("Отмена ❌", "delete_partner_cancel"),
 		),
 	)
+
+	partnerUsername, err := h.Store.GetUsername(ctx, partnerID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при попытке получить username партнера", err)
+		return
+	}
 
 	message := tgbotapi.NewMessage(chatID, "Вы уверены, что хотите удалить партнёра @"+partnerUsername+"?")
 	message.ReplyMarkup = buttons
@@ -47,15 +54,13 @@ func (h *Handler) HandleDeletePartnerCallback(cb *tgbotapi.CallbackQuery) error 
 	switch cb.Data {
 	case "delete_partner_confirm":
 		ctx := context.Background()
-		partnerUsername, err := h.Store.GetPartnerUsername(ctx, userID)
+		partnerID, err := h.Store.GetPartnerID(ctx, userID)
 		if err != nil {
 			h.RemoveButtons(chatID, messageID)
 			return err
 		}
 
-		partnerID, _ := h.Store.GetUserIDByUsername(ctx, partnerUsername)
-
-		err = h.Store.SetPartners(ctx, userID, partnerID, "", "")
+		err = h.Store.RemovePartners(ctx, userID, partnerID)
 		if err != nil {
 			h.RemoveButtons(chatID, messageID)
 			return err
