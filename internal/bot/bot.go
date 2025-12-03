@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"log"
 
 	"github.com/Waycoolers/fmlbot/internal/config"
@@ -10,8 +11,35 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+func clearOldUpdates(api *tgbotapi.BotAPI) error {
+	var lastID int
+
+	for {
+		updates, err := api.GetUpdates(tgbotapi.UpdateConfig{
+			Offset:  0,
+			Limit:   100,
+			Timeout: 0,
+		})
+		if err != nil {
+			return err
+		}
+
+		if len(updates) == 0 {
+			break
+		}
+
+		lastID = updates[len(updates)-1].UpdateID
+		_, _ = api.GetUpdates(tgbotapi.UpdateConfig{
+			Offset: lastID + 1,
+			Limit:  1,
+		})
+	}
+
+	return nil
+}
+
 type Bot struct {
-	api    *tgbotapi.BotAPI
+	Api    *tgbotapi.BotAPI
 	store  *storage.Storage
 	router *Router
 }
@@ -30,6 +58,7 @@ func New(cfg *config.Config, store *storage.Storage) (*Bot, error) {
 		{Command: string(models.AddCompliment), Description: "Добавить комплимент"},
 		{Command: string(models.GetCompliments), Description: "Получить свои комплименты"},
 		{Command: string(models.DeleteCompliment), Description: "Удалить комплимент"},
+		{Command: string(models.ReceiveCompliment), Description: "Получить комплимент"},
 		{Command: string(models.Cancel), Description: "Отмена"},
 	}
 
@@ -41,41 +70,33 @@ func New(cfg *config.Config, store *storage.Storage) (*Bot, error) {
 	handler := handlers.New(api, store)
 	router := NewRouter(handler)
 
-	return &Bot{api: api, store: store, router: router}, nil
+	return &Bot{Api: api, store: store, router: router}, nil
 }
 
-func (b *Bot) Run() {
-	log.Printf("Бот %s запущен", b.api.Self.UserName)
+func (b *Bot) Run(ctx context.Context) {
+	log.Printf("Бот %s запущен", b.Api.Self.UserName)
 
-	for {
-		updates, err := b.api.GetUpdates(tgbotapi.UpdateConfig{
-			Offset:  0,
-			Limit:   100,
-			Timeout: 0,
-		})
-		if err != nil || len(updates) == 0 {
-			break
-		}
-
-		lastUpdateID := updates[len(updates)-1].UpdateID
-		_, err = b.api.GetUpdates(tgbotapi.UpdateConfig{Offset: lastUpdateID + 1})
-		if err != nil {
-			log.Printf("Ошибка при запуске бота: %v", err)
-		}
+	if err := clearOldUpdates(b.Api); err != nil {
+		log.Printf("Ошибка очистки старых апдейтов: %v", err)
 	}
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-	updates := b.api.GetUpdatesChan(u)
+	updates := b.Api.GetUpdatesChan(u)
 
-	for update := range updates {
-		if update.CallbackQuery != nil {
-			b.router.HandleUpdate(update)
-			continue
-		}
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Контекст завершён, останавливаем бота...")
+			return
 
-		if update.Message != nil {
-			b.router.HandleUpdate(update)
+		case update, ok := <-updates:
+			if !ok {
+				log.Println("Канал updates закрыт, бот остановлен.")
+				return
+			}
+
+			b.router.HandleUpdate(ctx, update)
 		}
 	}
 }

@@ -7,7 +7,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) DeleteAccount(msg *tgbotapi.Message) {
+func (h *Handler) DeleteAccount(_ context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 
 	buttons := tgbotapi.NewInlineKeyboardMarkup(
@@ -28,15 +28,13 @@ func (h *Handler) DeleteAccount(msg *tgbotapi.Message) {
 	log.Printf("Бот ответил: %v", message.Text)
 }
 
-func (h *Handler) HandleDeleteCallback(cb *tgbotapi.CallbackQuery) error {
+func (h *Handler) HandleDeleteCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) error {
 	userID := cb.From.ID
 	chatID := cb.Message.Chat.ID
 	messageID := cb.Message.MessageID
 
 	switch cb.Data {
 	case "delete_confirm":
-		ctx := context.Background()
-
 		partnerID, err := h.Store.GetPartnerID(ctx, userID)
 		if err != nil {
 			h.RemoveButtons(chatID, messageID)

@@ -9,8 +9,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) SetPartner(msg *tgbotapi.Message) {
-	ctx := context.Background()
+func (h *Handler) SetPartner(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 
@@ -39,8 +38,7 @@ func (h *Handler) SetPartner(msg *tgbotapi.Message) {
 	}
 }
 
-func (h *Handler) ProcessPartnerUsername(msg *tgbotapi.Message) {
-	ctx := context.Background()
+func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 	partnerUsername := msg.Text

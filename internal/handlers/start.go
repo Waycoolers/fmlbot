@@ -7,8 +7,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) Start(msg *tgbotapi.Message) {
-	ctx := context.Background()
+func (h *Handler) Start(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 	username := msg.From.UserName

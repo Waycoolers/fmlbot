@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"log"
+	"os/signal"
+	"syscall"
 
 	"github.com/Waycoolers/fmlbot/internal/bot"
 	"github.com/Waycoolers/fmlbot/internal/config"
@@ -36,5 +39,13 @@ func main() {
 		log.Fatalf("Ошибка создания бота: %v", err)
 	}
 
-	b.Run()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	go func() {
+		<-ctx.Done()
+		log.Println("Выключение...")
+		b.Api.StopReceivingUpdates()
+	}()
+
+	b.Run(ctx)
 }
