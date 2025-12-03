@@ -23,9 +23,9 @@ func main() {
 		log.Fatalf("Ошибка подключения к БД: %v", err)
 	}
 	defer func(DB *sqlx.DB) {
-		err := DB.Close()
-		if err != nil {
-			log.Printf("Ошибка при закрытии подключения к БД: %v", err)
+		er := DB.Close()
+		if er != nil {
+			log.Printf("Ошибка при закрытии подключения к БД: %v", er)
 		}
 	}(store.DB)
 
