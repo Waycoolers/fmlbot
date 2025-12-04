@@ -4,7 +4,7 @@ import (
 	"context"
 	"math/rand"
 
-	"github.com/Waycoolers/fmlbot/internal/models"
+	"github.com/Waycoolers/fmlbot/internal/domain"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -20,7 +20,7 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 
 	if partnerID == 0 {
 		h.Reply(chatID, "Ты не можешь получить комплимент так как у тебя не добавлен партнёр. "+
-			"Сначала добавь партнёра с помощью "+string(models.SetPartner))
+			"Сначала добавь партнёра с помощью "+string(domain.SetPartner))
 		return
 	}
 
@@ -31,7 +31,7 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	}
 
 	// Выбираем только активные комплименты
-	var compliments []models.Compliment
+	var compliments []domain.Compliment
 	for _, compliment := range allCompliments {
 		if !compliment.IsSent {
 			compliments = append(compliments, compliment)

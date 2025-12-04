@@ -1,12 +1,12 @@
-package bot
+package app
 
 import (
 	"context"
 	"log"
 	"strings"
 
+	"github.com/Waycoolers/fmlbot/internal/domain"
 	"github.com/Waycoolers/fmlbot/internal/handlers"
-	"github.com/Waycoolers/fmlbot/internal/models"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -20,43 +20,29 @@ func NewRouter(h *handlers.Handler) *Router {
 
 func (r *Router) HandleUpdate(ctx context.Context, update tgbotapi.Update) {
 	if update.CallbackQuery != nil {
-		chatID := update.CallbackQuery.Message.Chat.ID
-		data := update.CallbackQuery.Data
-		if data == "delete_confirm" || data == "delete_cancel" {
-			err := r.h.HandleDeleteCallback(ctx, update.CallbackQuery)
-			if err != nil {
-				r.h.HandleErr(chatID, "Ошибка при обработке callback на удаление аккаунта", err)
-			}
-		}
-		if data == "delete_partner_confirm" || data == "delete_partner_cancel" {
-			err := r.h.HandleDeletePartnerCallback(ctx, update.CallbackQuery)
-			if err != nil {
-				r.h.HandleErr(chatID, "Ошибка при обработке callback на удаление партнера", err)
-			}
-		}
-		if strings.HasPrefix(data, "delete_compliment:") || data == "cancel_deletion" {
-			err := r.h.HandleDeleteComplimentCallback(ctx, update.CallbackQuery)
-			if err != nil {
-				r.h.HandleErr(chatID, "Ошибка при обработке callback на удаление комплимента", err)
-			}
-		}
+		r.handleCallback(ctx, update.CallbackQuery)
 		return
 	}
 
-	msg := update.Message
+	if update.Message != nil {
+		r.handleMessage(ctx, update.Message)
+		return
+	}
+}
+
+func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 	text := msg.Text
-
 	username, err := r.h.Store.GetUsername(ctx, userID)
 	if err != nil {
-		log.Printf("Ошибка при получении юзернейма: %v", err)
+		r.h.HandleErr(chatID, "Ошибка при получении юзернейма", err)
+		return
 	}
-
 	log.Printf("Клиент %v написал: %v", username, text)
 
-	if text == string(models.Start) {
-		err = r.h.Store.SetUserState(ctx, userID, models.Empty)
+	if text == string(domain.Start) {
+		err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
 		if err != nil {
 			r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 			return
@@ -73,10 +59,10 @@ func (r *Router) HandleUpdate(ctx context.Context, update tgbotapi.Update) {
 
 	if !strings.HasPrefix(text, "/") {
 		switch state {
-		case models.AwaitingPartner:
+		case domain.AwaitingPartner:
 			r.h.ProcessPartnerUsername(ctx, msg)
 			return
-		case models.AwaitingCompliment:
+		case domain.AwaitingCompliment:
 			r.h.ProcessCompliment(ctx, msg)
 			return
 		default:
@@ -85,59 +71,59 @@ func (r *Router) HandleUpdate(ctx context.Context, update tgbotapi.Update) {
 		}
 	} else {
 		switch {
-		case strings.HasPrefix(text, string(models.SetPartner)):
-			err = r.h.Store.SetUserState(ctx, userID, models.Empty)
+		case strings.HasPrefix(text, string(domain.SetPartner)):
+			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
 			if err != nil {
 				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
 			}
 			r.h.SetPartner(ctx, msg)
 			return
-		case strings.HasPrefix(text, string(models.DeletePartner)):
-			err = r.h.Store.SetUserState(ctx, userID, models.Empty)
+		case strings.HasPrefix(text, string(domain.DeletePartner)):
+			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
 			if err != nil {
 				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
 			}
 			r.h.DeletePartner(ctx, msg)
 			return
-		case strings.HasPrefix(text, string(models.Cancel)):
+		case strings.HasPrefix(text, string(domain.Cancel)):
 			r.h.Cancel(ctx, msg)
 			return
-		case strings.HasPrefix(text, string(models.DeleteAccount)):
-			err = r.h.Store.SetUserState(ctx, userID, models.Empty)
+		case strings.HasPrefix(text, string(domain.DeleteAccount)):
+			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
 			if err != nil {
 				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
 			}
 			r.h.DeleteAccount(ctx, msg)
 			return
-		case strings.HasPrefix(text, string(models.AddCompliment)):
-			err = r.h.Store.SetUserState(ctx, userID, models.Empty)
+		case strings.HasPrefix(text, string(domain.AddCompliment)):
+			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
 			if err != nil {
 				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
 			}
 			r.h.AddCompliment(ctx, msg)
 			return
-		case strings.HasPrefix(text, string(models.GetCompliments)):
-			err = r.h.Store.SetUserState(ctx, userID, models.Empty)
+		case strings.HasPrefix(text, string(domain.GetCompliments)):
+			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
 			if err != nil {
 				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
 			}
 			r.h.GetCompliments(ctx, msg)
 			return
-		case strings.HasPrefix(text, string(models.DeleteCompliment)):
-			err = r.h.Store.SetUserState(ctx, userID, models.Empty)
+		case strings.HasPrefix(text, string(domain.DeleteCompliment)):
+			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
 			if err != nil {
 				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
 			}
 			r.h.DeleteCompliment(ctx, msg)
 			return
-		case strings.HasPrefix(text, string(models.ReceiveCompliment)):
-			err = r.h.Store.SetUserState(ctx, userID, models.Empty)
+		case strings.HasPrefix(text, string(domain.ReceiveCompliment)):
+			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
 			if err != nil {
 				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
@@ -149,4 +135,28 @@ func (r *Router) HandleUpdate(ctx context.Context, update tgbotapi.Update) {
 			return
 		}
 	}
+}
+
+func (r *Router) handleCallback(ctx context.Context, cq *tgbotapi.CallbackQuery) {
+	chatID := cq.Message.Chat.ID
+	data := cq.Data
+	if data == "delete_confirm" || data == "delete_cancel" {
+		err := r.h.HandleDeleteCallback(ctx, cq)
+		if err != nil {
+			r.h.HandleErr(chatID, "Ошибка при обработке callback на удаление аккаунта", err)
+		}
+	}
+	if data == "delete_partner_confirm" || data == "delete_partner_cancel" {
+		err := r.h.HandleDeletePartnerCallback(ctx, cq)
+		if err != nil {
+			r.h.HandleErr(chatID, "Ошибка при обработке callback на удаление партнера", err)
+		}
+	}
+	if strings.HasPrefix(data, "delete_compliment:") || data == "cancel_deletion" {
+		err := r.h.HandleDeleteComplimentCallback(ctx, cq)
+		if err != nil {
+			r.h.HandleErr(chatID, "Ошибка при обработке callback на удаление комплимента", err)
+		}
+	}
+	return
 }

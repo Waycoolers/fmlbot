@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Waycoolers/fmlbot/internal/models"
+	"github.com/Waycoolers/fmlbot/internal/domain"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -13,7 +13,7 @@ func (h *Handler) SetPartner(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 
-	err := h.Store.SetUserState(ctx, userID, models.AwaitingPartner)
+	err := h.Store.SetUserState(ctx, userID, domain.AwaitingPartner)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния awaiting_partner", err)
 		return
@@ -26,7 +26,7 @@ func (h *Handler) SetPartner(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	if partnerID == 0 {
-		h.Reply(chatID, "Отправь username своей половинки\n(Напиши "+string(models.Cancel)+" чтобы отменить это действие)")
+		h.Reply(chatID, "Отправь username своей половинки\n(Напиши "+string(domain.Cancel)+" чтобы отменить это действие)")
 	} else {
 		partnerUsername, er := h.Store.GetUsername(ctx, partnerID)
 		if er != nil {
@@ -34,7 +34,7 @@ func (h *Handler) SetPartner(ctx context.Context, msg *tgbotapi.Message) {
 			return
 		}
 		h.Reply(chatID, "Твой партнер - @"+partnerUsername+"\nЕсли хочешь изменить аккаунт партнёра, "+
-			"то отправь username своей половинки\n(Напиши "+string(models.Cancel)+" чтобы отменить это действие)")
+			"то отправь username своей половинки\n(Напиши "+string(domain.Cancel)+" чтобы отменить это действие)")
 	}
 }
 
@@ -60,8 +60,8 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 	}
 
 	if !exists {
-		h.Reply(chatID, "Партнёр не найден. Попроси его сначала написать боту "+string(models.Start)+" 😅"+
-			"\n(Напиши "+string(models.Cancel)+" чтобы отменить это действие)")
+		h.Reply(chatID, "Партнёр не найден. Попроси его сначала написать боту "+string(domain.Start)+" 😅"+
+			"\n(Напиши "+string(domain.Cancel)+" чтобы отменить это действие)")
 		return
 	}
 
@@ -81,7 +81,7 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 	if partnerExists != 0 {
 		if partnerExists == userID {
 			h.Reply(chatID, "@"+correctPartnerUsername+" и так ваш партнёр. Приятного времяпрепровождения!")
-			err = h.Store.SetUserState(ctx, userID, models.Empty)
+			err = h.Store.SetUserState(ctx, userID, domain.Empty)
 			if err != nil {
 				h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
@@ -89,7 +89,7 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 			return
 		} else {
 			h.Reply(chatID, "У данного пользователя уже есть партнёр 😔")
-			err = h.Store.SetUserState(ctx, userID, models.Empty)
+			err = h.Store.SetUserState(ctx, userID, domain.Empty)
 			if err != nil {
 				h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 				return
@@ -113,13 +113,13 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 		h.Reply(userPartnerExists, "Твой партнёр добавил другого партнёра 💔")
 	}
 
-	err = h.Store.SetUserState(ctx, partnerID, models.Empty)
+	err = h.Store.SetUserState(ctx, partnerID, domain.Empty)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 		return
 	}
 
-	err = h.Store.SetUserState(ctx, userID, models.Empty)
+	err = h.Store.SetUserState(ctx, userID, domain.Empty)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 		return

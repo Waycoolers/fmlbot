@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 
-	"github.com/Waycoolers/fmlbot/internal/models"
+	"github.com/Waycoolers/fmlbot/internal/domain"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -24,7 +24,7 @@ func (h *Handler) Start(ctx context.Context, msg *tgbotapi.Message) {
 			h.HandleErr(chatID, "Ошибка при регистрации", err)
 			return
 		}
-		h.Reply(chatID, "Привет! 💖 Ты зарегистрирован в fmlbot. Добавь партнёра с помощью "+string(models.SetPartner)+"\n"+
+		h.Reply(chatID, "Привет! 💖 Ты зарегистрирован в fmlbot. Добавь партнёра с помощью "+string(domain.SetPartner)+"\n"+
 			"(Не забудь, что партнер должен тоже зарегистрироваться в боте)")
 	} else {
 		partnerID, er := h.Store.GetPartnerID(ctx, userID)
@@ -34,7 +34,7 @@ func (h *Handler) Start(ctx context.Context, msg *tgbotapi.Message) {
 		}
 
 		if partnerID == 0 {
-			h.Reply(chatID, "Ты уже зарегистрирован! Используй "+string(models.SetPartner)+", чтобы добавить партнёра 💌")
+			h.Reply(chatID, "Ты уже зарегистрирован! Используй "+string(domain.SetPartner)+", чтобы добавить партнёра 💌")
 		} else {
 			partnerUsername, err2 := h.Store.GetUsername(ctx, partnerID)
 			if err2 != nil {

@@ -17,15 +17,14 @@ func (h *Handler) DeleteAccount(_ context.Context, msg *tgbotapi.Message) {
 		),
 	)
 
-	message := tgbotapi.NewMessage(chatID, "Ты уверен, что хочешь удалить аккаунт? Все твои пользовательские данные тоже будут удалены.")
-	message.ReplyMarkup = buttons
+	text := "Ты уверен, что хочешь удалить аккаунт? Все твои пользовательские данные тоже будут удалены."
 
-	_, err := h.api.Send(message)
+	err := h.UI.Client.SendWithInlineKeyboard(chatID, text, buttons)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
 		return
 	}
-	log.Printf("Бот ответил: %v", message.Text)
+	log.Printf("Бот ответил: %v", text)
 }
 
 func (h *Handler) HandleDeleteCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) error {
@@ -37,27 +36,27 @@ func (h *Handler) HandleDeleteCallback(ctx context.Context, cb *tgbotapi.Callbac
 	case "delete_confirm":
 		partnerID, err := h.Store.GetPartnerID(ctx, userID)
 		if err != nil {
-			h.RemoveButtons(chatID, messageID)
+			h.UI.RemoveButtons(chatID, messageID)
 			return err
 		}
 
 		if partnerID != 0 {
 			err = h.Store.RemovePartners(ctx, userID, partnerID)
 			if err != nil {
-				h.RemoveButtons(chatID, messageID)
+				h.UI.RemoveButtons(chatID, messageID)
 				return err
 			}
 
 			err = h.Store.DeleteUser(ctx, userID)
 			if err != nil {
-				h.RemoveButtons(chatID, messageID)
+				h.UI.RemoveButtons(chatID, messageID)
 				return err
 			}
 			h.Reply(partnerID, "Твой партнёр удалил свой аккаунт 💔")
 		} else {
 			err = h.Store.DeleteUser(ctx, userID)
 			if err != nil {
-				h.RemoveButtons(chatID, messageID)
+				h.UI.RemoveButtons(chatID, messageID)
 				return err
 			}
 		}
@@ -67,6 +66,6 @@ func (h *Handler) HandleDeleteCallback(ctx context.Context, cb *tgbotapi.Callbac
 	case "delete_cancel":
 		h.Reply(chatID, "Удаление аккаунта отменено ✅")
 	}
-	h.RemoveButtons(chatID, messageID)
+	h.UI.RemoveButtons(chatID, messageID)
 	return nil
 }
