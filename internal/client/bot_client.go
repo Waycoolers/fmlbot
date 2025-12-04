@@ -39,6 +39,7 @@ type BotClient interface {
 	EditMessageReplyMarkup(chatID int64, messageID int, markup tgbotapi.InlineKeyboardMarkup) error
 	GetUpdatesChan() <-chan tgbotapi.Update
 	StopReceivingUpdates()
+	Send(msg tgbotapi.Chattable) (tgbotapi.Message, error)
 }
 
 type TelegramClient struct {
@@ -93,4 +94,8 @@ func (c *TelegramClient) GetUpdatesChan() <-chan tgbotapi.Update {
 
 func (c *TelegramClient) StopReceivingUpdates() {
 	c.api.StopReceivingUpdates()
+}
+
+func (c *TelegramClient) Send(msg tgbotapi.Chattable) (tgbotapi.Message, error) {
+	return c.api.Send(msg)
 }
