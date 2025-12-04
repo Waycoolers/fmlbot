@@ -15,7 +15,7 @@ func New(client client.BotClient) *MenuUI {
 	return &MenuUI{Client: client}
 }
 
-func (ui *MenuUI) MainMenu(chatID int64) {
+func (ui *MenuUI) MainMenu(chatID int64) error {
 	buttons := [][]tgbotapi.InlineKeyboardButton{
 		{tgbotapi.NewInlineKeyboardButtonData("👤 Партнёр", "menu:partner")},
 		{tgbotapi.NewInlineKeyboardButtonData("❤️ Комплименты", "menu:compliments")},
@@ -23,9 +23,29 @@ func (ui *MenuUI) MainMenu(chatID int64) {
 	}
 	kb := tgbotapi.NewInlineKeyboardMarkup(buttons...)
 	if err := ui.Client.SendWithInlineKeyboard(chatID, "Выберите действие:", kb); err != nil {
-		log.Printf("Ошибка при показе главного меню: %v", err)
+		return err
 	}
+	return nil
 }
+
+//func (ui *MenuUI) MainMenu(chatID int64) error {
+//	menu := tgbotapi.NewReplyKeyboard(
+//		tgbotapi.NewKeyboardButtonRow(
+//			tgbotapi.NewKeyboardButton("Аккаунт"),
+//			tgbotapi.NewKeyboardButton("Партнёр"),
+//			tgbotapi.NewKeyboardButton("Комплименты"),
+//		),
+//	)
+//
+//	menu.ResizeKeyboard = true
+//	menu.OneTimeKeyboard = false
+//
+//	msg := tgbotapi.NewMessage(chatID, "Добро пожаловать")
+//	msg.ReplyMarkup = menu
+//
+//	_, err := ui.Client.Send(msg)
+//	return err
+//}
 
 func (ui *MenuUI) RemoveButtons(chatID int64, messageID int) {
 	empty := tgbotapi.InlineKeyboardMarkup{

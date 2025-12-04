@@ -9,19 +9,31 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) SetPartner(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) ShowPartnerMenu(_ context.Context, cq *tgbotapi.CallbackQuery) {
+	chatID := cq.Message.Chat.ID
+	err := h.ui.PartnerMenu(chatID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при попытке отобразить меню партнеров", err)
+		return
+	}
+}
+
+func (h *Handler) SetPartner(ctx context.Context, cq *tgbotapi.CallbackQuery) {
+	userID := cq.From.ID
+	chatID := cq.Message.Chat.ID
+	messageID := cq.Message.MessageID
 
 	err := h.Store.SetUserState(ctx, userID, domain.AwaitingPartner)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния awaiting_partner", err)
+		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 
 	partnerID, err := h.Store.GetPartnerID(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке получить id партнёра", err)
+		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 
@@ -31,11 +43,13 @@ func (h *Handler) SetPartner(ctx context.Context, msg *tgbotapi.Message) {
 		partnerUsername, er := h.Store.GetUsername(ctx, partnerID)
 		if er != nil {
 			h.HandleErr(chatID, "Ошибка при попытке получить username партнёра", er)
+			h.ui.RemoveButtons(chatID, messageID)
 			return
 		}
 		h.Reply(chatID, "Твой партнер - @"+partnerUsername+"\nЕсли хочешь изменить аккаунт партнёра, "+
 			"то отправь username своей половинки\n(Напиши "+string(domain.Cancel)+" чтобы отменить это действие)")
 	}
+	h.ui.RemoveButtons(chatID, messageID)
 }
 
 func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Message) {
@@ -133,4 +147,76 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 
 	h.Reply(partnerID, "💞 Ура! Теперь вы и @"+userUsername+" — официально пара в боте 💌")
 	h.Reply(chatID, fmt.Sprintf("Партнёр успешно добавлен! 💖 (@%s)", correctPartnerUsername))
+}
+
+func (h *Handler) DeletePartner(ctx context.Context, cq *tgbotapi.CallbackQuery) {
+	userID := cq.From.ID
+	chatID := cq.Message.Chat.ID
+	messageID := cq.Message.MessageID
+	partnerID, err := h.Store.GetPartnerID(ctx, userID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
+		h.ui.RemoveButtons(chatID, messageID)
+		return
+	}
+
+	if partnerID == 0 {
+		h.Reply(userID, "У тебя ещё не добавлен партнер")
+		h.ui.RemoveButtons(chatID, messageID)
+		return
+	}
+
+	buttons := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Да, удалить 💔", "partner:delete:confirm"),
+			tgbotapi.NewInlineKeyboardButtonData("Отмена ❌", "partner:delete:cancel"),
+		),
+	)
+
+	partnerUsername, err := h.Store.GetUsername(ctx, partnerID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при попытке получить username партнера", err)
+		h.ui.RemoveButtons(chatID, messageID)
+		return
+	}
+
+	text := "Вы уверены, что хотите удалить партнёра @" + partnerUsername + "?"
+
+	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
+		h.ui.RemoveButtons(chatID, messageID)
+		return
+	}
+	h.ui.RemoveButtons(chatID, messageID)
+}
+
+func (h *Handler) HandleDeletePartner(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+	userID := cb.From.ID
+	chatID := cb.Message.Chat.ID
+	messageID := cb.Message.MessageID
+
+	switch cb.Data {
+	case "partner:delete:confirm":
+		partnerID, err := h.Store.GetPartnerID(ctx, userID)
+		if err != nil {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.HandleErr(chatID, "Ошибка при попытке получить id партнера", err)
+			return
+		}
+
+		err = h.Store.RemovePartners(ctx, userID, partnerID)
+		if err != nil {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.HandleErr(chatID, "Ошибка при попытке удалить партнеров", err)
+			return
+		}
+
+		h.Reply(chatID, "Партнёр успешно удалён 💔")
+		h.Reply(partnerID, "Твой партнёр отписался от тебя 💔")
+
+	case "partner:delete:cancel":
+		h.Reply(chatID, "Удаление партнёра отменено")
+	}
+	h.ui.RemoveButtons(chatID, messageID)
 }

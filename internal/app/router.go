@@ -10,6 +10,18 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+func parseCallbackData(data string) (section, action, payload string) {
+	parts := strings.Split(data, ":")
+	switch len(parts) {
+	case 1:
+		return parts[0], "", ""
+	case 2:
+		return parts[0], parts[1], ""
+	default:
+		return parts[0], parts[1], strings.Join(parts[2:], ":")
+	}
+}
+
 type Router struct {
 	h *handlers.Handler
 }
@@ -47,7 +59,7 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 			return
 		}
-		r.h.Start(ctx, msg)
+		r.h.ShowMainMenu(ctx, chatID)
 		return
 	}
 
@@ -69,94 +81,94 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			r.h.Reply(chatID, "Я жду от тебя команду")
 			return
 		}
-	} else {
-		switch {
-		case strings.HasPrefix(text, string(domain.SetPartner)):
-			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
-			if err != nil {
-				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-				return
-			}
-			r.h.SetPartner(ctx, msg)
-			return
-		case strings.HasPrefix(text, string(domain.DeletePartner)):
-			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
-			if err != nil {
-				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-				return
-			}
-			r.h.DeletePartner(ctx, msg)
-			return
-		case strings.HasPrefix(text, string(domain.Cancel)):
-			r.h.Cancel(ctx, msg)
-			return
-		case strings.HasPrefix(text, string(domain.DeleteAccount)):
-			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
-			if err != nil {
-				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-				return
-			}
-			r.h.DeleteAccount(ctx, msg)
-			return
-		case strings.HasPrefix(text, string(domain.AddCompliment)):
-			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
-			if err != nil {
-				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-				return
-			}
-			r.h.AddCompliment(ctx, msg)
-			return
-		case strings.HasPrefix(text, string(domain.GetCompliments)):
-			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
-			if err != nil {
-				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-				return
-			}
-			r.h.GetCompliments(ctx, msg)
-			return
-		case strings.HasPrefix(text, string(domain.DeleteCompliment)):
-			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
-			if err != nil {
-				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-				return
-			}
-			r.h.DeleteCompliment(ctx, msg)
-			return
-		case strings.HasPrefix(text, string(domain.ReceiveCompliment)):
-			err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
-			if err != nil {
-				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-				return
-			}
-			r.h.ReceiveCompliment(ctx, msg)
-			return
-		default:
-			r.h.Reply(chatID, "Я не знаю такую команду")
-			return
-		}
 	}
 }
 
 func (r *Router) handleCallback(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
 	data := cq.Data
-	if data == "delete_confirm" || data == "delete_cancel" {
-		err := r.h.HandleDeleteCallback(ctx, cq)
-		if err != nil {
-			r.h.HandleErr(chatID, "Ошибка при обработке callback на удаление аккаунта", err)
-		}
+	username := cq.From.UserName
+	text := ""
+	if cq.Message != nil {
+		text = cq.Message.Text
 	}
-	if data == "delete_partner_confirm" || data == "delete_partner_cancel" {
-		err := r.h.HandleDeletePartnerCallback(ctx, cq)
-		if err != nil {
-			r.h.HandleErr(chatID, "Ошибка при обработке callback на удаление партнера", err)
-		}
+	log.Printf("Клиент %v написал: %v", username, text)
+
+	section, action, payload := parseCallbackData(data)
+
+	switch section {
+	case "menu":
+		r.handleMenu(ctx, cq, action)
+	case "account":
+		r.handleAccount(ctx, cq, action, payload)
+	case "partner":
+		r.handlePartner(ctx, cq, action, payload)
+	case "compliments":
+		r.handleCompliments(ctx, cq, action, payload)
+	default:
+		r.h.ReplyUnknownCallback(ctx, cq)
 	}
-	if strings.HasPrefix(data, "delete_compliment:") || data == "cancel_deletion" {
-		err := r.h.HandleDeleteComplimentCallback(ctx, cq)
-		if err != nil {
-			r.h.HandleErr(chatID, "Ошибка при обработке callback на удаление комплимента", err)
-		}
+}
+
+func (r *Router) handleMenu(ctx context.Context, cq *tgbotapi.CallbackQuery, action string) {
+	switch action {
+	case "main":
+		r.h.ShowMainMenu(ctx, cq.Message.Chat.ID)
+	case "account":
+		r.h.ShowAccountMenu(ctx, cq)
+	case "partner":
+		r.h.ShowPartnerMenu(ctx, cq)
+	case "compliments":
+		r.h.ShowComplimentsMenu(ctx, cq)
+	default:
+		r.h.ReplyUnknownCallback(ctx, cq)
 	}
-	return
+}
+
+func (r *Router) handleAccount(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
+	switch action {
+	case "register":
+		r.h.Register(ctx, cq)
+	case "delete":
+		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
+			r.h.HandleDeleteAccount(ctx, cq)
+		} else {
+			r.h.DeleteAccount(ctx, cq)
+		}
+	default:
+		r.h.ReplyUnknownCallback(ctx, cq)
+	}
+}
+
+func (r *Router) handlePartner(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
+	switch action {
+	case "add":
+		r.h.SetPartner(ctx, cq)
+	case "delete":
+		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
+			r.h.HandleDeletePartner(ctx, cq)
+		} else {
+			r.h.DeletePartner(ctx, cq)
+		}
+	default:
+		r.h.ReplyUnknownCallback(ctx, cq)
+	}
+}
+
+func (r *Router) handleCompliments(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
+	switch action {
+	case "add":
+		r.h.AddCompliment(ctx, cq)
+	case "delete":
+		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
+			r.h.HandleDeleteCompliment(ctx, cq)
+		} else {
+			r.h.DeleteCompliment(ctx, cq)
+		}
+	case "all":
+		r.h.GetCompliments(ctx, cq)
+	case "receive":
+		r.h.ReceiveCompliment(ctx, cq)
+	default:
+		r.h.ReplyUnknownCallback(ctx, cq)
+	}
 }
