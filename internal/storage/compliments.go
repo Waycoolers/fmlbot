@@ -4,17 +4,17 @@ import (
 	"context"
 	"log"
 
-	"github.com/Waycoolers/fmlbot/internal/models"
+	"github.com/Waycoolers/fmlbot/internal/domain"
 )
 
-func (s *Storage) AddCompliment(ctx context.Context, telegramID int64, text string) (*models.Compliment, error) {
+func (s *Storage) AddCompliment(ctx context.Context, telegramID int64, text string) (*domain.Compliment, error) {
 	tx, err := s.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		log.Printf("Ошибка начала транзакции: %v", err)
 		return nil, err
 	}
 
-	var compliment models.Compliment
+	var compliment domain.Compliment
 	err = tx.QueryRowContext(ctx, `
         INSERT INTO compliments (text)
         VALUES ($1)
@@ -45,8 +45,8 @@ func (s *Storage) AddCompliment(ctx context.Context, telegramID int64, text stri
 	return &compliment, tx.Commit()
 }
 
-func (s *Storage) GetCompliments(ctx context.Context, telegramID int64) (compliments []models.Compliment, err error) {
-	compliments = []models.Compliment{}
+func (s *Storage) GetCompliments(ctx context.Context, telegramID int64) (compliments []domain.Compliment, err error) {
+	compliments = []domain.Compliment{}
 	err = s.DB.SelectContext(ctx, &compliments, `
 		SELECT c.id, c.text, c.is_sent, c.created_at
 		FROM compliments AS c

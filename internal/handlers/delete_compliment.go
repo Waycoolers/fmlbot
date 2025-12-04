@@ -33,9 +33,6 @@ func (h *Handler) DeleteCompliment(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
-	message := tgbotapi.NewMessage(chatID, "🗑 <b>Выбери комплимент для удаления</b>")
-	message.ParseMode = "HTML"
-
 	var keyboard [][]tgbotapi.InlineKeyboardButton
 
 	for _, compliment := range compliments {
@@ -56,13 +53,14 @@ func (h *Handler) DeleteCompliment(ctx context.Context, msg *tgbotapi.Message) {
 		tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "cancel_deletion"),
 	})
 
-	message.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(keyboard...)
-	_, err = h.api.Send(message)
+	text := "🗑 <b>Выбери комплимент для удаления</b>"
+	markup := tgbotapi.NewInlineKeyboardMarkup(keyboard...)
+	err = h.UI.Client.SendWithInlineKeyboard(chatID, text, markup)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
 		return
 	}
-	log.Printf("Бот ответил: %v", message.Text)
+	log.Printf("Бот ответил: %v", text)
 }
 
 func (h *Handler) HandleDeleteComplimentCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) error {
@@ -76,7 +74,7 @@ func (h *Handler) HandleDeleteComplimentCallback(ctx context.Context, cb *tgbota
 
 		err := h.Store.DeleteCompliment(ctx, cb.From.ID, int64(complimentID))
 		if err != nil {
-			h.RemoveButtons(chatID, messageID)
+			h.UI.RemoveButtons(chatID, messageID)
 			return err
 		}
 
@@ -84,6 +82,6 @@ func (h *Handler) HandleDeleteComplimentCallback(ctx context.Context, cb *tgbota
 	} else if data == "cancel_deletion" {
 		h.Reply(chatID, "Удаление комплимента отменено")
 	}
-	h.RemoveButtons(chatID, messageID)
+	h.UI.RemoveButtons(chatID, messageID)
 	return nil
 }

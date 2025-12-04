@@ -34,15 +34,14 @@ func (h *Handler) DeletePartner(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
-	message := tgbotapi.NewMessage(chatID, "Вы уверены, что хотите удалить партнёра @"+partnerUsername+"?")
-	message.ReplyMarkup = buttons
+	text := "Вы уверены, что хотите удалить партнёра @" + partnerUsername + "?"
 
-	_, err = h.api.Send(message)
+	err = h.UI.Client.SendWithInlineKeyboard(chatID, text, buttons)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
 		return
 	}
-	log.Printf("Бот ответил: %v", message.Text)
+	log.Printf("Бот ответил: %v", text)
 }
 
 func (h *Handler) HandleDeletePartnerCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) error {
@@ -54,13 +53,13 @@ func (h *Handler) HandleDeletePartnerCallback(ctx context.Context, cb *tgbotapi.
 	case "delete_partner_confirm":
 		partnerID, err := h.Store.GetPartnerID(ctx, userID)
 		if err != nil {
-			h.RemoveButtons(chatID, messageID)
+			h.UI.RemoveButtons(chatID, messageID)
 			return err
 		}
 
 		err = h.Store.RemovePartners(ctx, userID, partnerID)
 		if err != nil {
-			h.RemoveButtons(chatID, messageID)
+			h.UI.RemoveButtons(chatID, messageID)
 			return err
 		}
 
@@ -70,6 +69,6 @@ func (h *Handler) HandleDeletePartnerCallback(ctx context.Context, cb *tgbotapi.
 	case "delete_partner_cancel":
 		h.Reply(chatID, "Удаление партнёра отменено")
 	}
-	h.RemoveButtons(chatID, messageID)
+	h.UI.RemoveButtons(chatID, messageID)
 	return nil
 }

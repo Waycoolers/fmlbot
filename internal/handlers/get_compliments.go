@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 
-	"github.com/Waycoolers/fmlbot/internal/models"
+	"github.com/Waycoolers/fmlbot/internal/domain"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -19,7 +19,7 @@ func (h *Handler) GetCompliments(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	if len(compliments) == 0 {
-		h.Reply(chatID, "Ты пока не добавлял(а) комплиментов. Добавь комплимент с помощью "+string(models.AddCompliment))
+		h.Reply(chatID, "Ты пока не добавлял(а) комплиментов. Добавь комплимент с помощью "+string(domain.AddCompliment))
 		return
 	}
 

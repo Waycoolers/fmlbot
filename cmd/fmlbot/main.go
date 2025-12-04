@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Waycoolers/fmlbot/internal/bot"
+	"github.com/Waycoolers/fmlbot/internal/app"
 	"github.com/Waycoolers/fmlbot/internal/config"
 	"github.com/Waycoolers/fmlbot/internal/storage"
 	"github.com/jmoiron/sqlx"
@@ -34,7 +34,7 @@ func main() {
 		log.Fatalf("Ошибка при запуске миграций: %v", err)
 	}
 
-	b, err := bot.New(cfg, store)
+	b, err := app.New(cfg, store)
 	if err != nil {
 		log.Fatalf("Ошибка создания бота: %v", err)
 	}
@@ -44,7 +44,7 @@ func main() {
 	go func() {
 		<-ctx.Done()
 		log.Println("Выключение...")
-		b.Api.StopReceivingUpdates()
+		b.Client.StopReceivingUpdates()
 	}()
 
 	b.Run(ctx)
