@@ -18,7 +18,7 @@ func New(ui *ui.MenuUI, store *storage.Storage) *Handler {
 	return &Handler{ui: ui, Store: store}
 }
 
-func (h *Handler) ShowStartMenu(ctx context.Context, chatID int64) {
+func (h *Handler) ShowStartMenu(_ context.Context, chatID int64) {
 	err := h.ui.StartMenu(chatID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить стартовое меню", err)
