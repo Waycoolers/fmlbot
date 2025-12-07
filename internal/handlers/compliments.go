@@ -11,8 +11,8 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) ShowComplimentsMenu(_ context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
+func (h *Handler) ShowComplimentsMenu(_ context.Context, msg *tgbotapi.Message) {
+	chatID := msg.Chat.ID
 	err := h.ui.ComplimentsMenu(chatID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить меню комплиментов", err)
@@ -20,20 +20,17 @@ func (h *Handler) ShowComplimentsMenu(_ context.Context, cq *tgbotapi.CallbackQu
 	}
 }
 
-func (h *Handler) AddCompliment(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	userID := cq.From.ID
-	chatID := cq.Message.Chat.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) AddCompliment(ctx context.Context, msg *tgbotapi.Message) {
+	userID := msg.From.ID
+	chatID := msg.Chat.ID
 
 	err := h.Store.SetUserState(ctx, userID, domain.AwaitingCompliment)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния awaiting_compliment", err)
-		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 
-	h.Reply(chatID, "Введи комплимент\n(Напиши "+string(domain.Cancel)+" чтобы отменить это действие)")
-	h.ui.RemoveButtons(chatID, messageID)
+	h.Reply(chatID, "Введи комплимент\n(Напиши чтобы отменить это действие)")
 }
 
 func (h *Handler) ProcessCompliment(ctx context.Context, msg *tgbotapi.Message) {
@@ -66,22 +63,19 @@ func (h *Handler) ProcessCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	h.Reply(chatID, "Комплимент успешно добавлен")
 }
 
-func (h *Handler) GetCompliments(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	userID := cq.From.ID
-	chatID := cq.Message.Chat.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) GetCompliments(ctx context.Context, msg *tgbotapi.Message) {
+	userID := msg.From.ID
+	chatID := msg.Chat.ID
 	var reply string
 
 	compliments, err := h.Store.GetCompliments(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка комплиментов", err)
-		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 
 	if len(compliments) == 0 {
-		h.Reply(chatID, "Ты пока не добавлял(а) комплиментов. Добавь комплимент с помощью "+string(domain.AddCompliment))
-		h.ui.RemoveButtons(chatID, messageID)
+		h.Reply(chatID, "Ты пока не добавлял(а) комплиментов. Добавь комплимент")
 		return
 	}
 
@@ -103,7 +97,6 @@ func (h *Handler) GetCompliments(ctx context.Context, cq *tgbotapi.CallbackQuery
 	}
 
 	h.Reply(chatID, reply)
-	h.ui.RemoveButtons(chatID, messageID)
 }
 
 func truncateText(text string, maxLength int) string {
@@ -114,21 +107,18 @@ func truncateText(text string, maxLength int) string {
 	return text[:maxLength-3] + "..."
 }
 
-func (h *Handler) DeleteCompliment(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	userID := cq.From.ID
-	chatID := cq.Message.Chat.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) DeleteCompliment(ctx context.Context, msg *tgbotapi.Message) {
+	userID := msg.From.ID
+	chatID := msg.Chat.ID
 
 	compliments, err := h.Store.GetCompliments(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка комплиментов", err)
-		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 
 	if len(compliments) == 0 {
 		h.Reply(chatID, "У тебя пока нет запланированных комплиментов 😔")
-		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 
@@ -157,7 +147,6 @@ func (h *Handler) DeleteCompliment(ctx context.Context, cq *tgbotapi.CallbackQue
 	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, markup)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
-		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 }
@@ -185,29 +174,25 @@ func (h *Handler) HandleDeleteCompliment(ctx context.Context, cb *tgbotapi.Callb
 	h.ui.RemoveButtons(chatID, messageID)
 }
 
-func (h *Handler) ReceiveCompliment(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	userID := cq.From.ID
-	chatID := cq.Message.Chat.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) {
+	userID := msg.From.ID
+	chatID := msg.Chat.ID
 
 	partnerID, err := h.Store.GetPartnerID(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
-		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 
 	if partnerID == 0 {
 		h.Reply(chatID, "Ты не можешь получить комплимент так как у тебя не добавлен партнёр. "+
-			"Сначала добавь партнёра с помощью "+string(domain.SetPartner))
-		h.ui.RemoveButtons(chatID, messageID)
+			"Сначала добавь партнёра с помощью")
 		return
 	}
 
 	allCompliments, err := h.Store.GetCompliments(ctx, partnerID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка комплиментов", err)
-		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 
@@ -221,7 +206,6 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, cq *tgbotapi.CallbackQu
 
 	if len(compliments) == 0 {
 		h.Reply(chatID, "Тебе не отправили комплимент (((")
-		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 
@@ -229,7 +213,6 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, cq *tgbotapi.CallbackQu
 	err = h.Store.MarkComplimentSent(ctx, compliment.ID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отметить комплимент как отправленный", err)
-		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 
@@ -248,5 +231,4 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, cq *tgbotapi.CallbackQu
 			"Ты только что сделал своего партнёра чуточку счастливее 😊\n\n"+
 			"<i>Ты отправил:</i>\n"+"«"+compliment.Text+"»",
 	)
-	h.ui.RemoveButtons(chatID, messageID)
 }

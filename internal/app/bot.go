@@ -9,7 +9,6 @@ import (
 	"github.com/Waycoolers/fmlbot/internal/handlers"
 	"github.com/Waycoolers/fmlbot/internal/storage"
 	"github.com/Waycoolers/fmlbot/internal/ui"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type Bot struct {
@@ -18,12 +17,7 @@ type Bot struct {
 }
 
 func New(cfg *config.Config, store *storage.Storage) (*Bot, error) {
-	api, err := tgbotapi.NewBotAPI(cfg.Token)
-	if err != nil {
-		return nil, err
-	}
-
-	telegramClient := client.NewTelegramClient(api)
+	telegramClient := client.NewTelegramClient(cfg)
 	menuUI := ui.New(telegramClient)
 	handler := handlers.New(menuUI, store)
 	router := NewRouter(handler)

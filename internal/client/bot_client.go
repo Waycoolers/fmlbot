@@ -3,6 +3,7 @@ package client
 import (
 	"log"
 
+	"github.com/Waycoolers/fmlbot/internal/config"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -46,7 +47,11 @@ type TelegramClient struct {
 	api *tgbotapi.BotAPI
 }
 
-func NewTelegramClient(api *tgbotapi.BotAPI) BotClient {
+func NewTelegramClient(cfg *config.Config) BotClient {
+	api, err := tgbotapi.NewBotAPI(cfg.Token)
+	if err != nil {
+		log.Fatalf("Ошибка при создании бота: %v", err)
+	}
 	return &TelegramClient{api: api}
 }
 
