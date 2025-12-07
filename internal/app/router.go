@@ -46,6 +46,35 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 	text := msg.Text
+
+	commands := []string{
+		string(domain.Start),
+		string(domain.Main),
+		string(domain.Register),
+		string(domain.Account),
+		string(domain.Partner),
+		string(domain.Compliments),
+		string(domain.Register),
+		string(domain.DeleteAccount),
+		string(domain.AddPartner),
+		string(domain.DeletePartner),
+		string(domain.AddCompliment),
+		string(domain.DeleteCompliment),
+		string(domain.GetCompliments),
+		string(domain.ReceiveCompliment),
+	}
+
+	// Если введена команда, то сбрасываем state
+	for _, command := range commands {
+		if text == command {
+			err := r.h.Store.SetUserState(ctx, userID, domain.Empty)
+			if err != nil {
+				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
+				return
+			}
+		}
+	}
+
 	username, err := r.h.Store.GetUsername(ctx, userID)
 	if err != nil {
 		r.h.HandleErr(chatID, "Ошибка при получении юзернейма", err)
@@ -54,11 +83,10 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	log.Printf("Клиент %v написал: %v", username, text)
 
 	if text == string(domain.Start) {
-		err = r.h.Store.SetUserState(ctx, userID, domain.Empty)
-		if err != nil {
-			r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-			return
-		}
+		r.h.ShowStartMenu(ctx, chatID)
+		return
+	} else if text == string(domain.Register) {
+		r.h.Register(ctx, msg)
 		r.h.ShowMainMenu(ctx, chatID)
 		return
 	}
@@ -69,17 +97,41 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
-	if !strings.HasPrefix(text, "/") {
+	if !(state == domain.Empty) {
 		switch state {
 		case domain.AwaitingPartner:
 			r.h.ProcessPartnerUsername(ctx, msg)
-			return
 		case domain.AwaitingCompliment:
 			r.h.ProcessCompliment(ctx, msg)
-			return
 		default:
-			r.h.Reply(chatID, "Я жду от тебя команду")
-			return
+			r.h.ReplyUnknownMessage(ctx, msg)
+		}
+	} else {
+		switch text {
+		case string(domain.Main):
+			r.h.ShowMainMenu(ctx, chatID)
+		case string(domain.Account):
+			r.h.ShowAccountMenu(ctx, msg)
+		case string(domain.Partner):
+			r.h.ShowPartnerMenu(ctx, msg)
+		case string(domain.Compliments):
+			r.h.ShowComplimentsMenu(ctx, msg)
+		case string(domain.DeleteAccount):
+			r.h.DeleteAccount(ctx, msg)
+		case string(domain.AddPartner):
+			r.h.SetPartner(ctx, msg)
+		case string(domain.DeletePartner):
+			r.h.DeletePartner(ctx, msg)
+		case string(domain.AddCompliment):
+			r.h.AddCompliment(ctx, msg)
+		case string(domain.DeleteCompliment):
+			r.h.DeleteCompliment(ctx, msg)
+		case string(domain.GetCompliments):
+			r.h.GetCompliments(ctx, msg)
+		case string(domain.ReceiveCompliment):
+			r.h.ReceiveCompliment(ctx, msg)
+		default:
+			r.h.ReplyUnknownMessage(ctx, msg)
 		}
 	}
 }
@@ -96,8 +148,6 @@ func (r *Router) handleCallback(ctx context.Context, cq *tgbotapi.CallbackQuery)
 	section, action, payload := parseCallbackData(data)
 
 	switch section {
-	case "menu":
-		r.handleMenu(ctx, cq, action)
 	case "account":
 		r.handleAccount(ctx, cq, action, payload)
 	case "partner":
@@ -109,30 +159,11 @@ func (r *Router) handleCallback(ctx context.Context, cq *tgbotapi.CallbackQuery)
 	}
 }
 
-func (r *Router) handleMenu(ctx context.Context, cq *tgbotapi.CallbackQuery, action string) {
-	switch action {
-	case "main":
-		r.h.ShowMainMenu(ctx, cq.Message.Chat.ID)
-	case "account":
-		r.h.ShowAccountMenu(ctx, cq)
-	case "partner":
-		r.h.ShowPartnerMenu(ctx, cq)
-	case "compliments":
-		r.h.ShowComplimentsMenu(ctx, cq)
-	default:
-		r.h.ReplyUnknownCallback(ctx, cq)
-	}
-}
-
 func (r *Router) handleAccount(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
 	switch action {
-	case "register":
-		r.h.Register(ctx, cq)
 	case "delete":
 		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
 			r.h.HandleDeleteAccount(ctx, cq)
-		} else {
-			r.h.DeleteAccount(ctx, cq)
 		}
 	default:
 		r.h.ReplyUnknownCallback(ctx, cq)
@@ -141,13 +172,9 @@ func (r *Router) handleAccount(ctx context.Context, cq *tgbotapi.CallbackQuery, 
 
 func (r *Router) handlePartner(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
 	switch action {
-	case "add":
-		r.h.SetPartner(ctx, cq)
 	case "delete":
 		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
 			r.h.HandleDeletePartner(ctx, cq)
-		} else {
-			r.h.DeletePartner(ctx, cq)
 		}
 	default:
 		r.h.ReplyUnknownCallback(ctx, cq)
@@ -156,18 +183,10 @@ func (r *Router) handlePartner(ctx context.Context, cq *tgbotapi.CallbackQuery, 
 
 func (r *Router) handleCompliments(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
 	switch action {
-	case "add":
-		r.h.AddCompliment(ctx, cq)
 	case "delete":
 		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
 			r.h.HandleDeleteCompliment(ctx, cq)
-		} else {
-			r.h.DeleteCompliment(ctx, cq)
 		}
-	case "all":
-		r.h.GetCompliments(ctx, cq)
-	case "receive":
-		r.h.ReceiveCompliment(ctx, cq)
 	default:
 		r.h.ReplyUnknownCallback(ctx, cq)
 	}

@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"context"
+	"log"
 
-	"github.com/Waycoolers/fmlbot/internal/domain"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) ShowAccountMenu(_ context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
+func (h *Handler) ShowAccountMenu(_ context.Context, msg *tgbotapi.Message) {
+	chatID := msg.Chat.ID
 	err := h.ui.AccountMenu(chatID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить меню аккаунтов", err)
@@ -16,16 +16,14 @@ func (h *Handler) ShowAccountMenu(_ context.Context, cq *tgbotapi.CallbackQuery)
 	}
 }
 
-func (h *Handler) Register(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	userID := cq.From.ID
-	chatID := cq.Message.Chat.ID
-	messageID := cq.Message.MessageID
-	username := cq.From.UserName
+func (h *Handler) Register(ctx context.Context, msg *tgbotapi.Message) {
+	userID := msg.From.ID
+	chatID := msg.Chat.ID
+	username := msg.From.UserName
 
 	exists, err := h.Store.IsUserExists(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при проверке пользователя", err)
-		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 
@@ -33,39 +31,13 @@ func (h *Handler) Register(ctx context.Context, cq *tgbotapi.CallbackQuery) {
 		er := h.Store.AddUser(ctx, userID, username)
 		if er != nil {
 			h.HandleErr(chatID, "Ошибка при регистрации", err)
-			h.ui.RemoveButtons(chatID, messageID)
 			return
 		}
-		h.Reply(chatID, "Привет! 💖 Ты зарегистрирован в fmlbot. Добавь партнёра с помощью "+string(domain.SetPartner)+"\n"+
-			"(Не забудь, что партнер должен тоже зарегистрироваться в боте)")
-		h.ui.RemoveButtons(chatID, messageID)
-	} else {
-		partnerID, er := h.Store.GetPartnerID(ctx, userID)
-		if er != nil {
-			h.HandleErr(chatID, "Ошибка при попытке получить id партнера", err)
-			h.ui.RemoveButtons(chatID, messageID)
-			return
-		}
-
-		if partnerID == 0 {
-			h.Reply(chatID, "Ты уже зарегистрирован! Используй "+string(domain.SetPartner)+", чтобы добавить партнёра 💌")
-		} else {
-			partnerUsername, err2 := h.Store.GetUsername(ctx, partnerID)
-			if err2 != nil {
-				h.HandleErr(chatID, "Ошибка при попытке получить username партнера", err2)
-				h.ui.RemoveButtons(chatID, messageID)
-				return
-			}
-			text := "Ты уже зарегистрирован! Твой партнер - @" + partnerUsername
-			h.Reply(chatID, text)
-		}
-		h.ui.RemoveButtons(chatID, messageID)
 	}
 }
 
-func (h *Handler) DeleteAccount(_ context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) DeleteAccount(_ context.Context, msg *tgbotapi.Message) {
+	chatID := msg.Chat.ID
 
 	buttons := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -79,7 +51,6 @@ func (h *Handler) DeleteAccount(_ context.Context, cq *tgbotapi.CallbackQuery) {
 	err := h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
-		h.ui.RemoveButtons(chatID, messageID)
 		return
 	}
 }
@@ -123,7 +94,11 @@ func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *tgbotapi.Callback
 		}
 
 		h.Reply(chatID, "Твой аккаунт успешно удалён 💔")
-
+		err = h.ui.StartMenu(chatID)
+		if err != nil {
+			log.Printf("Ошибка при вызове стартового меню")
+			h.Reply(chatID, "Перезапусти бота с помощью /start")
+		}
 	case "account:delete:cancel":
 		h.Reply(chatID, "Удаление аккаунта отменено ✅")
 	}
