@@ -9,9 +9,30 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) ShowPartnerMenu(_ context.Context, msg *tgbotapi.Message) {
+func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *tgbotapi.Message) {
+	userID := msg.From.ID
 	chatID := msg.Chat.ID
-	err := h.ui.PartnerMenu(chatID)
+	text := ""
+
+	partnerID, err := h.Store.GetPartnerID(ctx, userID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при попытке получить id партнера", err)
+		return
+	}
+
+	if partnerID == 0 {
+		text = "У тебя пока не добавлен партнер"
+	} else {
+		partnerUsername, err := h.Store.GetUsername(ctx, partnerID)
+		if err != nil {
+			h.HandleErr(chatID, "Ошибка при попытке получить username партнера", err)
+			return
+		}
+
+		text = "Твой партнер: @" + partnerUsername
+	}
+
+	err = h.ui.PartnerMenu(chatID, text)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить меню партнеров", err)
 		return
