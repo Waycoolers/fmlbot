@@ -13,7 +13,8 @@ import (
 
 func (h *Handler) ShowComplimentsMenu(_ context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
-	err := h.ui.ComplimentsMenu(chatID)
+	text := "Меню комплиментов"
+	err := h.ui.ComplimentsMenu(chatID, text)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить меню комплиментов", err)
 		return

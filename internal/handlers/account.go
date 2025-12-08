@@ -9,7 +9,8 @@ import (
 
 func (h *Handler) ShowAccountMenu(_ context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
-	err := h.ui.AccountMenu(chatID)
+	text := "Меню аккаунта"
+	err := h.ui.AccountMenu(chatID, text)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить меню аккаунтов", err)
 		return
@@ -94,7 +95,8 @@ func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *tgbotapi.Callback
 		}
 
 		h.Reply(chatID, "Твой аккаунт успешно удалён 💔")
-		err = h.ui.StartMenu(chatID)
+		text := "Чтобы разбудить бота, зарегистрируйся по кнопке ниже"
+		err = h.ui.StartMenu(chatID, text)
 		if err != nil {
 			log.Printf("Ошибка при вызове стартового меню")
 			h.Reply(chatID, "Перезапусти бота с помощью /start")

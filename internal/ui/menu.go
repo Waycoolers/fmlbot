@@ -16,7 +16,7 @@ func New(client client.BotClient) *MenuUI {
 	return &MenuUI{Client: client}
 }
 
-func (ui *MenuUI) StartMenu(chatID int64) error {
+func (ui *MenuUI) StartMenu(chatID int64, text string) error {
 	menu := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(string(domain.Register)),
@@ -26,14 +26,14 @@ func (ui *MenuUI) StartMenu(chatID int64) error {
 	menu.ResizeKeyboard = true
 	menu.OneTimeKeyboard = true
 
-	msg := tgbotapi.NewMessage(chatID, "Чтобы разбудить бота, зарегистрируйся по кнопке ниже")
+	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = menu
 
 	_, err := ui.Client.Send(msg)
 	return err
 }
 
-func (ui *MenuUI) MainMenu(chatID int64) error {
+func (ui *MenuUI) MainMenu(chatID int64, text string) error {
 	menu := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(string(domain.Account)),
@@ -45,7 +45,7 @@ func (ui *MenuUI) MainMenu(chatID int64) error {
 	menu.ResizeKeyboard = true
 	menu.OneTimeKeyboard = false
 
-	msg := tgbotapi.NewMessage(chatID, "fmlbot приветствует тебя! 💖")
+	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = menu
 
 	_, err := ui.Client.Send(msg)

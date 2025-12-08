@@ -87,7 +87,7 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	} else if text == string(domain.Register) {
 		r.h.Register(ctx, msg)
-		r.h.ShowMainMenu(ctx, chatID)
+		r.h.ShowMainMenu(ctx, msg)
 		return
 	}
 
@@ -109,7 +109,7 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	} else {
 		switch text {
 		case string(domain.Main):
-			r.h.ShowMainMenu(ctx, chatID)
+			r.h.ShowMainMenu(ctx, msg)
 		case string(domain.Account):
 			r.h.ShowAccountMenu(ctx, msg)
 		case string(domain.Partner):

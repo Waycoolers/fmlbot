@@ -5,7 +5,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (ui *MenuUI) ComplimentsMenu(chatID int64) error {
+func (ui *MenuUI) ComplimentsMenu(chatID int64, text string) error {
 	menu := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(string(domain.AddCompliment)),
@@ -19,7 +19,7 @@ func (ui *MenuUI) ComplimentsMenu(chatID int64) error {
 	menu.ResizeKeyboard = true
 	menu.OneTimeKeyboard = false
 
-	msg := tgbotapi.NewMessage(chatID, "Меню комплиментов")
+	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = menu
 
 	_, err := ui.Client.Send(msg)
