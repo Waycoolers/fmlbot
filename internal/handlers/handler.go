@@ -19,15 +19,18 @@ func New(ui *ui.MenuUI, store *storage.Storage) *Handler {
 }
 
 func (h *Handler) ShowStartMenu(_ context.Context, chatID int64) {
-	err := h.ui.StartMenu(chatID)
+	text := "Чтобы разбудить бота, зарегистрируйся по кнопке ниже"
+	err := h.ui.StartMenu(chatID, text)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить стартовое меню", err)
 		return
 	}
 }
 
-func (h *Handler) ShowMainMenu(_ context.Context, chatID int64) {
-	err := h.ui.MainMenu(chatID)
+func (h *Handler) ShowMainMenu(_ context.Context, msg *tgbotapi.Message) {
+	chatID := msg.Chat.ID
+	text := "fmlbot приветствует тебя! 💖"
+	err := h.ui.MainMenu(chatID, text)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить главное меню", err)
 		return
