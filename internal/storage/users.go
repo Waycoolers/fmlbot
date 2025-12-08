@@ -7,12 +7,37 @@ import (
 )
 
 func (s *Storage) AddUser(ctx context.Context, telegramID int64, username string) error {
-	_, err := s.DB.ExecContext(ctx, `
+	tx, err := s.DB.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.DB.ExecContext(ctx, `
         INSERT INTO users (telegram_id, username)
         VALUES ($1, $2)
         ON CONFLICT (telegram_id) DO NOTHING;
     `, telegramID, username)
-	return err
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+        INSERT INTO user_config (telegram_id)
+        VALUES ($1)
+    `, telegramID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (s *Storage) GetUserIDByUsername(ctx context.Context, username string) (int64, error) {

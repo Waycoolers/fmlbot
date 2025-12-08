@@ -10,7 +10,6 @@ import (
 func (s *Storage) AddCompliment(ctx context.Context, telegramID int64, text string) (*domain.Compliment, error) {
 	tx, err := s.DB.BeginTxx(ctx, nil)
 	if err != nil {
-		log.Printf("Ошибка начала транзакции: %v", err)
 		return nil, err
 	}
 
@@ -23,9 +22,8 @@ func (s *Storage) AddCompliment(ctx context.Context, telegramID int64, text stri
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {
-			log.Printf("Ошибка отката транзакции: %v", er)
+			return nil, er
 		}
-		log.Printf("Ошибка добавления комплимента: %v", err)
 		return nil, err
 	}
 
@@ -36,9 +34,8 @@ func (s *Storage) AddCompliment(ctx context.Context, telegramID int64, text stri
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {
-			log.Printf("Ошибка отката транзакции: %v", er)
+			return nil, er
 		}
-		log.Printf("Ошибка добавления user_compliment: %v", err)
 		return nil, err
 	}
 

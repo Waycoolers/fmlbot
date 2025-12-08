@@ -12,7 +12,7 @@ import (
 func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
-	text := ""
+	text := "Партнёр"
 
 	partnerID, err := h.Store.GetPartnerID(ctx, userID)
 	if err != nil {
@@ -23,9 +23,9 @@ func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *tgbotapi.Message) {
 	if partnerID == 0 {
 		text = "У тебя пока не добавлен партнер"
 	} else {
-		partnerUsername, err := h.Store.GetUsername(ctx, partnerID)
-		if err != nil {
-			h.HandleErr(chatID, "Ошибка при попытке получить username партнера", err)
+		partnerUsername, er := h.Store.GetUsername(ctx, partnerID)
+		if er != nil {
+			h.HandleErr(chatID, "Ошибка при попытке получить username партнера", er)
 			return
 		}
 
@@ -50,9 +50,9 @@ func (h *Handler) SetPartner(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	if partnerID == 0 {
-		err := h.Store.SetUserState(ctx, userID, domain.AwaitingPartner)
-		if err != nil {
-			h.HandleErr(chatID, "Ошибка при установке состояния awaiting_partner", err)
+		er := h.Store.SetUserState(ctx, userID, domain.AwaitingPartner)
+		if er != nil {
+			h.HandleErr(chatID, "Ошибка при установке состояния awaiting_partner", er)
 			return
 		}
 		h.Reply(chatID, "Отправь username своей половинки\n(Напиши чтобы отменить это действие)")
@@ -211,6 +211,19 @@ func (h *Handler) HandleDeletePartner(ctx context.Context, cb *tgbotapi.Callback
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
 			h.HandleErr(chatID, "Ошибка при попытке получить id партнера", err)
+			return
+		}
+
+		err = h.Store.SetDefault(ctx, userID)
+		if err != nil {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.HandleErr(chatID, "Ошибка при сбросе конфига", err)
+			return
+		}
+		err = h.Store.SetDefault(ctx, partnerID)
+		if err != nil {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.HandleErr(chatID, "Ошибка при сбросе конфига", err)
 			return
 		}
 

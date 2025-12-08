@@ -62,6 +62,7 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		string(domain.DeleteCompliment),
 		string(domain.GetCompliments),
 		string(domain.ReceiveCompliment),
+		string(domain.EditComplimentFrequency),
 	}
 
 	// Если введена команда, то сбрасываем state
@@ -103,6 +104,8 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			r.h.ProcessPartnerUsername(ctx, msg)
 		case domain.AwaitingCompliment:
 			r.h.ProcessCompliment(ctx, msg)
+		case domain.AwaitingComplimentFrequency:
+			r.h.ProcessComplimentFrequency(ctx, msg)
 		default:
 			r.h.ReplyUnknownMessage(ctx, msg)
 		}
@@ -130,6 +133,8 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			r.h.GetCompliments(ctx, msg)
 		case string(domain.ReceiveCompliment):
 			r.h.ReceiveCompliment(ctx, msg)
+		case string(domain.EditComplimentFrequency):
+			r.h.EditComplimentFrequency(ctx, msg)
 		default:
 			r.h.ReplyUnknownMessage(ctx, msg)
 		}

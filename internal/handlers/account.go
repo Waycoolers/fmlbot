@@ -84,6 +84,14 @@ func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *tgbotapi.Callback
 				h.HandleErr(chatID, "Ошибка при попытке удалить юзера", err)
 				return
 			}
+
+			err = h.Store.SetDefault(ctx, partnerID)
+			if err != nil {
+				h.ui.RemoveButtons(chatID, messageID)
+				h.HandleErr(chatID, "Ошибка при сбросе конфига", err)
+				return
+			}
+
 			h.Reply(partnerID, "Твой партнёр удалил свой аккаунт 💔")
 		} else {
 			err = h.Store.DeleteUser(ctx, userID)

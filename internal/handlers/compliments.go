@@ -11,10 +11,46 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) ShowComplimentsMenu(_ context.Context, msg *tgbotapi.Message) {
+func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *tgbotapi.Message) {
+	userID := msg.From.ID
 	chatID := msg.Chat.ID
-	text := "Меню комплиментов"
-	err := h.ui.ComplimentsMenu(chatID, text)
+	text := "Комплименты"
+	count := 0
+	maxCount := 1
+	partnerID, err := h.Store.GetPartnerID(ctx, userID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
+		return
+	}
+
+	if partnerID == 0 {
+		text = "Добавь партнёра, чтобы получить возможность получать и отправлять комплименты."
+	} else {
+		count, err = h.Store.GetComplimentCount(ctx, partnerID)
+		if err != nil {
+			h.HandleErr(chatID, "Ошибка при получении количества полученных комплиментов", err)
+			return
+		}
+		maxCount, err = h.Store.GetComplimentMaxCount(ctx, partnerID)
+		if err != nil {
+			h.HandleErr(chatID, "Ошибка при получении максимального количества комплиментов", err)
+			return
+		}
+
+		if maxCount == -1 {
+			text = "Сегодня ты можешь получить еще ♾️ комплиментов."
+		} else {
+			delta := maxCount - count
+			if delta > 0 {
+				deltaStr := strconv.Itoa(delta)
+				text = "Сегодня ты можешь получить еще <b>" + deltaStr + "</b> комплимент(ов)."
+			} else {
+				text = "Сегодня ты больше не можешь получать комплименты ("
+			}
+		}
+	}
+
+	err = h.ui.ComplimentsMenu(chatID, text)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить меню комплиментов", err)
 		return
@@ -191,6 +227,23 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 		return
 	}
 
+	count, err := h.Store.GetComplimentCount(ctx, partnerID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении количества полученных комплиментов", err)
+		return
+	}
+	maxCount, err := h.Store.GetComplimentMaxCount(ctx, partnerID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении максимального количества комплиментов", err)
+		return
+	}
+
+	if count >= maxCount && maxCount != -1 {
+		h.Reply(chatID, "Комплименты на сегодня закончились (")
+		return
+	}
+	count++
+
 	allCompliments, err := h.Store.GetCompliments(ctx, partnerID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка комплиментов", err)
@@ -225,6 +278,12 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 		"🌸 <b>Твой любимый человек оставил для тебя послание:</b>\n\n«" + compliment.Text + "»\n\nПусть эти слова принесут тебе немного тепла и улыбок 💛",
 	}
 
+	err = h.Store.SetComplimentCount(ctx, partnerID, count)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при попытке изменить количество полученных комплиментов", err)
+		return
+	}
+
 	randomIndex := rand.Intn(len(complimentMessages))
 	h.Reply(chatID, complimentMessages[randomIndex])
 	h.Reply(partnerID,
@@ -232,4 +291,67 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 			"Ты только что сделал своего партнёра чуточку счастливее 😊\n\n"+
 			"<i>Ты отправил:</i>\n"+"«"+compliment.Text+"»",
 	)
+}
+
+func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *tgbotapi.Message) {
+	userID := msg.From.ID
+	chatID := msg.Chat.ID
+
+	actualFreq, err := h.Store.GetComplimentMaxCount(ctx, userID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при попытке получить частоту комплиментов", err)
+		return
+	}
+	count, err := h.Store.GetComplimentCount(ctx, userID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении количества комплиментов", err)
+		return
+	}
+
+	actualFreqStr := strconv.Itoa(actualFreq)
+	countStr := strconv.Itoa(count)
+	if actualFreq == -1 {
+		actualFreqStr = "♾️"
+	}
+	text := "Твой партнёр получил <b>" + countStr + "/" + actualFreqStr + "</b> комплимент(ов) в день. " +
+		"Хочешь изменить лимит? Просто отправь новое значение в чат. Чтобы убрать лимит, отправь «-»."
+
+	err = h.Store.SetUserState(ctx, userID, domain.AwaitingComplimentFrequency)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при попытке установить состояние", err)
+		return
+	}
+
+	err = h.ui.EditComplimentFrequencyMenu(chatID, text)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при попытке отобразить меню для изменения частоты комплиментов", err)
+		return
+	}
+}
+
+func (h *Handler) ProcessComplimentFrequency(ctx context.Context, msg *tgbotapi.Message) {
+	userID := msg.From.ID
+	chatID := msg.Chat.ID
+	freq := msg.Text
+	freqInt := 1
+
+	// Валидация
+	if freq == "-" {
+		freqInt = -1
+	} else {
+		var err error
+		freqInt, err = strconv.Atoi(freq)
+		if err != nil || freqInt <= 0 {
+			h.Reply(chatID, "Некорректный ввод")
+			return
+		}
+	}
+
+	err := h.Store.SetComplimentMaxCount(ctx, userID, freqInt)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при изменении частоты комплиментов", err)
+		return
+	}
+
+	h.Reply(chatID, "Лимит изменен")
 }
