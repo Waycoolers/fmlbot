@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -244,6 +246,22 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	}
 	count++
 
+	last, err := h.Store.GetComplimentTime(ctx, partnerID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении времени последнего комплимента", err)
+		return
+	}
+	now := time.Now().UTC()
+	log.Print(now)
+	log.Print(last)
+	if last.Add(1 * time.Hour).After(now) {
+		remaining := last.Add(time.Hour).Sub(now)
+		mins := int(remaining.Minutes())
+
+		h.Reply(chatID, fmt.Sprintf("Ты уже получал комплимент недавно ❤️\nПопробуй снова через %d минут.", mins))
+		return
+	}
+
 	allCompliments, err := h.Store.GetCompliments(ctx, partnerID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка комплиментов", err)
@@ -278,12 +296,6 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 		"🌸 <b>Твой любимый человек оставил для тебя послание:</b>\n\n«" + compliment.Text + "»\n\nПусть эти слова принесут тебе немного тепла и улыбок 💛",
 	}
 
-	err = h.Store.SetComplimentCount(ctx, partnerID, count)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при попытке изменить количество полученных комплиментов", err)
-		return
-	}
-
 	randomIndex := rand.Intn(len(complimentMessages))
 	h.Reply(chatID, complimentMessages[randomIndex])
 	h.Reply(partnerID,
@@ -291,6 +303,16 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 			"Ты только что сделал своего партнёра чуточку счастливее 😊\n\n"+
 			"<i>Ты отправил:</i>\n"+"«"+compliment.Text+"»",
 	)
+
+	err = h.Store.SetComplimentTime(ctx, partnerID)
+	if err != nil {
+		log.Printf("Ошибка при попытке установить время получения комплимента: %v", err)
+	}
+
+	err = h.Store.SetComplimentCount(ctx, partnerID, count)
+	if err != nil {
+		log.Printf("Ошибка при попытке изменить количество полученных комплиментов: %v", err)
+	}
 }
 
 func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *tgbotapi.Message) {
@@ -313,7 +335,7 @@ func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *tgbotapi.Mes
 	if actualFreq == -1 {
 		actualFreqStr = "♾️"
 	}
-	text := "Твой партнёр получил <b>" + countStr + "/" + actualFreqStr + "</b> комплимент(ов) в день. " +
+	text := "Твой партнёр сегодня получил <b>" + countStr + "/" + actualFreqStr + "</b> комплимент(ов). " +
 		"Хочешь изменить лимит? Просто отправь новое значение в чат. Чтобы убрать лимит, отправь «-»."
 
 	err = h.Store.SetUserState(ctx, userID, domain.AwaitingComplimentFrequency)

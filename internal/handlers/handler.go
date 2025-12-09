@@ -47,8 +47,14 @@ func (h *Handler) Reply(chatID int64, text string) {
 func (h *Handler) DoMidnightTasks(ctx context.Context) {
 	err := h.Store.ClearComplimentsCount(ctx)
 	if err != nil {
-		log.Printf("Ошибка при выполнении задач в 00:00: %v", err)
+		log.Printf("Ошибка при очистке количества полученных комплиментов: %v", err)
 	}
+
+	err = h.Store.ClearComplimentTime(ctx)
+	if err != nil {
+		log.Printf("Ошибка при очистке времени последнего полученного комплимента: %v", err)
+	}
+
 	log.Print("Задачи выполнены")
 }
 
