@@ -10,8 +10,12 @@ func (ui *MenuUI) ComplimentsMenu(chatID int64, text string) error {
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(string(domain.AddCompliment)),
 			tgbotapi.NewKeyboardButton(string(domain.DeleteCompliment)),
+		),
+		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(string(domain.GetCompliments)),
 			tgbotapi.NewKeyboardButton(string(domain.ReceiveCompliment)),
+		),
+		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(string(domain.EditComplimentFrequency)),
 			tgbotapi.NewKeyboardButton(string(domain.Main)),
 		),

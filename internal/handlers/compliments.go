@@ -156,6 +156,14 @@ func (h *Handler) DeleteCompliment(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
+	var filtered []domain.Compliment
+	for _, c := range compliments {
+		if !c.IsSent {
+			filtered = append(filtered, c)
+		}
+	}
+	compliments = filtered
+
 	if len(compliments) == 0 {
 		h.Reply(chatID, "У тебя пока нет запланированных комплиментов 😔")
 		return
@@ -164,10 +172,6 @@ func (h *Handler) DeleteCompliment(ctx context.Context, msg *tgbotapi.Message) {
 	var keyboard [][]tgbotapi.InlineKeyboardButton
 
 	for _, compliment := range compliments {
-		if compliment.IsSent {
-			continue
-		}
-
 		buttonText := truncateText(compliment.Text, 30)
 		callbackData := fmt.Sprintf("compliments:delete:confirm:%d", compliment.ID)
 
