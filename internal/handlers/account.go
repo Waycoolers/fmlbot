@@ -9,7 +9,7 @@ import (
 
 func (h *Handler) ShowAccountMenu(_ context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
-	text := "Меню аккаунта"
+	text := "Управление аккаунтом"
 	err := h.ui.AccountMenu(chatID, text)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить меню аккаунтов", err)

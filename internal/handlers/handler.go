@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/Waycoolers/fmlbot/internal/domain"
 	"github.com/Waycoolers/fmlbot/internal/storage"
 	"github.com/Waycoolers/fmlbot/internal/ui"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -29,7 +30,13 @@ func (h *Handler) ShowStartMenu(_ context.Context, chatID int64) {
 
 func (h *Handler) ShowMainMenu(_ context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
-	text := "fmlbot приветствует тебя! 💖"
+	msgText := msg.Text
+	text := "Выбери действие"
+
+	if msgText == string(domain.Register) {
+		text = "fmlbot приветствует тебя! 💖"
+	}
+
 	err := h.ui.MainMenu(chatID, text)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить главное меню", err)
