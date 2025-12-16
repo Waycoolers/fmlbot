@@ -13,6 +13,7 @@ type BotClient interface {
 	GetUpdatesChan() <-chan tgbotapi.Update
 	StopReceivingUpdates()
 	Send(msg tgbotapi.Chattable) (tgbotapi.Message, error)
+	DeleteMessage(chatID int64, messageID int) error
 }
 
 type ImportantDateDraftRepo interface {

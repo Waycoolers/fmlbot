@@ -55,13 +55,85 @@ func (h *Handler) HandleTitleImportantDate(ctx context.Context, msg *tgbotapi.Me
 		h.HandleErr(chatID, "Ошибка при установке состояния", err)
 		return
 	}
-	h.Reply(chatID, "Введи дату")
+
+	err = h.ui.SendYearKeyboard(chatID, time.Now().Year())
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при отправке клавиатуры для выбора года", err)
+		return
+	}
 }
 
-func (h *Handler) HandleDateImportantDate(ctx context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
-	userID := msg.From.ID
-	date := strings.TrimSpace(msg.Text)
+func (h *Handler) HandleYearImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
+	chatID := cq.Message.Chat.ID
+	userID := cq.From.ID
+	messageID := cq.Message.MessageID
+
+	draft, err := h.importantDateDrafts.Get(ctx, userID)
+	if err != nil {
+		h.ui.RemoveButtons(chatID, messageID)
+		h.HandleErr(chatID, "Ошибка при получении черновика", err)
+		return
+	}
+	if draft == nil {
+		h.ui.RemoveButtons(chatID, messageID)
+		h.HandleErr(chatID, "Черновик пустой", err)
+		return
+	}
+
+	switch {
+	case strings.HasPrefix(cq.Data, "important_dates:add:year:select:"):
+		year, _ := strconv.Atoi(strings.TrimPrefix(cq.Data, "important_dates:add:year:select:"))
+
+		draft.Year = year
+
+		er := h.importantDateDrafts.Save(ctx, userID, draft)
+		if er != nil {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.HandleErr(chatID, "Ошибка при сохранении года важной даты", er)
+			return
+		}
+
+		h.ui.RemoveButtons(chatID, messageID)
+		er = h.ui.Client.DeleteMessage(chatID, messageID)
+		if er != nil {
+			h.HandleErr(chatID, "Ошибка при удалении сообщения", er)
+		}
+
+		err = h.ui.SendMonthKeyboard(chatID)
+		if err != nil {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.HandleErr(chatID, "Ошибка при отправке клавиатуры для выбора месяца", err)
+			return
+		}
+
+	case strings.HasPrefix(cq.Data, "important_dates:add:year:page:"):
+		startYear, _ := strconv.Atoi(strings.TrimPrefix(cq.Data, "important_dates:add:year:page:"))
+		keyboard := h.ui.BuildYearKeyboard(startYear)
+
+		er := h.ui.Client.EditMessageReplyMarkup(
+			chatID,
+			messageID,
+			keyboard,
+		)
+		if er != nil {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.HandleErr(chatID, "Ошибка при редактировании кнопок", er)
+			return
+		}
+	default:
+		h.HandleErr(chatID, "Неизвестный префикс у cq.Data", nil)
+		err = h.ui.Client.DeleteMessage(chatID, messageID)
+		if err != nil {
+			h.HandleErr(chatID, "Ошибка при удалении сообщения", err)
+		}
+		return
+	}
+}
+
+func (h *Handler) HandleMonthImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
+	chatID := cq.Message.Chat.ID
+	userID := cq.From.ID
+	messageID := cq.Message.MessageID
 
 	draft, err := h.importantDateDrafts.Get(ctx, userID)
 	if err != nil {
@@ -73,24 +145,59 @@ func (h *Handler) HandleDateImportantDate(ctx context.Context, msg *tgbotapi.Mes
 		return
 	}
 
-	parsedDate, err := time.Parse("02.01.2006", date)
-	if err != nil {
-		h.Reply(
-			chatID,
-			"😔 Не смог распознать дату.\n"+
-				"Пожалуйста, введи её в формате: `ДД.ММ.ГГГГ`\n"+
-				"Например: `14.02.2024`",
-		)
-		return
-	}
+	h.ui.RemoveButtons(chatID, messageID)
 
-	draft.Date = parsedDate
+	month, _ := strconv.Atoi(strings.TrimPrefix(cq.Data, "important_dates:add:month:"))
+	draft.Month = month
 	err = h.importantDateDrafts.Save(ctx, userID, draft)
 	if err != nil {
-		h.HandleErr(chatID, "Ошибка при сохранении даты важной даты", err)
+		h.HandleErr(chatID, "Ошибка при сохранении месяца важной даты", err)
 		return
 	}
 
+	err = h.ui.Client.DeleteMessage(chatID, messageID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при удалении сообщения", err)
+	}
+
+	err = h.ui.SendDayKeyboard(chatID, draft.Year, month)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при отправке клавиатуры для выбора дня", err)
+		return
+	}
+}
+
+func (h *Handler) HandleDayImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
+	chatID := cq.Message.Chat.ID
+	userID := cq.From.ID
+	messageID := cq.Message.MessageID
+
+	draft, err := h.importantDateDrafts.Get(ctx, userID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении черновика", err)
+		return
+	}
+	if draft == nil {
+		h.HandleErr(chatID, "Черновик пустой", err)
+		return
+	}
+
+	h.ui.RemoveButtons(chatID, messageID)
+
+	day, _ := strconv.Atoi(strings.TrimPrefix(cq.Data, "important_dates:add:day:"))
+	draft.Day = day
+	err = h.importantDateDrafts.Save(ctx, userID, draft)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при сохранении дня важной даты", err)
+		return
+	}
+
+	err = h.ui.Client.DeleteMessage(chatID, messageID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при удалении сообщения", err)
+	}
+
+	// Далее
 	partnerID, er := h.Store.GetPartnerID(ctx, userID)
 	if er != nil {
 		h.HandleErr(chatID, "Ошибка при получении id партнера", er)
@@ -106,20 +213,9 @@ func (h *Handler) HandleDateImportantDate(ctx context.Context, msg *tgbotapi.Mes
 			return
 		}
 
-		buttons := tgbotapi.NewInlineKeyboardMarkup(
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("0", "important_dates:add:notify_before:0"),
-				tgbotapi.NewInlineKeyboardButtonData("1", "important_dates:add:notify_before:1"),
-				tgbotapi.NewInlineKeyboardButtonData("3", "important_dates:add:notify_before:3"),
-				tgbotapi.NewInlineKeyboardButtonData("7", "important_dates:add:notify_before:7"),
-			),
-		)
-
-		text := "Выбери, за сколько дней до даты тебе напомнить о ней"
-
-		err = h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
+		err = h.ui.SendNotifyBeforeKeyboard(chatID)
 		if err != nil {
-			h.HandleErr(chatID, "Ошибка при отправке кнопок", err)
+			h.HandleErr(chatID, "Ошибка при отправке клавиатуры для выбора количества дней", err)
 			return
 		}
 	} else {
@@ -129,18 +225,9 @@ func (h *Handler) HandleDateImportantDate(ctx context.Context, msg *tgbotapi.Mes
 			return
 		}
 
-		buttons := tgbotapi.NewInlineKeyboardMarkup(
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("👤 Только для меня", "important_dates:add:partner:false"),
-				tgbotapi.NewInlineKeyboardButtonData("💑 Общая с партнёром", "important_dates:add:partner:true"),
-			),
-		)
-
-		text := "👥 Эта дата будет:"
-
-		err = h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
+		err = h.ui.SendPartnerKeyboard(chatID)
 		if err != nil {
-			h.HandleErr(chatID, "Ошибка при отправке кнопок", err)
+			h.HandleErr(chatID, "Ошибка при отправке клавиатуры для выбора партнера в важной дате", err)
 			return
 		}
 	}
@@ -191,26 +278,20 @@ func (h *Handler) HandlePartnerImportantDate(ctx context.Context, cq *tgbotapi.C
 		}
 	}
 
+	err = h.ui.Client.DeleteMessage(chatID, messageID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при удалении сообщения", err)
+	}
+
 	err = h.Store.SetUserState(ctx, userID, domain.AwaitingNotifyBeforeImportantDate)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния", err)
 		return
 	}
 
-	buttons := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("0", "important_dates:add:notify_before:0"),
-			tgbotapi.NewInlineKeyboardButtonData("1", "important_dates:add:notify_before:1"),
-			tgbotapi.NewInlineKeyboardButtonData("3", "important_dates:add:notify_before:3"),
-			tgbotapi.NewInlineKeyboardButtonData("7", "important_dates:add:notify_before:7"),
-		),
-	)
-
-	text := "Выбери, за сколько дней до даты тебе напомнить о ней"
-
-	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
+	err = h.ui.SendNotifyBeforeKeyboard(chatID)
 	if err != nil {
-		h.HandleErr(chatID, "Ошибка при отправке кнопок", err)
+		h.HandleErr(chatID, "Ошибка при отправке клавиатуры для выбора количества дней", err)
 		return
 	}
 }
@@ -267,11 +348,24 @@ func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *tgbot
 		return
 	}
 
+	date := time.Date(
+		draft.Year,
+		time.Month(draft.Month),
+		draft.Day,
+		0, 0, 0, 0,
+		time.Local,
+	)
+
 	_, err = h.Store.AddImportantDate(ctx, sql.NullInt64{Int64: userID, Valid: true}, finalDraft.PartnerID, finalDraft.Title,
-		finalDraft.Date, finalDraft.NotifyBeforeDays)
+		date, finalDraft.NotifyBeforeDays)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при добавлении важной даты", err)
 		return
+	}
+
+	err = h.ui.Client.DeleteMessage(chatID, messageID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при удалении сообщения", err)
 	}
 
 	h.Reply(chatID, "Памятная дата добавлена")
