@@ -8,6 +8,7 @@ const (
 	Account                 Command = "⚙ Аккаунт"
 	Partner                 Command = "👤 Партнёр"
 	Compliments             Command = "❤️ Комплименты"
+	ImportantDates          Command = "Важные даты"
 	Register                Command = "Зарегистрироваться"
 	DeleteAccount           Command = "Удалить аккаунт"
 	AddPartner              Command = "Добавить партнёра"
@@ -17,4 +18,5 @@ const (
 	GetCompliments          Command = "Все комплименты"
 	ReceiveCompliment       Command = "Получить комплимент"
 	EditComplimentFrequency Command = "Лимит в день"
+	AddImportantDate        Command = "Добавить важную дату"
 )

@@ -54,6 +54,7 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		string(domain.Account),
 		string(domain.Partner),
 		string(domain.Compliments),
+		string(domain.ImportantDates),
 		string(domain.Register),
 		string(domain.DeleteAccount),
 		string(domain.AddPartner),
@@ -63,6 +64,7 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		string(domain.GetCompliments),
 		string(domain.ReceiveCompliment),
 		string(domain.EditComplimentFrequency),
+		string(domain.AddImportantDate),
 	}
 
 	// Если введена команда, то сбрасываем state
@@ -106,6 +108,10 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			r.h.ProcessCompliment(ctx, msg)
 		case domain.AwaitingComplimentFrequency:
 			r.h.ProcessComplimentFrequency(ctx, msg)
+		case domain.AwaitingTitleImportantDate:
+			r.h.HandleTitleImportantDate(ctx, msg)
+		case domain.AwaitingDateImportantDate:
+			r.h.HandleDateImportantDate(ctx, msg)
 		default:
 			r.h.ReplyUnknownMessage(ctx, msg)
 		}
@@ -119,6 +125,8 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			r.h.ShowPartnerMenu(ctx, msg)
 		case string(domain.Compliments):
 			r.h.ShowComplimentsMenu(ctx, msg)
+		case string(domain.ImportantDates):
+			r.h.ShowImportantDatesMenu(ctx, msg)
 		case string(domain.DeleteAccount):
 			r.h.DeleteAccount(ctx, msg)
 		case string(domain.AddPartner):
@@ -135,6 +143,8 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			r.h.ReceiveCompliment(ctx, msg)
 		case string(domain.EditComplimentFrequency):
 			r.h.EditComplimentFrequency(ctx, msg)
+		case string(domain.AddImportantDate):
+			r.h.AddImportantDate(ctx, msg)
 		default:
 			r.h.ReplyUnknownMessage(ctx, msg)
 		}
@@ -159,6 +169,8 @@ func (r *Router) handleCallback(ctx context.Context, cq *tgbotapi.CallbackQuery)
 		r.handlePartner(ctx, cq, action, payload)
 	case "compliments":
 		r.handleCompliments(ctx, cq, action, payload)
+	case "important_dates":
+		r.handleImportantDates(ctx, cq, action, payload)
 	default:
 		r.h.ReplyUnknownCallback(ctx, cq)
 	}
@@ -191,6 +203,19 @@ func (r *Router) handleCompliments(ctx context.Context, cq *tgbotapi.CallbackQue
 	case "delete":
 		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
 			r.h.HandleDeleteCompliment(ctx, cq)
+		}
+	default:
+		r.h.ReplyUnknownCallback(ctx, cq)
+	}
+}
+
+func (r *Router) handleImportantDates(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
+	switch action {
+	case "add":
+		if strings.HasPrefix(payload, "partner") {
+			r.h.HandlePartnerImportantDate(ctx, cq)
+		} else if strings.HasPrefix(payload, "notify_before") {
+			r.h.HandleNotifyBeforeImportantDate(ctx, cq)
 		}
 	default:
 		r.h.ReplyUnknownCallback(ctx, cq)

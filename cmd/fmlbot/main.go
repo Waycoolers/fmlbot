@@ -8,8 +8,10 @@ import (
 
 	"github.com/Waycoolers/fmlbot/internal/app"
 	"github.com/Waycoolers/fmlbot/internal/config"
+	"github.com/Waycoolers/fmlbot/internal/redis_store"
 	"github.com/Waycoolers/fmlbot/internal/storage"
 	"github.com/jmoiron/sqlx"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -34,7 +36,18 @@ func main() {
 		log.Fatalf("Ошибка при запуске миграций: %v", err)
 	}
 
-	b, err := app.New(cfg, store)
+	rdb, err := redis_store.New(&cfg.RDB)
+	if err != nil {
+		log.Fatalf("Ошибка подключения к redis_store: %v", err)
+	}
+	defer func(rdb *redis.Client) {
+		er := rdb.Close()
+		if er != nil {
+			log.Printf("Ошибка при закрытии подключения к redis_store: %v", er)
+		}
+	}(rdb)
+
+	b, err := app.New(cfg, store, rdb)
 	if err != nil {
 		log.Fatalf("Ошибка создания бота: %v", err)
 	}
