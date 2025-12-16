@@ -27,8 +27,8 @@ func New(cfg *config.DatabaseConfig) (*Storage, error) {
 		log.Fatalf("Ошибка подключения к БД: %v", err)
 	}
 
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Ошибка пинга в БД: %v", err)
+	if er := db.Ping(); er != nil {
+		log.Fatalf("Ошибка пинга в БД: %v", er)
 	}
 
 	log.Println("БД успешно подключена")
