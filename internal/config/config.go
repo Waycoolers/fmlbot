@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Token string
 	DB    DatabaseConfig
+	RDB   RedisConfig
 }
 
 type DatabaseConfig struct {
@@ -18,6 +19,13 @@ type DatabaseConfig struct {
 	User     string
 	Password string
 	Name     string
+}
+
+type RedisConfig struct {
+	Host     string
+	Port     string
+	Password string
+	DB       string
 }
 
 func Load() (*Config, error) {
@@ -36,6 +44,12 @@ func Load() (*Config, error) {
 			User:     os.Getenv("DB_USER"),
 			Password: os.Getenv("DB_PASSWORD"),
 			Name:     os.Getenv("DB_NAME"),
+		},
+		RDB: RedisConfig{
+			Host:     os.Getenv("REDIS_HOST"),
+			Port:     os.Getenv("REDIS_PORT"),
+			Password: os.Getenv("REDIS_PASSWORD"),
+			DB:       os.Getenv("REDIS_DB"),
 		},
 	}, nil
 }

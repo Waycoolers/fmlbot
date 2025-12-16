@@ -3,16 +3,15 @@ package ui
 import (
 	"log"
 
-	"github.com/Waycoolers/fmlbot/internal/client"
 	"github.com/Waycoolers/fmlbot/internal/domain"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type MenuUI struct {
-	Client client.BotClient
+	Client domain.BotClient
 }
 
-func New(client client.BotClient) *MenuUI {
+func New(client domain.BotClient) *MenuUI {
 	return &MenuUI{Client: client}
 }
 
@@ -39,6 +38,9 @@ func (ui *MenuUI) MainMenu(chatID int64, text string) error {
 			tgbotapi.NewKeyboardButton(string(domain.Account)),
 			tgbotapi.NewKeyboardButton(string(domain.Partner)),
 			tgbotapi.NewKeyboardButton(string(domain.Compliments)),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(string(domain.ImportantDates)),
 		),
 	)
 

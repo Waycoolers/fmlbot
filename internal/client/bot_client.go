@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/Waycoolers/fmlbot/internal/config"
+	"github.com/Waycoolers/fmlbot/internal/domain"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -34,20 +35,11 @@ func clearOldUpdates(api *tgbotapi.BotAPI) error {
 	return nil
 }
 
-type BotClient interface {
-	SendMessage(chatID int64, text string) error
-	SendWithInlineKeyboard(chatID int64, text string, markup tgbotapi.InlineKeyboardMarkup) error
-	EditMessageReplyMarkup(chatID int64, messageID int, markup tgbotapi.InlineKeyboardMarkup) error
-	GetUpdatesChan() <-chan tgbotapi.Update
-	StopReceivingUpdates()
-	Send(msg tgbotapi.Chattable) (tgbotapi.Message, error)
-}
-
 type TelegramClient struct {
 	api *tgbotapi.BotAPI
 }
 
-func NewTelegramClient(cfg *config.Config) BotClient {
+func NewTelegramClient(cfg *config.Config) domain.BotClient {
 	api, err := tgbotapi.NewBotAPI(cfg.Token)
 	if err != nil {
 		log.Fatalf("Ошибка при создании бота: %v", err)

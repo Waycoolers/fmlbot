@@ -5,18 +5,20 @@ import (
 	"log"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
+	"github.com/Waycoolers/fmlbot/internal/redis_store"
 	"github.com/Waycoolers/fmlbot/internal/storage"
 	"github.com/Waycoolers/fmlbot/internal/ui"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type Handler struct {
-	ui    *ui.MenuUI
-	Store *storage.Storage
+	ui                  *ui.MenuUI
+	Store               *storage.Storage
+	importantDateDrafts *redis_store.ImportantDateDraftStore
 }
 
-func New(ui *ui.MenuUI, store *storage.Storage) *Handler {
-	return &Handler{ui: ui, Store: store}
+func New(ui *ui.MenuUI, store *storage.Storage, importantDateDrafts *redis_store.ImportantDateDraftStore) *Handler {
+	return &Handler{ui: ui, Store: store, importantDateDrafts: importantDateDrafts}
 }
 
 func (h *Handler) ShowStartMenu(_ context.Context, chatID int64) {
