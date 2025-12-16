@@ -5,7 +5,7 @@ import (
 
 	"github.com/Waycoolers/fmlbot/internal/config"
 	"github.com/Waycoolers/fmlbot/internal/domain"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func clearOldUpdates(api *tgbotapi.BotAPI) error {
@@ -95,4 +95,10 @@ func (c *TelegramClient) StopReceivingUpdates() {
 
 func (c *TelegramClient) Send(msg tgbotapi.Chattable) (tgbotapi.Message, error) {
 	return c.api.Send(msg)
+}
+
+func (c *TelegramClient) DeleteMessage(chatID int64, messageID int) error {
+	req := tgbotapi.NewDeleteMessage(chatID, messageID)
+	_, err := c.api.Request(req)
+	return err
 }

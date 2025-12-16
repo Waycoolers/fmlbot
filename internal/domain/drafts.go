@@ -7,7 +7,9 @@ import (
 
 type ImportantDateDraft struct {
 	Title            string
-	Date             time.Time
+	Year             int
+	Month            int
+	Day              int
 	PartnerID        sql.NullInt64
 	NotifyBeforeDays int
 	CreatedAt        time.Time

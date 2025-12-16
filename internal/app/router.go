@@ -110,8 +110,6 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			r.h.ProcessComplimentFrequency(ctx, msg)
 		case domain.AwaitingTitleImportantDate:
 			r.h.HandleTitleImportantDate(ctx, msg)
-		case domain.AwaitingDateImportantDate:
-			r.h.HandleDateImportantDate(ctx, msg)
 		default:
 			r.h.ReplyUnknownMessage(ctx, msg)
 		}
@@ -212,10 +210,19 @@ func (r *Router) handleCompliments(ctx context.Context, cq *tgbotapi.CallbackQue
 func (r *Router) handleImportantDates(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
 	switch action {
 	case "add":
-		if strings.HasPrefix(payload, "partner") {
+		switch {
+		case strings.HasPrefix(payload, "partner"):
 			r.h.HandlePartnerImportantDate(ctx, cq)
-		} else if strings.HasPrefix(payload, "notify_before") {
+		case strings.HasPrefix(payload, "notify_before"):
 			r.h.HandleNotifyBeforeImportantDate(ctx, cq)
+		case strings.HasPrefix(payload, "year"):
+			r.h.HandleYearImportantDate(ctx, cq)
+		case strings.HasPrefix(payload, "month"):
+			r.h.HandleMonthImportantDate(ctx, cq)
+		case strings.HasPrefix(payload, "day"):
+			r.h.HandleDayImportantDate(ctx, cq)
+		default:
+			r.h.ReplyUnknownCallback(ctx, cq)
 		}
 	default:
 		r.h.ReplyUnknownCallback(ctx, cq)
