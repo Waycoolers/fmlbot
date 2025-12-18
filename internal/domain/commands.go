@@ -19,4 +19,5 @@ const (
 	ReceiveCompliment       Command = "Получить комплимент"
 	EditComplimentFrequency Command = "Лимит в день"
 	AddImportantDate        Command = "Добавить важную дату"
+	GetImportantDates       Command = "Мои важные даты"
 )

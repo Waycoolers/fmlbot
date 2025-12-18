@@ -14,6 +14,7 @@ func (ui *MenuUI) ImportantDatesMenu(chatID int64, text string) error {
 	menu := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(string(domain.AddImportantDate)),
+			tgbotapi.NewKeyboardButton(string(domain.GetImportantDates)),
 			tgbotapi.NewKeyboardButton(string(domain.Main)),
 		),
 	)
