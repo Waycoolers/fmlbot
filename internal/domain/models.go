@@ -28,4 +28,5 @@ type ImportantDate struct {
 	IsActive           bool          `db:"is_active"`
 	LastNotificationAt sql.NullTime  `db:"last_notification_at"`
 	NotifyBeforeDays   int           `db:"notify_before_days"`
+	CreatedAt          time.Time     `db:"created_at"`
 }

@@ -128,11 +128,11 @@ func (h *Handler) GetCompliments(ctx context.Context, msg *tgbotapi.Message) {
 		}
 	}
 
-	if sentCompliments != "" {
-		reply += "<b>Отправленные комплименты:</b>\n\n" + sentCompliments + "\n"
-	}
 	if activeCompliments != "" {
 		reply += "<b>Заготовленные комплименты:</b>\n\n" + activeCompliments
+	}
+	if sentCompliments != "" {
+		reply += "<b>Отправленные комплименты:</b>\n\n" + sentCompliments + "\n"
 	}
 
 	h.Reply(chatID, reply)

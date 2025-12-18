@@ -348,6 +348,12 @@ func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *tgbot
 		return
 	}
 
+	partnerID, err := h.Store.GetPartnerID(ctx, userID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
+		return
+	}
+
 	date := time.Date(
 		draft.Year,
 		time.Month(draft.Month),
@@ -369,4 +375,51 @@ func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *tgbot
 	}
 
 	h.Reply(chatID, "Памятная дата добавлена")
+	if partnerID != 0 && draft.PartnerID.Valid {
+		h.Reply(partnerID, "Твой партнёр добавил памятную дату:\n"+finalDraft.Title)
+	}
+}
+
+func (h *Handler) GetImportantDates(ctx context.Context, msg *tgbotapi.Message) {
+	chatID := msg.Chat.ID
+	userID := msg.From.ID
+
+	importantDates, err := h.Store.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении списка важных дат", err)
+		return
+	}
+
+	if len(importantDates) == 0 {
+		h.Reply(chatID, "Ты пока не добавлял(а) важных дат. Добавь важную дату")
+		return
+	}
+
+	var activeImportantDates string
+	var unactiveImportantDates string
+	var reply string
+	for _, importantDate := range importantDates {
+		if importantDate.IsActive {
+			if importantDate.PartnerID.Valid && importantDate.TelegramID.Valid {
+				activeImportantDates += "👉 " + importantDate.Title + "💑\n\n"
+			} else {
+				activeImportantDates += "👉 " + importantDate.Title + "👤\n\n"
+			}
+		} else {
+			if importantDate.PartnerID.Valid && importantDate.TelegramID.Valid {
+				unactiveImportantDates += "👉 " + importantDate.Title + "💑\n\n"
+			} else {
+				unactiveImportantDates += "👉 " + importantDate.Title + "👤\n\n"
+			}
+		}
+	}
+
+	if activeImportantDates != "" {
+		reply += "<b>Активные важные даты:</b>\n\n" + activeImportantDates
+	}
+	if unactiveImportantDates != "" {
+		reply += "<b>Неактивные важные даты:</b>\n\n" + unactiveImportantDates + "\n"
+	}
+
+	h.Reply(chatID, reply)
 }

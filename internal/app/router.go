@@ -65,6 +65,7 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		string(domain.ReceiveCompliment),
 		string(domain.EditComplimentFrequency),
 		string(domain.AddImportantDate),
+		string(domain.GetImportantDates),
 	}
 
 	// Если введена команда, то сбрасываем state
@@ -143,6 +144,8 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			r.h.EditComplimentFrequency(ctx, msg)
 		case string(domain.AddImportantDate):
 			r.h.AddImportantDate(ctx, msg)
+		case string(domain.GetImportantDates):
+			r.h.GetImportantDates(ctx, msg)
 		default:
 			r.h.ReplyUnknownMessage(ctx, msg)
 		}
