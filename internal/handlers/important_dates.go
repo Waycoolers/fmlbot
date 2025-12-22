@@ -423,3 +423,30 @@ func (h *Handler) GetImportantDates(ctx context.Context, msg *tgbotapi.Message) 
 
 	h.Reply(chatID, reply)
 }
+
+func (h *Handler) DeleteImportantDate(ctx context.Context, msg *tgbotapi.Message) {
+	chatID := msg.Chat.ID
+	userID := msg.From.ID
+
+	importantDates, err := h.Store.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении списка важных дат", err)
+		return
+	}
+
+	if len(importantDates) == 0 {
+		h.Reply(chatID, "У тебя не добавлены важные даты")
+		return
+	}
+
+	var sortedImportantDates []domain.ImportantDate
+	for i, importantDate := range importantDates {
+		if importantDate.PartnerID.Valid && importantDate.TelegramID.Valid {
+			importantDate.Title = "💑 " + importantDate.Title
+			sortedImportantDates = append(sortedImportantDates, importantDate)
+			importantDates = append(importantDates[:i], importantDates[i+1:]...)
+		} else {
+			importantDate.Title = "👤 " + importantDate.Title
+		}
+	}
+}
