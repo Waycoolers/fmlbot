@@ -148,7 +148,7 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		case string(domain.GetImportantDates):
 			r.h.GetImportantDates(ctx, msg)
 		case string(domain.DeleteImportantDate):
-
+			r.h.DeleteImportantDate(ctx, msg)
 		default:
 			r.h.ReplyUnknownMessage(ctx, msg)
 		}
@@ -229,6 +229,10 @@ func (r *Router) handleImportantDates(ctx context.Context, cq *tgbotapi.Callback
 			r.h.HandleDayImportantDate(ctx, cq)
 		default:
 			r.h.ReplyUnknownCallback(ctx, cq)
+		}
+	case "delete":
+		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
+			r.h.HandleDeleteImportantDate(ctx, cq)
 		}
 	default:
 		r.h.ReplyUnknownCallback(ctx, cq)
