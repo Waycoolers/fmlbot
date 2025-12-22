@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -440,13 +441,67 @@ func (h *Handler) DeleteImportantDate(ctx context.Context, msg *tgbotapi.Message
 	}
 
 	var sortedImportantDates []domain.ImportantDate
-	for i, importantDate := range importantDates {
+	var otherDates []domain.ImportantDate
+
+	for _, importantDate := range importantDates {
 		if importantDate.PartnerID.Valid && importantDate.TelegramID.Valid {
 			importantDate.Title = "💑 " + importantDate.Title
 			sortedImportantDates = append(sortedImportantDates, importantDate)
-			importantDates = append(importantDates[:i], importantDates[i+1:]...)
 		} else {
 			importantDate.Title = "👤 " + importantDate.Title
+			otherDates = append(otherDates, importantDate)
 		}
 	}
+	sortedImportantDates = append(sortedImportantDates, otherDates...)
+
+	var keyboard [][]tgbotapi.InlineKeyboardButton
+
+	for _, importantDate := range sortedImportantDates {
+		dateText := strings.Split(importantDate.Date.Format("02.01.2006"), " ")[0]
+		buttonText := truncateText(fmt.Sprintf(importantDate.Title), 30)
+		buttonText += " (" + dateText + ")"
+		callbackData := fmt.Sprintf("important_dates:delete:confirm:%d", importantDate.ID)
+
+		row := []tgbotapi.InlineKeyboardButton{
+			tgbotapi.NewInlineKeyboardButtonData(buttonText, callbackData),
+		}
+		keyboard = append(keyboard, row)
+	}
+
+	keyboard = append(keyboard, []tgbotapi.InlineKeyboardButton{
+		tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "important_dates:delete:cancel"),
+	})
+
+	text := "🗑 <b>Выбери важную дату для удаления</b>"
+	markup := tgbotapi.NewInlineKeyboardMarkup(keyboard...)
+	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, markup)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
+		return
+	}
+}
+
+func (h *Handler) HandleDeleteImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
+	data := cq.Data
+	chatID := cq.Message.Chat.ID
+	messageID := cq.Message.MessageID
+
+	if strings.HasPrefix(data, "important_dates:delete:confirm") {
+		importantDateIDStr := strings.TrimPrefix(data, "important_dates:delete:confirm:")
+		importantDateID, _ := strconv.Atoi(importantDateIDStr)
+
+		err := h.Store.DeleteImportantDate(ctx, int64(importantDateID))
+		if err != nil {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.HandleErr(chatID, "Ошибка при удалении важной даты", err)
+			return
+		}
+
+		h.Reply(chatID, "Важная дата успешно удалена! ✅")
+	} else if strings.HasPrefix(data, "important_dates:delete:cancel") {
+		h.Reply(chatID, "Удаление важной даты отменено")
+	} else {
+		h.Reply(chatID, "Произошла ошибка")
+	}
+	_ = h.ui.Client.DeleteMessage(chatID, messageID)
 }

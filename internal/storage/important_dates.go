@@ -51,3 +51,39 @@ func (s *Storage) GetImportantDates(ctx context.Context, telegramID sql.NullInt6
 
 	return importantDates, nil
 }
+
+func (s *Storage) DeleteImportantDate(ctx context.Context, id int64) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM important_dates WHERE id=$1`, id)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *Storage) EditIsActiveImportantDate(ctx context.Context, id int64, isActive bool) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `UPDATE important_dates SET is_active=$1 WHERE id=$2;`, isActive, id)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	return tx.Commit()
+}
