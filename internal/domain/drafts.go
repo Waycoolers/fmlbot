@@ -14,3 +14,8 @@ type ImportantDateDraft struct {
 	NotifyBeforeDays int
 	CreatedAt        time.Time
 }
+
+type ImportantDateEditDraft struct {
+	ImportantDateID int64     `json:"important_date_id"`
+	CreatedAt       time.Time `json:"created_at"`
+}

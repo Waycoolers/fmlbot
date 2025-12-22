@@ -21,4 +21,5 @@ const (
 	AddImportantDate        Command = "Добавить важную дату"
 	GetImportantDates       Command = "Мои важные даты"
 	DeleteImportantDate     Command = "Удалить важную дату"
+	EditImportantDate       Command = "Управление"
 )
