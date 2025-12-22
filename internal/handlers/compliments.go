@@ -140,10 +140,11 @@ func (h *Handler) GetCompliments(ctx context.Context, msg *tgbotapi.Message) {
 
 func truncateText(text string, maxLength int) string {
 	text = strings.TrimSpace(text)
-	if len(text) <= maxLength {
+	runes := []rune(text) // конвертируем в руны
+	if len(runes) <= maxLength {
 		return text
 	}
-	return text[:maxLength-3] + "..."
+	return string(runes[:maxLength-3]) + "..."
 }
 
 func (h *Handler) DeleteCompliment(ctx context.Context, msg *tgbotapi.Message) {
@@ -214,7 +215,7 @@ func (h *Handler) HandleDeleteCompliment(ctx context.Context, cb *tgbotapi.Callb
 	} else if data == "compliments:delete:cancel" {
 		h.Reply(chatID, "Удаление комплимента отменено")
 	}
-	h.ui.RemoveButtons(chatID, messageID)
+	_ = h.ui.Client.DeleteMessage(chatID, messageID)
 }
 
 func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) {

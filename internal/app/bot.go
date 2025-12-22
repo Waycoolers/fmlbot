@@ -26,7 +26,8 @@ func New(cfg *config.Config, store *storage.Storage, rdb *redis.Client) (*Bot, e
 	telegramClient := client.NewTelegramClient(cfg)
 	menuUI := ui.New(telegramClient)
 	importantDateDrafts := redis_store.NewImportantDateDraftStore(rdb, 15*time.Minute)
-	handler := handlers.New(menuUI, store, importantDateDrafts)
+	importantDateEditDrafts := redis_store.NewImportantDateEditDraftStore(rdb, 15*time.Minute)
+	handler := handlers.New(menuUI, store, importantDateDrafts, importantDateEditDrafts)
 	s := scheduler.New(handler)
 	router := NewRouter(handler)
 

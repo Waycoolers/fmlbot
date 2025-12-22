@@ -12,13 +12,14 @@ import (
 )
 
 type Handler struct {
-	ui                  *ui.MenuUI
-	Store               *storage.Storage
-	importantDateDrafts *redis_store.ImportantDateDraftStore
+	ui                      *ui.MenuUI
+	Store                   *storage.Storage
+	importantDateDrafts     *redis_store.ImportantDateDraftStore
+	importantDateEditDrafts *redis_store.ImportantDateEditDraftStore
 }
 
-func New(ui *ui.MenuUI, store *storage.Storage, importantDateDrafts *redis_store.ImportantDateDraftStore) *Handler {
-	return &Handler{ui: ui, Store: store, importantDateDrafts: importantDateDrafts}
+func New(ui *ui.MenuUI, store *storage.Storage, importantDateDrafts *redis_store.ImportantDateDraftStore, importantDateEditDrafts *redis_store.ImportantDateEditDraftStore) *Handler {
+	return &Handler{ui: ui, Store: store, importantDateDrafts: importantDateDrafts, importantDateEditDrafts: importantDateEditDrafts}
 }
 
 func (h *Handler) ShowStartMenu(_ context.Context, chatID int64) {

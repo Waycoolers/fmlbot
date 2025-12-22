@@ -67,6 +67,7 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		string(domain.AddImportantDate),
 		string(domain.GetImportantDates),
 		string(domain.DeleteImportantDate),
+		string(domain.EditImportantDate),
 	}
 
 	// Если введена команда, то сбрасываем state
@@ -112,6 +113,8 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			r.h.ProcessComplimentFrequency(ctx, msg)
 		case domain.AwaitingTitleImportantDate:
 			r.h.HandleTitleImportantDate(ctx, msg)
+		case domain.AwaitingEditTitleImportantDate:
+			r.h.HandleEditTitleImportantDateText(ctx, msg)
 		default:
 			r.h.ReplyUnknownMessage(ctx, msg)
 		}
@@ -149,6 +152,8 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			r.h.GetImportantDates(ctx, msg)
 		case string(domain.DeleteImportantDate):
 			r.h.DeleteImportantDate(ctx, msg)
+		case string(domain.EditImportantDate):
+			r.h.EditImportantDate(ctx, msg)
 		default:
 			r.h.ReplyUnknownMessage(ctx, msg)
 		}
@@ -222,17 +227,51 @@ func (r *Router) handleImportantDates(ctx context.Context, cq *tgbotapi.Callback
 		case strings.HasPrefix(payload, "notify_before"):
 			r.h.HandleNotifyBeforeImportantDate(ctx, cq)
 		case strings.HasPrefix(payload, "year"):
-			r.h.HandleYearImportantDate(ctx, cq)
+			r.h.HandleYearImportantDateUniversal(ctx, cq)
 		case strings.HasPrefix(payload, "month"):
-			r.h.HandleMonthImportantDate(ctx, cq)
+			r.h.HandleMonthImportantDateUniversal(ctx, cq)
 		case strings.HasPrefix(payload, "day"):
-			r.h.HandleDayImportantDate(ctx, cq)
+			r.h.HandleDayImportantDateUniversal(ctx, cq)
 		default:
 			r.h.ReplyUnknownCallback(ctx, cq)
 		}
 	case "delete":
 		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
 			r.h.HandleDeleteImportantDate(ctx, cq)
+		}
+	case "update_menu":
+		r.h.HandleEditImportantDate(ctx, cq)
+	case "update":
+		switch {
+		case strings.HasPrefix(payload, "title"):
+			r.h.HandleEditTitleImportantDate(ctx, cq)
+		case strings.HasPrefix(payload, "date"):
+			r.h.HandleEditDateImportantDate(ctx, cq)
+		case strings.HasPrefix(payload, "partner"):
+			r.h.HandleEditPartnerImportantDate(ctx, cq)
+		case strings.HasPrefix(payload, "notify_before"):
+			r.h.HandleEditNotifyBeforeImportantDate(ctx, cq)
+		case strings.HasPrefix(payload, "is_active"):
+			r.h.HandleEditIsActiveImportantDate(ctx, cq)
+		case strings.HasPrefix(payload, "cancel"):
+			r.h.CancelCallbackImportantDate(ctx, cq)
+		default:
+			r.h.ReplyUnknownCallback(ctx, cq)
+		}
+	case "edit":
+		switch {
+		case strings.HasPrefix(payload, "year"):
+			r.h.HandleYearImportantDateUniversal(ctx, cq)
+		case strings.HasPrefix(payload, "month"):
+			r.h.HandleMonthImportantDateUniversal(ctx, cq)
+		case strings.HasPrefix(payload, "day"):
+			r.h.HandleDayImportantDateUniversal(ctx, cq)
+		case strings.HasPrefix(payload, "partner"):
+			r.h.HandleEditPartnerImportantDateSelect(ctx, cq)
+		case strings.HasPrefix(payload, "notify_before"):
+			r.h.HandleEditNotifyBeforeImportantDateSelect(ctx, cq)
+		default:
+			r.h.ReplyUnknownCallback(ctx, cq)
 		}
 	default:
 		r.h.ReplyUnknownCallback(ctx, cq)
