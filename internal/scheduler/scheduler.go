@@ -15,7 +15,12 @@ type Scheduler struct {
 }
 
 func New(h *handlers.Handler) *Scheduler {
-	loc, _ := time.LoadLocation("Europe/Moscow")
+	loc, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		log.Printf("Не удалось загрузить таймзону, используем UTC: %v", err)
+		loc = time.UTC
+	}
+
 	c := cron.New(cron.WithSeconds(), cron.WithLocation(loc))
 	return &Scheduler{h: h, c: c}
 }
