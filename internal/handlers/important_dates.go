@@ -44,11 +44,93 @@ func (h *Handler) beautifyImportantDates(importantDates []domain.ImportantDate, 
 	return beautifiedImportantDates
 }
 
-func (h *Handler) ShowImportantDatesMenu(_ context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
-	text := "Важные даты"
+func (h *Handler) detailImportantDate(importantDate domain.ImportantDate, maxLength int) string {
+	var title string
+	dateText := strings.Split(importantDate.Date.Format("02.01.2006"), " ")[0]
+	days := strconv.Itoa(importantDate.NotifyBeforeDays)
 
-	err := h.ui.ImportantDatesMenu(chatID, text)
+	if importantDate.PartnerID.Valid && importantDate.TelegramID.Valid {
+		if importantDate.IsActive {
+			title = "👩‍❤️‍👨 | " + importantDate.Title
+			title = truncateText(title, maxLength) + " | " + dateText + " | 🟢 | " + days
+		} else {
+			title = "👩‍❤️‍👨 | " + importantDate.Title
+			title = truncateText(title, maxLength) + " | " + dateText + " | ⚪ | " + days
+		}
+	} else {
+		if importantDate.IsActive {
+			title = "👤 | " + importantDate.Title
+			title = truncateText(title, maxLength) + " | " + dateText + " | 🟢 | " + days
+		} else {
+			title = "👤 | " + importantDate.Title
+			title = truncateText(title, maxLength) + " | " + dateText + " | ⚪ | " + days
+		}
+	}
+	return title
+}
+
+func nextOccurrence(date time.Time, now time.Time) time.Time {
+	next := time.Date(
+		now.Year(),
+		date.Month(),
+		date.Day(),
+		0, 0, 0, 0,
+		now.Location(),
+	)
+
+	// если в этом году уже прошло — берём следующий год
+	if next.Before(now) {
+		next = next.AddDate(1, 0, 0)
+	}
+
+	return next
+}
+
+func (h *Handler) nearestImportantDate(dates []domain.ImportantDate, now time.Time) (domain.ImportantDate, bool) {
+	var nearest domain.ImportantDate
+	found := false
+	var nearestTime time.Time
+
+	for _, d := range dates {
+		if !d.IsActive {
+			continue
+		}
+
+		next := nextOccurrence(d.Date, now)
+
+		if !found || next.Before(nearestTime) {
+			nearest = d
+			nearestTime = next
+			found = true
+		}
+	}
+
+	return nearest, found
+}
+
+func (h *Handler) ShowImportantDatesMenu(ctx context.Context, msg *tgbotapi.Message) {
+	chatID := msg.Chat.ID
+	userID := msg.From.ID
+	var text string
+
+	importantDates, err := h.Store.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении списка важных дат", err)
+		return
+	}
+
+	if len(importantDates) == 0 {
+		text = "📅 Ближайших дат нет"
+	} else {
+		nearest, found := h.nearestImportantDate(importantDates, time.Now())
+		if !found {
+			text = "📅 Ближайших дат нет"
+		}
+		title := h.detailImportantDate(nearest, 256)
+		text = "📅 Ближайшая важная дата: \n\n" + title
+	}
+
+	err = h.ui.ImportantDatesMenu(chatID, text)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить меню важных дат", err)
 		return
@@ -65,8 +147,11 @@ func (h *Handler) AddImportantDate(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 	h.Reply(chatID,
-		"✍️ Как называется памятная дата?\n"+
-			"Например: <b>Годовщина</b>, <b>Твой день рождения</b>, <b>Первое свидание</b>",
+		"✍️ Как назовём эту дату?\n\n"+
+			"Примеры:\n"+
+			"• <b>Годовщина</b>\n"+
+			"• <b>День рождения</b>\n"+
+			"• <b>Первое свидание</b> 💫",
 	)
 }
 
@@ -129,7 +214,7 @@ func (h *Handler) HandlePartnerImportantDate(ctx context.Context, cq *tgbotapi.C
 		}
 
 		if partnerID == 0 {
-			h.Reply(chatID, "У тебя не добавлен партнёр. Сначала добавь его")
+			h.Reply(chatID, "У тебя пока нет партнёра 💭\nСначала добавь его, и сможете делить даты вместе")
 			return
 		}
 
@@ -239,9 +324,9 @@ func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *tgbot
 
 	stringDate := date.Format("02.01.2006")
 
-	h.Reply(chatID, "Важная дата добавлена")
+	h.Reply(chatID, "🎉 Важная дата добавлена!")
 	if partnerID != 0 && draft.PartnerID.Valid && partnerID == draft.PartnerID.Int64 {
-		h.Reply(partnerID, "Твой партнёр добавил важную дату:\n"+"<b>"+finalDraft.Title+"</b>"+"\n"+stringDate)
+		h.Reply(partnerID, "🎉 Твой партнёр добавил важную дату:\n"+"<b>"+finalDraft.Title+"</b>"+"\n"+stringDate)
 	}
 }
 
@@ -256,7 +341,7 @@ func (h *Handler) GetImportantDates(ctx context.Context, msg *tgbotapi.Message) 
 	}
 
 	if len(importantDates) == 0 {
-		h.Reply(chatID, "Ты пока не добавлял(а) важных дат. Добавь важную дату")
+		h.Reply(chatID, "Ты пока не добавлял(а) важных дат… Давай создадим первую вместе! 💖")
 		return
 	}
 
@@ -294,7 +379,7 @@ func (h *Handler) DeleteImportantDate(ctx context.Context, msg *tgbotapi.Message
 	}
 
 	if len(importantDates) == 0 {
-		h.Reply(chatID, "У тебя не добавлены важные даты")
+		h.Reply(chatID, "Ты пока не добавлял(а) важных дат… Давай создадим первую вместе! 💖")
 		return
 	}
 
@@ -312,10 +397,10 @@ func (h *Handler) DeleteImportantDate(ctx context.Context, msg *tgbotapi.Message
 	}
 
 	buttons = append(buttons, []tgbotapi.InlineKeyboardButton{
-		tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "important_dates:delete:cancel"),
+		tgbotapi.NewInlineKeyboardButtonData("❌ Ой, передумал(а)", "important_dates:delete:cancel"),
 	})
 
-	text := "🗑 <b>Выбери важную дату для удаления</b>"
+	text := "🗑 Выбери, какую дату мы удалим"
 	markup := tgbotapi.NewInlineKeyboardMarkup(buttons...)
 	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, markup)
 	if err != nil {
@@ -358,16 +443,16 @@ func (h *Handler) HandleDeleteImportantDate(ctx context.Context, cq *tgbotapi.Ca
 			return
 		}
 
-		h.Reply(chatID, "Важная дата успешно удалена! ✅")
+		h.Reply(chatID, "✅ Готово! Важная дата удалена")
 
 		if (partnerID != 0 && importantDate.PartnerID.Valid && importantDate.PartnerID.Int64 == partnerID) ||
 			(partnerID != 0 && importantDate.TelegramID.Valid && importantDate.TelegramID.Int64 == partnerID) {
-			h.Reply(partnerID, "Твой партнёр удалил важную дату:\n"+"<b>"+title+"</b>"+"\n"+date)
+			h.Reply(partnerID, "💔 Твой партнёр удалил важную дату:\n"+"<b>"+title+"</b>"+"\n"+date)
 		}
 	} else if strings.HasPrefix(data, "important_dates:delete:cancel") {
-		h.Reply(chatID, "Удаление важной даты отменено")
+		h.Reply(chatID, "😉 Удаление отменено")
 	} else {
-		h.Reply(chatID, "Произошла ошибка")
+		h.Reply(chatID, "😢 Что-то пошло не так…")
 	}
 	_ = h.ui.Client.DeleteMessage(chatID, messageID)
 }
@@ -383,7 +468,7 @@ func (h *Handler) EditImportantDate(ctx context.Context, msg *tgbotapi.Message) 
 	}
 
 	if len(importantDates) == 0 {
-		h.Reply(chatID, "У тебя не добавлены важные даты")
+		h.Reply(chatID, "Ты пока не добавлял(а) важных дат… Давай создадим первую вместе! 💖")
 		return
 	}
 
@@ -404,7 +489,7 @@ func (h *Handler) EditImportantDate(ctx context.Context, msg *tgbotapi.Message) 
 		tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "important_dates:update_menu:cancel"),
 	})
 
-	text := "<b>Выбери важную дату</b>"
+	text := "🌸 Выбери дату, которую хочешь изменить"
 	markup := tgbotapi.NewInlineKeyboardMarkup(buttons...)
 	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, markup)
 	if err != nil {
@@ -420,7 +505,7 @@ func (h *Handler) HandleEditImportantDate(ctx context.Context, cq *tgbotapi.Call
 
 	data = strings.TrimPrefix(data, "important_dates:update_menu:")
 	if data == "cancel" {
-		h.Reply(chatID, "Редактирование важной даты отменено")
+		h.Reply(chatID, "😉 Редактирование отменено")
 	} else {
 		id, _ := strconv.Atoi(data)
 
@@ -432,25 +517,26 @@ func (h *Handler) HandleEditImportantDate(ctx context.Context, cq *tgbotapi.Call
 
 		var active string
 		if importantDate.IsActive {
-			active = "Деактивировать"
+			active = "Деактивировать 💤"
 		} else {
-			active = "Активировать"
+			active = "Активировать ✨"
 		}
 
 		buttons := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("Название", "important_dates:update:title:"+data),
-				tgbotapi.NewInlineKeyboardButtonData("Дата", "important_dates:update:date:"+data),
-				tgbotapi.NewInlineKeyboardButtonData("Партнёр", "important_dates:update:partner:"+data),
+				tgbotapi.NewInlineKeyboardButtonData("Название 📝", "important_dates:update:title:"+data),
+				tgbotapi.NewInlineKeyboardButtonData("Дата 📅", "important_dates:update:date:"+data),
+				tgbotapi.NewInlineKeyboardButtonData("Партнёр 💑", "important_dates:update:partner:"+data),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("Уведомлять за", "important_dates:update:notify_before:"+data),
+				tgbotapi.NewInlineKeyboardButtonData("Уведомлять за ⏰", "important_dates:update:notify_before:"+data),
 				tgbotapi.NewInlineKeyboardButtonData(active, "important_dates:update:is_active:"+data),
 				tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "important_dates:update:cancel"),
 			),
 		)
 
-		text := "Что ты хочешь изменить?"
+		title := h.detailImportantDate(importantDate, 256)
+		text := "💌 Что хочешь изменить?\n\n" + title
 
 		err = h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
 		if err != nil {
@@ -471,7 +557,7 @@ func (h *Handler) CancelCallbackImportantDate(_ context.Context, cq *tgbotapi.Ca
 		h.HandleErr(chatID, "Ошибка при удалении сообщения", er)
 	}
 
-	h.Reply(chatID, "Действие отменено")
+	h.Reply(chatID, "😉 Действие отменено")
 }
 
 func (h *Handler) HandleEditTitleImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
@@ -533,7 +619,7 @@ func (h *Handler) HandleEditTitleImportantDateText(ctx context.Context, msg *tgb
 		return
 	}
 
-	h.Reply(chatID, "✅ Название обновлено")
+	h.Reply(chatID, "✅ Отлично! Название обновлено")
 }
 
 func (h *Handler) HandleEditDateImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
@@ -631,7 +717,7 @@ func (h *Handler) HandleEditPartnerImportantDateSelect(ctx context.Context, cq *
 		h.HandleErr(chatID, "Ошибка при удалении сообщения", er)
 	}
 
-	h.Reply(chatID, "👥 Партнёр обновлён")
+	h.Reply(chatID, "👥 Партнёр успешно обновлён")
 }
 
 func (h *Handler) HandleEditNotifyBeforeImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
@@ -693,7 +779,7 @@ func (h *Handler) HandleEditNotifyBeforeImportantDateSelect(ctx context.Context,
 		h.HandleErr(chatID, "Ошибка при удалении сообщения", er)
 	}
 
-	h.Reply(chatID, "⏰ Уведомления обновлены")
+	h.Reply(chatID, "⏰ Уведомления успешно обновлены")
 }
 
 func (h *Handler) HandleEditIsActiveImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
@@ -716,10 +802,10 @@ func (h *Handler) HandleEditIsActiveImportantDate(ctx context.Context, cq *tgbot
 		return
 	}
 
-	h.ui.RemoveButtons(chatID, messageID)
+	_ = h.ui.Client.DeleteMessage(chatID, messageID)
 
 	if date.IsActive {
-		h.Reply(chatID, "🟢 Дата активирована")
+		h.Reply(chatID, "🟢 Дата теперь активна")
 	} else {
 		h.Reply(chatID, "⚪ Дата деактивирована")
 	}
@@ -922,7 +1008,7 @@ func (h *Handler) HandleDayImportantDateUniversal(ctx context.Context, cq *tgbot
 				h.HandleErr(chatID, "Ошибка при удалении сообщения", er)
 			}
 
-			h.Reply(chatID, "📅 Дата обновлена")
+			h.Reply(chatID, "📅 Дата успешно обновлена")
 		} else {
 			draft, err := h.importantDateDrafts.Get(ctx, userID)
 			if err != nil || draft == nil {
@@ -948,7 +1034,7 @@ func (h *Handler) HandleDayImportantDateUniversal(ctx context.Context, cq *tgbot
 			}
 
 			if partnerID == 0 {
-				h.Reply(chatID, "Так как у тебя не добавлен партнер, памятная дата будет твоей личной")
+				h.Reply(chatID, "✨ Так как у тебя пока нет партнёра, памятная дата будет твоей личной")
 				_ = h.Store.SetUserState(ctx, userID, domain.AwaitingNotifyBeforeImportantDate)
 				_ = h.ui.SendNotifyBeforeKeyboard(chatID, isEdit)
 			} else {
@@ -1017,7 +1103,7 @@ func (h *Handler) NotifyImportantDatesCron(ctx context.Context) {
 
 		var text string
 		if isEventDay {
-			text = fmt.Sprintf("🎉 Сегодня важная дата!\n\n<b>%s</b>\n%s",
+			text = fmt.Sprintf("🎉 Ура! Сегодня важная дата!\n\n<b>%s</b>\n%s",
 				importantDate.Title,
 				eventDate.Format("02.01.2006"),
 			)

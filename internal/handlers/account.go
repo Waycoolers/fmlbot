@@ -9,7 +9,7 @@ import (
 
 func (h *Handler) ShowAccountMenu(_ context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
-	text := "Управление аккаунтом"
+	text := "⚙️ Здесь можно управлять своим аккаунтом"
 	err := h.ui.AccountMenu(chatID, text)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить меню аккаунтов", err)
@@ -42,12 +42,13 @@ func (h *Handler) DeleteAccount(_ context.Context, msg *tgbotapi.Message) {
 
 	buttons := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Да, удалить 💔", "account:delete:confirm"),
-			tgbotapi.NewInlineKeyboardButtonData("Отмена ❌", "account:delete:cancel"),
+			tgbotapi.NewInlineKeyboardButtonData("💔 Да, удалить", "account:delete:confirm"),
+			tgbotapi.NewInlineKeyboardButtonData("↩️ Передумал(а)", "account:delete:cancel"),
 		),
 	)
 
-	text := "Ты уверен, что хочешь удалить аккаунт? Все твои пользовательские данные тоже будут удалены."
+	text := "💭 Ты уверен(а), что хочешь удалить аккаунт?\n\n" +
+		"Все сохранённые данные и тёплые моменты будут удалены без возможности восстановления."
 
 	err := h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
 	if err != nil {
@@ -102,15 +103,15 @@ func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *tgbotapi.Callback
 			}
 		}
 
-		h.Reply(chatID, "Твой аккаунт успешно удалён 💔")
-		text := "Чтобы разбудить бота, зарегистрируйся по кнопке ниже"
+		h.Reply(chatID, "🕊️ Аккаунт удалён\nЕсли захочешь — я всегда буду рад(а) начать заново")
+		text := "✨ Хочешь вернуться?\nНажми кнопку ниже, чтобы начать сначала"
 		err = h.ui.StartMenu(chatID, text)
 		if err != nil {
 			log.Printf("Ошибка при вызове стартового меню")
-			h.Reply(chatID, "Перезапусти бота с помощью /start")
+			h.Reply(chatID, "Попробуй перезапустить бота командой /start")
 		}
 	case "account:delete:cancel":
-		h.Reply(chatID, "Удаление аккаунта отменено ✅")
+		h.Reply(chatID, "💛 Хорошо, ничего не удаляем")
 	}
-	h.ui.RemoveButtons(chatID, messageID)
+	_ = h.ui.Client.DeleteMessage(chatID, messageID)
 }

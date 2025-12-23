@@ -23,7 +23,7 @@ func New(ui *ui.MenuUI, store *storage.Storage, importantDateDrafts *redis_store
 }
 
 func (h *Handler) ShowStartMenu(_ context.Context, chatID int64) {
-	text := "Чтобы разбудить бота, зарегистрируйся по кнопке ниже"
+	text := "✨ Чтобы разбудить бота, зарегистрируйся по кнопке ниже"
 	err := h.ui.StartMenu(chatID, text)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отобразить стартовое меню", err)
@@ -34,7 +34,7 @@ func (h *Handler) ShowStartMenu(_ context.Context, chatID int64) {
 func (h *Handler) ShowMainMenu(_ context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 	msgText := msg.Text
-	text := "Выбери действие"
+	text := "🌿 Выбери, что хочешь сделать"
 
 	if msgText == string(domain.Register) {
 		text = "fmlbot приветствует тебя! 💖"
@@ -70,15 +70,15 @@ func (h *Handler) DoMidnightTasks(ctx context.Context) {
 
 func (h *Handler) ReplyUnknownCallback(_ context.Context, cq *tgbotapi.CallbackQuery) {
 	chatID := cq.Message.Chat.ID
-	h.Reply(chatID, "Используй кнопки")
+	h.Reply(chatID, "🤍 Лучше воспользуйся кнопками — так будет проще")
 }
 
 func (h *Handler) ReplyUnknownMessage(_ context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
-	h.Reply(chatID, "Я не знаю такую команду")
+	h.Reply(chatID, "🤔 Я пока не понимаю это сообщение\nПопробуй выбрать действие с кнопок ниже")
 }
 
 func (h *Handler) HandleErr(chatID int64, msg string, err error) {
-	h.Reply(chatID, "Произошла ошибка 😔")
+	h.Reply(chatID, "😔 Что-то пошло не так\nЯ уже стараюсь всё исправить")
 	log.Printf("%s: %v", msg, err)
 }
