@@ -237,9 +237,11 @@ func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *tgbot
 		h.HandleErr(chatID, "Ошибка при удалении сообщения", err)
 	}
 
-	h.Reply(chatID, "Памятная дата добавлена")
-	if partnerID != 0 && draft.PartnerID.Valid {
-		h.Reply(partnerID, "Твой партнёр добавил памятную дату:\n"+finalDraft.Title)
+	stringDate := date.Format("02.01.2006")
+
+	h.Reply(chatID, "Важная дата добавлена")
+	if partnerID != 0 && draft.PartnerID.Valid && partnerID == draft.PartnerID.Int64 {
+		h.Reply(partnerID, "Твой партнёр добавил важную дату:\n"+"<b>"+finalDraft.Title+"</b>"+"\n"+stringDate)
 	}
 }
 
@@ -325,13 +327,31 @@ func (h *Handler) DeleteImportantDate(ctx context.Context, msg *tgbotapi.Message
 func (h *Handler) HandleDeleteImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
 	data := cq.Data
 	chatID := cq.Message.Chat.ID
+	userID := cq.From.ID
 	messageID := cq.Message.MessageID
 
 	if strings.HasPrefix(data, "important_dates:delete:confirm") {
 		importantDateIDStr := strings.TrimPrefix(data, "important_dates:delete:confirm:")
 		importantDateID, _ := strconv.Atoi(importantDateIDStr)
 
-		err := h.Store.DeleteImportantDate(ctx, int64(importantDateID))
+		partnerID, err := h.Store.GetPartnerID(ctx, userID)
+		if err != nil {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.HandleErr(chatID, "Ошибка при получении id партнера", err)
+			return
+		}
+
+		importantDate, err := h.Store.GetImportantDateByID(ctx, int64(importantDateID))
+		if err != nil {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.HandleErr(chatID, "Ошибка при получении важной даты", err)
+			return
+		}
+
+		title := importantDate.Title
+		date := importantDate.Date.Format("02.01.2006")
+
+		err = h.Store.DeleteImportantDate(ctx, int64(importantDateID))
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
 			h.HandleErr(chatID, "Ошибка при удалении важной даты", err)
@@ -339,6 +359,11 @@ func (h *Handler) HandleDeleteImportantDate(ctx context.Context, cq *tgbotapi.Ca
 		}
 
 		h.Reply(chatID, "Важная дата успешно удалена! ✅")
+
+		if (partnerID != 0 && importantDate.PartnerID.Valid && importantDate.PartnerID.Int64 == partnerID) ||
+			(partnerID != 0 && importantDate.TelegramID.Valid && importantDate.TelegramID.Int64 == partnerID) {
+			h.Reply(partnerID, "Твой партнёр удалил важную дату:\n"+"<b>"+title+"</b>"+"\n"+date)
+		}
 	} else if strings.HasPrefix(data, "important_dates:delete:cancel") {
 		h.Reply(chatID, "Удаление важной даты отменено")
 	} else {
