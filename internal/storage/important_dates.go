@@ -104,3 +104,22 @@ func (s *Storage) EditImportantDate(ctx context.Context, date domain.ImportantDa
 
 	return tx.Commit()
 }
+
+func (s *Storage) GetAllActiveImportantDates(ctx context.Context) (importantDates []domain.ImportantDate, err error) {
+	importantDates = make([]domain.ImportantDate, 0)
+	err = s.DB.SelectContext(ctx, &importantDates, `
+		SELECT * FROM important_dates
+		WHERE is_active = TRUE
+	`)
+	if err != nil {
+		return nil, err
+	}
+	return importantDates, nil
+}
+
+func (s *Storage) UpdateLastNotificationAt(ctx context.Context, id int64, timestamp time.Time) error {
+	_, err := s.DB.ExecContext(ctx, `
+		UPDATE important_dates SET last_notification_at=$1 WHERE id=$2;
+	`, timestamp, id)
+	return err
+}
