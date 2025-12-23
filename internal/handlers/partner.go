@@ -94,7 +94,7 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 	if !exists {
 		h.Reply(
 			chatID,
-			"🤔 Я не нашёл(ла) этого пользователя\n"+
+			"🤔 Я не нашёл этого пользователя\n"+
 				"Пусть он сначала напишет боту команду "+string(domain.Start)+"\n\n",
 		)
 		return
