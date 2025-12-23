@@ -526,10 +526,12 @@ func (h *Handler) HandleEditImportantDate(ctx context.Context, cq *tgbotapi.Call
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("Название 📝", "important_dates:update:title:"+data),
 				tgbotapi.NewInlineKeyboardButtonData("Дата 📅", "important_dates:update:date:"+data),
-				tgbotapi.NewInlineKeyboardButtonData("Партнёр 💑", "important_dates:update:partner:"+data),
 			),
 			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("Партнёр 💑", "important_dates:update:partner:"+data),
 				tgbotapi.NewInlineKeyboardButtonData("Уведомлять за ⏰", "important_dates:update:notify_before:"+data),
+			),
+			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData(active, "important_dates:update:is_active:"+data),
 				tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "important_dates:update:cancel"),
 			),
