@@ -37,9 +37,9 @@ func (ui *MenuUI) MainMenu(chatID int64, text string) error {
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(string(domain.Account)),
 			tgbotapi.NewKeyboardButton(string(domain.Partner)),
-			tgbotapi.NewKeyboardButton(string(domain.Compliments)),
 		),
 		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(string(domain.Compliments)),
 			tgbotapi.NewKeyboardButton(string(domain.ImportantDates)),
 		),
 	)

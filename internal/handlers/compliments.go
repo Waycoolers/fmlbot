@@ -16,7 +16,7 @@ import (
 func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
-	text := "Комплименты"
+	text := "❤️ Комплименты"
 	count := 0
 	maxCount := 1
 	partnerID, err := h.Store.GetPartnerID(ctx, userID)
@@ -26,7 +26,7 @@ func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *tgbotapi.Message
 	}
 
 	if partnerID == 0 {
-		text = "Добавь партнёра, чтобы получить возможность получать и отправлять комплименты."
+		text = "🤍 Добавь партнёра, и здесь появится магия комплиментов ✨"
 	} else {
 		count, err = h.Store.GetComplimentCount(ctx, partnerID)
 		if err != nil {
@@ -40,14 +40,13 @@ func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *tgbotapi.Message
 		}
 
 		if maxCount == -1 {
-			text = "Сегодня ты можешь получить еще ♾️ комплиментов."
+			text = "💫 Сегодня ты можешь получить ещё ♾️ комплиментов"
 		} else {
 			delta := maxCount - count
 			if delta > 0 {
-				deltaStr := strconv.Itoa(delta)
-				text = "Сегодня ты можешь получить еще <b>" + deltaStr + "</b> комплимент(ов)."
+				text = "💛 Сегодня для тебя доступно ещё <b>" + strconv.Itoa(delta) + "</b> комплимент(ов)"
 			} else {
-				text = "Сегодня ты больше не можешь получать комплименты ("
+				text = "🌙 На сегодня комплименты закончились. Завтра будет больше тепла 💛"
 			}
 		}
 	}
@@ -69,7 +68,7 @@ func (h *Handler) AddCompliment(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
-	h.Reply(chatID, "Введи комплимент\n(Напиши чтобы отменить это действие)")
+	h.Reply(chatID, "💌 Напиши комплимент")
 }
 
 func (h *Handler) ProcessCompliment(ctx context.Context, msg *tgbotapi.Message) {
@@ -83,7 +82,7 @@ func (h *Handler) ProcessCompliment(ctx context.Context, msg *tgbotapi.Message) 
 			h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 			return
 		}
-		h.Reply(chatID, "Некорректный ввод")
+		h.Reply(chatID, "Кажется, тут пусто 🙈 Попробуй ещё раз")
 		return
 	}
 
@@ -99,7 +98,7 @@ func (h *Handler) ProcessCompliment(ctx context.Context, msg *tgbotapi.Message) 
 		return
 	}
 
-	h.Reply(chatID, "Комплимент успешно добавлен")
+	h.Reply(chatID, "✨ Готово! Комплимент сохранён и ждёт своего часа 💛")
 }
 
 func (h *Handler) GetCompliments(ctx context.Context, msg *tgbotapi.Message) {
@@ -114,7 +113,7 @@ func (h *Handler) GetCompliments(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	if len(compliments) == 0 {
-		h.Reply(chatID, "Ты пока не добавлял(а) комплиментов. Добавь комплимент")
+		h.Reply(chatID, "📭 Здесь пока пусто. Добавь первый комплимент — пусть он согревает 🤍")
 		return
 	}
 
@@ -166,7 +165,7 @@ func (h *Handler) DeleteCompliment(ctx context.Context, msg *tgbotapi.Message) {
 	compliments = filtered
 
 	if len(compliments) == 0 {
-		h.Reply(chatID, "У тебя пока нет запланированных комплиментов 😔")
+		h.Reply(chatID, "🌿 У тебя нет комплиментов, которые можно удалить")
 		return
 	}
 
@@ -183,10 +182,10 @@ func (h *Handler) DeleteCompliment(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	keyboard = append(keyboard, []tgbotapi.InlineKeyboardButton{
-		tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "compliments:delete:cancel"),
+		tgbotapi.NewInlineKeyboardButtonData("↩️ Передумал(а)", "compliments:delete:cancel"),
 	})
 
-	text := "🗑 <b>Выбери комплимент для удаления</b>"
+	text := "🗑 <b>Выбери комплимент, который хочешь убрать</b>"
 	markup := tgbotapi.NewInlineKeyboardMarkup(keyboard...)
 	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, markup)
 	if err != nil {
@@ -211,9 +210,9 @@ func (h *Handler) HandleDeleteCompliment(ctx context.Context, cb *tgbotapi.Callb
 			return
 		}
 
-		h.Reply(chatID, "Комплимент успешно удален! ✅")
+		h.Reply(chatID, "🧹 Готово. Комплимент удалён")
 	} else if data == "compliments:delete:cancel" {
-		h.Reply(chatID, "Удаление комплимента отменено")
+		h.Reply(chatID, "🌸 Хорошо, ничего не удаляем")
 	}
 	_ = h.ui.Client.DeleteMessage(chatID, messageID)
 }
@@ -229,8 +228,7 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	}
 
 	if partnerID == 0 {
-		h.Reply(chatID, "Ты не можешь получить комплимент так как у тебя не добавлен партнёр. "+
-			"Сначала добавь партнёра с помощью")
+		h.Reply(chatID, "🤍 Чтобы получать комплименты, сначала добавь партнёра")
 		return
 	}
 
@@ -246,7 +244,7 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	}
 
 	if count >= maxCount && maxCount != -1 {
-		h.Reply(chatID, "Комплименты на сегодня закончились (")
+		h.Reply(chatID, "🌙 На сегодня лимит исчерпан. Завтра будет продолжение 💛")
 		return
 	}
 	count++
@@ -263,7 +261,7 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 		remaining := last.Add(time.Hour).Sub(now)
 		mins := int(remaining.Minutes())
 
-		h.Reply(chatID, fmt.Sprintf("Ты уже получал комплимент недавно ❤️\nПопробуй снова через %d минут.", mins))
+		h.Reply(chatID, fmt.Sprintf("⏳ Немного терпения\nСледующий комплимент будет доступен через %d мин.", mins))
 		return
 	}
 
@@ -282,7 +280,7 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	}
 
 	if len(compliments) == 0 {
-		h.Reply(chatID, "Тебе не отправили комплимент (((")
+		h.Reply(chatID, "📭 Пока для тебя нет новых комплиментов")
 		return
 	}
 
@@ -294,19 +292,15 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	}
 
 	var complimentMessages = []string{
-		"🌙 <b>Твоя половинка оставила для тебя нежное послание:</b>\n\n«" + compliment.Text + "»\n\nПусть эти слова согреют твоё сердце сегодня 💖",
-		"✨ <b>Твой светлый лучик прислал тебе маленькое чудо:</b>\n\n«" + compliment.Text + "»\n\nУлыбнись! Этот комплимент специально для тебя 😄💛",
-		"💛 <b>Твой дорогой человек хочет поднять тебе настроение:</b>\n\n«" + compliment.Text + "»\n\nПусть эти слова дадут тебе силы и радость сегодня 🌼",
-		"🌹 <b>Твоя нежная половинка отправила тебе тёплые слова:</b>\n\n«" + compliment.Text + "»\n\nПусть этот маленький знак внимания согреет твоё сердце 💖",
-		"🌸 <b>Твой любимый человек оставил для тебя послание:</b>\n\n«" + compliment.Text + "»\n\nПусть эти слова принесут тебе немного тепла и улыбок 💛",
+		"💖 <b>Для тебя есть тёплые слова:</b>\n\n«" + compliment.Text + "»",
+		"✨ <b>Небольшое послание от твоего человека:</b>\n\n«" + compliment.Text + "»",
+		"🌷 <b>Тебе отправили комплимент:</b>\n\n«" + compliment.Text + "»",
 	}
 
 	randomIndex := rand.Intn(len(complimentMessages))
 	h.Reply(chatID, complimentMessages[randomIndex])
 	h.Reply(partnerID,
-		"🌷 <b>Твой комплимент нашёл своего адресата!</b>\n"+
-			"Ты только что сделал своего партнёра чуточку счастливее 😊\n\n"+
-			"<i>Ты отправил:</i>\n"+"«"+compliment.Text+"»",
+		"💌 <b>Комплимент доставлен</b>\n\nТы только что порадовал(а) своего партнёра ✨\n\n«"+compliment.Text+"»",
 	)
 
 	err = h.Store.SetComplimentTime(ctx, partnerID)
@@ -340,8 +334,11 @@ func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *tgbotapi.Mes
 	if actualFreq == -1 {
 		actualFreqStr = "♾️"
 	}
-	text := "Твой партнёр сегодня получил <b>" + countStr + "/" + actualFreqStr + "</b> комплимент(ов). " +
-		"Хочешь изменить лимит? Просто отправь новое значение в чат. Чтобы убрать лимит, отправь «-»."
+	text := "💛 Сегодня твой партнёр получил <b>" + countStr + "/" + actualFreqStr +
+		"</b> комплимент(ов).\n\n" +
+		"Хочешь изменить лимит?\n" +
+		"• отправь число\n" +
+		"• или «-», чтобы убрать лимит"
 
 	err = h.Store.SetUserState(ctx, userID, domain.AwaitingComplimentFrequency)
 	if err != nil {
@@ -369,16 +366,16 @@ func (h *Handler) ProcessComplimentFrequency(ctx context.Context, msg *tgbotapi.
 		var err error
 		freqInt, err = strconv.Atoi(freq)
 		if err != nil || freqInt <= 0 {
-			h.Reply(chatID, "Некорректный ввод")
+			h.Reply(chatID, "🤔 Я не понял. Отправь число или «-»")
 			return
 		}
 	}
 
 	err := h.Store.SetComplimentMaxCount(ctx, userID, freqInt)
 	if err != nil {
-		h.HandleErr(chatID, "Ошибка при изменении частоты комплиментов", err)
+		h.HandleErr(chatID, "Ошибка при изменении лимита", err)
 		return
 	}
 
-	h.Reply(chatID, "Лимит изменен")
+	h.Reply(chatID, "✨ Лимит обновлён")
 }

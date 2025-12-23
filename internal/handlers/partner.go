@@ -12,7 +12,7 @@ import (
 func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
-	text := "Партнёр"
+	text := "👤 Партнёр"
 
 	partnerID, err := h.Store.GetPartnerID(ctx, userID)
 	if err != nil {
@@ -21,7 +21,7 @@ func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	if partnerID == 0 {
-		text = "У тебя пока не добавлен партнер"
+		text = "🤍 У тебя пока нет партнёра"
 	} else {
 		partnerUsername, er := h.Store.GetUsername(ctx, partnerID)
 		if er != nil {
@@ -29,7 +29,7 @@ func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *tgbotapi.Message) {
 			return
 		}
 
-		text = "Твой партнер: @" + partnerUsername
+		text = "💞 Твой партнёр: @" + partnerUsername
 	}
 
 	err = h.ui.PartnerMenu(chatID, text)
@@ -55,15 +55,18 @@ func (h *Handler) SetPartner(ctx context.Context, msg *tgbotapi.Message) {
 			h.HandleErr(chatID, "Ошибка при установке состояния awaiting_partner", er)
 			return
 		}
-		h.Reply(chatID, "Отправь username своей половинки\n(Напиши чтобы отменить это действие)")
+		h.Reply(chatID, "💌 Отправь username партнёра")
 	} else {
 		partnerUsername, er := h.Store.GetUsername(ctx, partnerID)
 		if er != nil {
 			h.HandleErr(chatID, "Ошибка при попытке получить username партнёра", er)
 			return
 		}
-		h.Reply(chatID, "Твой партнер - @"+partnerUsername+"\nЕсли хочешь изменить партнёра, "+
-			"то сначала удали существующего")
+		h.Reply(
+			chatID,
+			"💞 Сейчас твой партнёр — @"+partnerUsername+
+				"\nЕсли хочешь изменить выбор, сначала нужно удалить текущего партнёра",
+		)
 	}
 }
 
@@ -84,13 +87,16 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 	}
 
 	if strings.ToLower(partnerUsername) == strings.ToLower(userUsername) {
-		h.Reply(chatID, "Ты не можешь добавить самого себя 😅")
+		h.Reply(chatID, "😅 Так не получится — себя добавить нельзя")
 		return
 	}
 
 	if !exists {
-		h.Reply(chatID, "Партнёр не найден. Попроси его сначала написать боту "+string(domain.Start)+" 😅"+
-			"\n(Напиши чтобы отменить это действие)")
+		h.Reply(
+			chatID,
+			"🤔 Я не нашёл(ла) этого пользователя\n"+
+				"Пусть он сначала напишет боту команду "+string(domain.Start)+"\n\n",
+		)
 		return
 	}
 
@@ -109,7 +115,7 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 
 	if partnerExists != 0 {
 		if partnerExists == userID {
-			h.Reply(chatID, "@"+correctPartnerUsername+" и так ваш партнёр. Приятного времяпрепровождения!")
+			h.Reply(chatID, "💛 @"+correctPartnerUsername+" и так ваш партнёр. Приятного времяпрепровождения!")
 			err = h.Store.SetUserState(ctx, userID, domain.Empty)
 			if err != nil {
 				h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
@@ -117,7 +123,7 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 			}
 			return
 		} else {
-			h.Reply(chatID, "У данного пользователя уже есть партнёр 😔")
+			h.Reply(chatID, "😔 У этого пользователя уже есть партнёр")
 			err = h.Store.SetUserState(ctx, userID, domain.Empty)
 			if err != nil {
 				h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
@@ -139,7 +145,7 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 			h.HandleErr(chatID, "Ошибка при сбросе партнера у партнера", err)
 			return
 		}
-		h.Reply(userPartnerExists, "Твой партнёр добавил другого партнёра 💔")
+		h.Reply(userPartnerExists, "💔 Твой партнёр добавил другого партнёра")
 	}
 
 	err = h.Store.SetUserState(ctx, partnerID, domain.Empty)
@@ -160,8 +166,8 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 		return
 	}
 
-	h.Reply(partnerID, "💞 Ура! Теперь вы и @"+userUsername+" — официально пара в боте 💌")
-	h.Reply(chatID, fmt.Sprintf("Партнёр успешно добавлен! 💖 (@%s)", correctPartnerUsername))
+	h.Reply(partnerID, "💞 У вас с @"+userUsername+" теперь есть общая история в боте ✨")
+	h.Reply(chatID, fmt.Sprintf("✨ Готово! Партнёр @%s добавлен", correctPartnerUsername))
 }
 
 func (h *Handler) DeletePartner(ctx context.Context, msg *tgbotapi.Message) {
@@ -174,14 +180,14 @@ func (h *Handler) DeletePartner(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	if partnerID == 0 {
-		h.Reply(userID, "У тебя ещё не добавлен партнер")
+		h.Reply(chatID, "🤍 У тебя сейчас не добавлен партнёр")
 		return
 	}
 
 	buttons := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Да, удалить 💔", "partner:delete:confirm"),
-			tgbotapi.NewInlineKeyboardButtonData("Отмена ❌", "partner:delete:cancel"),
+			tgbotapi.NewInlineKeyboardButtonData("💔 Да, удалить", "partner:delete:confirm"),
+			tgbotapi.NewInlineKeyboardButtonData("↩️ Передумал(а)", "partner:delete:cancel"),
 		),
 	)
 
@@ -191,7 +197,8 @@ func (h *Handler) DeletePartner(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
-	text := "Вы уверены, что хотите удалить партнёра @" + partnerUsername + "?"
+	text := "💭 Ты уверен(а), что хочешь удалить партнёра @" + partnerUsername + "?\n" +
+		"Все общие настройки будут сброшены."
 
 	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
 	if err != nil {
@@ -234,11 +241,11 @@ func (h *Handler) HandleDeletePartner(ctx context.Context, cb *tgbotapi.Callback
 			return
 		}
 
-		h.Reply(chatID, "Партнёр успешно удалён 💔")
-		h.Reply(partnerID, "Твой партнёр отписался от тебя 💔")
+		h.Reply(chatID, "🕊️ Партнёр удалён")
+		h.Reply(partnerID, "💔 Твой партнёр больше не связан с тобой")
 
 	case "partner:delete:cancel":
-		h.Reply(chatID, "Удаление партнёра отменено")
+		h.Reply(chatID, "💛 Хорошо, ничего не меняем")
 	}
 	h.ui.RemoveButtons(chatID, messageID)
 }
