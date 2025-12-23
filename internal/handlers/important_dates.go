@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -12,7 +13,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) beautifyImportantDates(importantDates []domain.ImportantDate) []domain.ImportantDate {
+func (h *Handler) beautifyImportantDates(importantDates []domain.ImportantDate, maxLength int) []domain.ImportantDate {
 	var beautifiedImportantDates []domain.ImportantDate
 	var otherDates []domain.ImportantDate
 
@@ -22,19 +23,19 @@ func (h *Handler) beautifyImportantDates(importantDates []domain.ImportantDate) 
 		if importantDate.PartnerID.Valid && importantDate.TelegramID.Valid {
 			if importantDate.IsActive {
 				importantDate.Title = "👩‍❤️‍👨 | " + importantDate.Title
-				importantDate.Title = truncateText(importantDate.Title, 30) + " | " + dateText + " | 🟢 | " + days
+				importantDate.Title = truncateText(importantDate.Title, maxLength) + " | " + dateText + " | 🟢 | " + days
 			} else {
 				importantDate.Title = "👩‍❤️‍👨 | " + importantDate.Title
-				importantDate.Title = truncateText(importantDate.Title, 30) + " | " + dateText + " | ⚪ | " + days
+				importantDate.Title = truncateText(importantDate.Title, maxLength) + " | " + dateText + " | ⚪ | " + days
 			}
 			beautifiedImportantDates = append(beautifiedImportantDates, importantDate)
 		} else {
 			if importantDate.IsActive {
 				importantDate.Title = "👤 | " + importantDate.Title
-				importantDate.Title = truncateText(importantDate.Title, 30) + " | " + dateText + " | 🟢 | " + days
+				importantDate.Title = truncateText(importantDate.Title, maxLength) + " | " + dateText + " | 🟢 | " + days
 			} else {
 				importantDate.Title = "👤 | " + importantDate.Title
-				importantDate.Title = truncateText(importantDate.Title, 30) + " | " + dateText + " | ⚪ | " + days
+				importantDate.Title = truncateText(importantDate.Title, maxLength) + " | " + dateText + " | ⚪ | " + days
 			}
 			otherDates = append(otherDates, importantDate)
 		}
@@ -257,7 +258,7 @@ func (h *Handler) GetImportantDates(ctx context.Context, msg *tgbotapi.Message) 
 		return
 	}
 
-	sortedImportantDates := h.beautifyImportantDates(importantDates)
+	sortedImportantDates := h.beautifyImportantDates(importantDates, 256)
 
 	var activeImportantDates string
 	var unactiveImportantDates string
@@ -295,7 +296,7 @@ func (h *Handler) DeleteImportantDate(ctx context.Context, msg *tgbotapi.Message
 		return
 	}
 
-	sortedImportantDates := h.beautifyImportantDates(importantDates)
+	sortedImportantDates := h.beautifyImportantDates(importantDates, 30)
 
 	var buttons [][]tgbotapi.InlineKeyboardButton
 
@@ -361,7 +362,7 @@ func (h *Handler) EditImportantDate(ctx context.Context, msg *tgbotapi.Message) 
 		return
 	}
 
-	sortedImportantDates := h.beautifyImportantDates(importantDates)
+	sortedImportantDates := h.beautifyImportantDates(importantDates, 30)
 
 	var buttons [][]tgbotapi.InlineKeyboardButton
 
@@ -387,7 +388,7 @@ func (h *Handler) EditImportantDate(ctx context.Context, msg *tgbotapi.Message) 
 	}
 }
 
-func (h *Handler) HandleEditImportantDate(_ context.Context, cq *tgbotapi.CallbackQuery) {
+func (h *Handler) HandleEditImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
 	data := cq.Data
 	chatID := cq.Message.Chat.ID
 	messageID := cq.Message.MessageID
@@ -396,6 +397,21 @@ func (h *Handler) HandleEditImportantDate(_ context.Context, cq *tgbotapi.Callba
 	if data == "cancel" {
 		h.Reply(chatID, "Редактирование важной даты отменено")
 	} else {
+		id, _ := strconv.Atoi(data)
+
+		importantDate, err := h.Store.GetImportantDateByID(ctx, int64(id))
+		if err != nil {
+			h.HandleErr(chatID, "Ошибка при получении важной даты", err)
+			return
+		}
+
+		var active string
+		if importantDate.IsActive {
+			active = "Деактивировать"
+		} else {
+			active = "Активировать"
+		}
+
 		buttons := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("Название", "important_dates:update:title:"+data),
@@ -404,14 +420,14 @@ func (h *Handler) HandleEditImportantDate(_ context.Context, cq *tgbotapi.Callba
 			),
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("Уведомлять за", "important_dates:update:notify_before:"+data),
-				tgbotapi.NewInlineKeyboardButtonData("Активность", "important_dates:update:is_active:"+data),
+				tgbotapi.NewInlineKeyboardButtonData(active, "important_dates:update:is_active:"+data),
 				tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "important_dates:update:cancel"),
 			),
 		)
 
 		text := "Что ты хочешь изменить?"
 
-		err := h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
+		err = h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
 		if err != nil {
 			h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
 			return
@@ -919,4 +935,83 @@ func (h *Handler) HandleDayImportantDateUniversal(ctx context.Context, cq *tgbot
 	}
 
 	h.HandleErr(chatID, "Неизвестный callback для дня", nil)
+}
+
+func (h *Handler) NotifyImportantDatesCron(ctx context.Context) {
+	now := time.Now()
+	today := time.Date(
+		now.Year(),
+		now.Month(),
+		now.Day(),
+		0, 0, 0, 0,
+		time.Local,
+	)
+
+	importantDates, err := h.Store.GetAllActiveImportantDates(ctx)
+	if err != nil {
+		log.Println("Ошибка получения всех важных дат:", err)
+		return
+	}
+
+	for _, importantDate := range importantDates {
+		if !importantDate.IsActive {
+			continue
+		}
+
+		eventDate := importantDate.Date.In(time.Local)
+		eventDay := time.Date(
+			eventDate.Year(),
+			eventDate.Month(),
+			eventDate.Day(),
+			0, 0, 0, 0,
+			time.Local,
+		)
+
+		notifyDay := eventDay.AddDate(0, 0, -importantDate.NotifyBeforeDays)
+
+		isNotifyDay := notifyDay.Equal(today)
+		isEventDay := eventDay.Equal(today)
+
+		if !isNotifyDay && !isEventDay {
+			continue
+		}
+
+		if importantDate.LastNotificationAt.Valid {
+			last := importantDate.LastNotificationAt.Time.In(time.Local)
+			lastDay := time.Date(
+				last.Year(),
+				last.Month(),
+				last.Day(),
+				0, 0, 0, 0,
+				time.Local,
+			)
+			if lastDay.Equal(today) {
+				continue
+			}
+		}
+
+		var text string
+		if isEventDay {
+			text = fmt.Sprintf("🎉 Сегодня важная дата!\n\n<b>%s</b>\n%s",
+				importantDate.Title,
+				eventDate.Format("02.01.2006"),
+			)
+		} else {
+			text = fmt.Sprintf(
+				"⏰ Напоминание: через %d дн.\n\n<b>%s</b>\n%s",
+				importantDate.NotifyBeforeDays,
+				importantDate.Title,
+				eventDate.Format("02.01.2006"),
+			)
+		}
+
+		if importantDate.TelegramID.Valid && importantDate.TelegramID.Int64 != 0 {
+			h.Reply(importantDate.TelegramID.Int64, text)
+		}
+		if importantDate.PartnerID.Valid && importantDate.PartnerID.Int64 != 0 {
+			h.Reply(importantDate.PartnerID.Int64, text)
+		}
+
+		_ = h.Store.UpdateLastNotificationAt(ctx, importantDate.ID, now)
+	}
 }
