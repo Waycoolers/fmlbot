@@ -68,9 +68,6 @@ func (h *Handler) DoMidnightTasks(ctx context.Context) {
 	log.Print("Задачи выполнены")
 }
 
-func (h *Handler) AddComplimentInBucket(ctx context.Context, userID int64) {
-}
-
 func (h *Handler) ReplyUnknownCallback(_ context.Context, cq *tgbotapi.CallbackQuery) {
 	chatID := cq.Message.Chat.ID
 	h.Reply(chatID, "🤍 Лучше воспользуйся кнопками — так будет проще")
