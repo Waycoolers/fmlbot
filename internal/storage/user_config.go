@@ -60,7 +60,7 @@ func (s *Storage) SetDefault(ctx context.Context, userID int64) error {
 	}
 
 	_, err = s.DB.ExecContext(ctx, `
-		UPDATE user_config SET last_compliment_at=null WHERE telegram_id = $1;
+		UPDATE user_config SET compliment_token_bucket=2 WHERE telegram_id = $1;
 	`, userID)
 	if err != nil {
 		er := tx.Rollback()
@@ -78,6 +78,31 @@ func (s *Storage) SetComplimentTime(ctx context.Context, userID int64) error {
 		UPDATE user_config SET last_compliment_at=(NOW() AT TIME ZONE 'UTC') WHERE telegram_id = $1;
 	`, userID)
 	return err
+}
+
+func (s *Storage) TakeComplimentFromBucket(ctx context.Context, userID int64) error {
+	_, err := s.DB.ExecContext(ctx, `
+		UPDATE user_config SET compliment_token_bucket=compliment_token_bucket-1 WHERE telegram_id = $1;
+	`, userID)
+	return err
+}
+
+func (s *Storage) AddComplimentToBucket(ctx context.Context, userID int64) error {
+	_, err := s.DB.ExecContext(ctx, `
+		UPDATE user_config SET compliment_token_bucket=compliment_token_bucket+1 WHERE telegram_id = $1;
+	`, userID)
+	return err
+}
+
+func (s *Storage) GetComplimentsBucket(ctx context.Context, userID int64) (int, error) {
+	var count int
+	err := s.DB.QueryRowContext(ctx, `
+		SELECT compliment_token_bucket FROM user_config WHERE telegram_id = $1;
+	`, userID).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func (s *Storage) GetComplimentTime(ctx context.Context, userID int64) (time.Time, error) {

@@ -249,20 +249,25 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	}
 	count++
 
-	last, err := h.Store.GetComplimentTime(ctx, partnerID)
+	bucket, err := h.Store.GetComplimentsBucket(ctx, partnerID)
 	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении времени последнего комплимента", err)
+		h.HandleErr(chatID, "Ошибка при получении ведра комплиментов", err)
 		return
 	}
-	now := time.Now().UTC()
-	log.Print(now)
-	log.Print(last)
-	if last.Add(1 * time.Hour).After(now) {
-		remaining := last.Add(time.Hour).Sub(now)
-		mins := int(remaining.Minutes())
+	if bucket == 0 {
+		last, er := h.Store.GetComplimentTime(ctx, partnerID)
+		if er != nil {
+			h.HandleErr(chatID, "Ошибка при получении времени последнего комплимента", er)
+			return
+		}
+		now := time.Now().UTC()
+		if last.Add(1 * time.Hour).After(now) {
+			remaining := last.Add(time.Hour).Sub(now)
+			mins := int(remaining.Minutes())
 
-		h.Reply(chatID, fmt.Sprintf("⏳ Немного терпения\nСледующий комплимент будет доступен через %d мин.", mins))
-		return
+			h.Reply(chatID, fmt.Sprintf("⏳ Немного терпения\nСледующий комплимент будет доступен через %d мин.", mins))
+			return
+		}
 	}
 
 	allCompliments, err := h.Store.GetCompliments(ctx, partnerID)
@@ -307,6 +312,21 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	if err != nil {
 		log.Printf("Ошибка при попытке установить время получения комплимента: %v", err)
 	}
+
+	err = h.Store.TakeComplimentFromBucket(ctx, partnerID)
+	if err != nil {
+		log.Printf("Ошибка при взятии комплимента из ведра: %v", err)
+	}
+
+	timer := time.NewTimer(time.Hour)
+	go func() {
+		<-timer.C
+		err = h.Store.AddComplimentToBucket(ctx, partnerID)
+		if err != nil {
+			log.Printf("Ошибка при добавлении комплимента в ведро: %v", err)
+		}
+		timer.Stop()
+	}()
 
 	err = h.Store.SetComplimentCount(ctx, partnerID, count)
 	if err != nil {
