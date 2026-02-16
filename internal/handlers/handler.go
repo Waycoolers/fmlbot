@@ -60,12 +60,15 @@ func (h *Handler) DoMidnightTasks(ctx context.Context) {
 		log.Printf("Ошибка при очистке количества полученных комплиментов: %v", err)
 	}
 
-	err = h.Store.ClearComplimentTime(ctx)
+	err = h.Store.ClearComplimentTokenBucket(ctx)
 	if err != nil {
-		log.Printf("Ошибка при очистке времени последнего полученного комплимента: %v", err)
+		log.Printf("Ошибка при очистке ведра для доступных комплиментов: %v", err)
 	}
 
 	log.Print("Задачи выполнены")
+}
+
+func (h *Handler) AddComplimentInBucket(ctx context.Context, userID int64) {
 }
 
 func (h *Handler) ReplyUnknownCallback(_ context.Context, cq *tgbotapi.CallbackQuery) {
