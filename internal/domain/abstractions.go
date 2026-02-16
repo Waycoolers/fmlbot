@@ -1,8 +1,6 @@
 package domain
 
 import (
-	"context"
-
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -14,10 +12,4 @@ type BotClient interface {
 	StopReceivingUpdates()
 	Send(msg tgbotapi.Chattable) (tgbotapi.Message, error)
 	DeleteMessage(chatID int64, messageID int) error
-}
-
-type ImportantDateDraftRepo interface {
-	Get(ctx context.Context, userID int64) (*ImportantDateDraft, error)
-	Save(ctx context.Context, userID int64, draft *ImportantDateDraft) error
-	Delete(ctx context.Context, userID int64) error
 }
