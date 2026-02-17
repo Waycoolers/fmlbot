@@ -254,20 +254,39 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 		h.HandleErr(chatID, "Ошибка при получении ведра комплиментов", err)
 		return
 	}
-	if bucket == 0 {
-		last, er := h.Store.GetComplimentTime(ctx, partnerID)
-		if er != nil {
-			h.HandleErr(chatID, "Ошибка при получении времени последнего комплимента", er)
-			return
+	lastBucketUpdate, err := h.Store.GetLastBucketUpdate(ctx, partnerID)
+	if err != nil {
+		h.HandleErr(chatID, "Ошибка при получении последнего обновления ведра комплиментов", err)
+		return
+	}
+	now := time.Now().UTC()
+	hoursPassed := int(now.Sub(lastBucketUpdate).Hours())
+	updateTime := lastBucketUpdate
+	if hoursPassed > 0 {
+		newBucket := hoursPassed + bucket
+		if newBucket > 2 {
+			newBucket = 2
 		}
-		now := time.Now().UTC()
-		if last.Add(1 * time.Hour).After(now) {
-			remaining := last.Add(time.Hour).Sub(now)
-			mins := int(remaining.Minutes())
+		if newBucket != bucket {
+			err = h.Store.UpdateComplimentBucket(ctx, partnerID, newBucket, now)
+			if err != nil {
+				h.HandleErr(chatID, "Ошибка при обновлении ведра комплиментов", err)
+				return
+			}
+			bucket = newBucket
+			updateTime = now
+		}
+	}
 
-			h.Reply(chatID, fmt.Sprintf("⏳ Немного терпения\nСледующий комплимент будет доступен через %d мин.", mins))
-			return
+	if bucket == 0 {
+		hoursSinceUpdate := now.Sub(updateTime).Hours()
+		remaining := updateTime.Add(time.Duration(hoursSinceUpdate+1) * time.Hour).Sub(now)
+		mins := int(remaining.Minutes())
+		if mins < 0 {
+			mins = 0
 		}
+		h.Reply(chatID, fmt.Sprintf("⏳ Немного терпения\nСледующий комплимент будет доступен через %d мин.", mins))
+		return
 	}
 
 	allCompliments, err := h.Store.GetCompliments(ctx, partnerID)
@@ -317,16 +336,6 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	if err != nil {
 		log.Printf("Ошибка при взятии комплимента из ведра: %v", err)
 	}
-
-	timer := time.NewTimer(time.Hour)
-	go func() {
-		<-timer.C
-		err = h.Store.AddComplimentToBucket(ctx, partnerID)
-		if err != nil {
-			log.Printf("Ошибка при добавлении комплимента в ведро: %v", err)
-		}
-		timer.Stop()
-	}()
 
 	err = h.Store.SetComplimentCount(ctx, partnerID, count)
 	if err != nil {
