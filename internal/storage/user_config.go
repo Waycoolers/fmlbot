@@ -12,7 +12,7 @@ func (s *Storage) GetComplimentMaxCount(ctx context.Context, userID int64) (int,
 		SELECT max_compliment_count FROM user_config WHERE telegram_id=$1;
 	`, userID).Scan(&frequency)
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 	return frequency, nil
 }
@@ -48,7 +48,7 @@ func (s *Storage) SetDefault(ctx context.Context, userID int64) error {
 		return err
 	}
 
-	_, err = s.DB.ExecContext(ctx, `
+	_, err = tx.ExecContext(ctx, `
 		UPDATE user_config SET compliment_count=0 WHERE telegram_id = $1;
 	`, userID)
 	if err != nil {
@@ -59,8 +59,8 @@ func (s *Storage) SetDefault(ctx context.Context, userID int64) error {
 		return err
 	}
 
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE user_config SET compliment_token_bucket=2 WHERE telegram_id = $1;
+	_, err = tx.ExecContext(ctx, `
+		UPDATE user_config SET compliment_token_bucket=2, last_bucket_update=now() WHERE telegram_id = $1;
 	`, userID)
 	if err != nil {
 		er := tx.Rollback()
@@ -82,15 +82,17 @@ func (s *Storage) SetComplimentTime(ctx context.Context, userID int64) error {
 
 func (s *Storage) TakeComplimentFromBucket(ctx context.Context, userID int64) error {
 	_, err := s.DB.ExecContext(ctx, `
-		UPDATE user_config SET compliment_token_bucket=compliment_token_bucket-1 WHERE telegram_id = $1;
+		UPDATE user_config SET compliment_token_bucket=compliment_token_bucket - 1
+		                   WHERE telegram_id = $1
+		                     AND compliment_token_bucket > 0;
 	`, userID)
 	return err
 }
 
-func (s *Storage) AddComplimentToBucket(ctx context.Context, userID int64) error {
+func (s *Storage) UpdateComplimentBucket(ctx context.Context, userID int64, value int, time time.Time) error {
 	_, err := s.DB.ExecContext(ctx, `
-		UPDATE user_config SET compliment_token_bucket=compliment_token_bucket+1 WHERE telegram_id = $1;
-	`, userID)
+		UPDATE user_config SET compliment_token_bucket=$1, last_bucket_update=$2 WHERE telegram_id = $3;
+	`, value, time, userID)
 	return err
 }
 
@@ -103,6 +105,17 @@ func (s *Storage) GetComplimentsBucket(ctx context.Context, userID int64) (int, 
 		return 0, err
 	}
 	return count, nil
+}
+
+func (s *Storage) GetLastBucketUpdate(ctx context.Context, userID int64) (time.Time, error) {
+	var lastBucketUpdate time.Time
+	err := s.DB.QueryRowContext(ctx, `
+		SELECT last_bucket_update FROM user_config WHERE telegram_id = $1;
+	`, userID).Scan(&lastBucketUpdate)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return lastBucketUpdate, nil
 }
 
 func (s *Storage) GetComplimentTime(ctx context.Context, userID int64) (time.Time, error) {
