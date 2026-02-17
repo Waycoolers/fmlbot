@@ -29,12 +29,19 @@ func (h *Handler) Register(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	if !exists {
+		if username == "" {
+			h.Reply(chatID, "Сначала установи себе имя пользователя в настройках telegram")
+			return
+		}
+
 		er := h.Store.AddUser(ctx, userID, username)
 		if er != nil {
 			h.HandleErr(chatID, "Ошибка при регистрации", err)
 			return
 		}
 	}
+
+	h.ShowMainMenu(ctx, msg)
 }
 
 func (h *Handler) DeleteAccount(_ context.Context, msg *tgbotapi.Message) {
