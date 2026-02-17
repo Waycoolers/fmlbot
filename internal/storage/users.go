@@ -12,7 +12,7 @@ func (s *Storage) AddUser(ctx context.Context, telegramID int64, username string
 		return err
 	}
 
-	_, err = s.DB.ExecContext(ctx, `
+	_, err = tx.ExecContext(ctx, `
         INSERT INTO users (telegram_id, username)
         VALUES ($1, $2)
         ON CONFLICT (telegram_id) DO NOTHING;

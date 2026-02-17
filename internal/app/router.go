@@ -93,7 +93,6 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	} else if text == string(domain.Register) {
 		r.h.Register(ctx, msg)
-		r.h.ShowMainMenu(ctx, msg)
 		return
 	}
 
