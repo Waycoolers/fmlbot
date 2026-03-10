@@ -3,14 +3,20 @@ package storage
 import (
 	"context"
 	"database/sql"
+
 	"time"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
+	"github.com/jmoiron/sqlx"
 )
 
-func (s *Storage) AddImportantDate(ctx context.Context, telegramID sql.NullInt64, partnerID sql.NullInt64, title string,
+type importantDatesRepo struct {
+	db *sqlx.DB
+}
+
+func (s *importantDatesRepo) AddImportantDate(ctx context.Context, telegramID sql.NullInt64, partnerID sql.NullInt64, title string,
 	date time.Time, notifyBefore int) (*domain.ImportantDate, error) {
-	tx, err := s.DB.BeginTx(ctx, nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -29,9 +35,9 @@ func (s *Storage) AddImportantDate(ctx context.Context, telegramID sql.NullInt64
 	return &importantDate, tx.Commit()
 }
 
-func (s *Storage) GetImportantDates(ctx context.Context, telegramID sql.NullInt64) (importantDates []domain.ImportantDate, err error) {
+func (s *importantDatesRepo) GetImportantDates(ctx context.Context, telegramID sql.NullInt64) (importantDates []domain.ImportantDate, err error) {
 	importantDates = make([]domain.ImportantDate, 0)
-	err = s.DB.SelectContext(ctx, &importantDates, `
+	err = s.db.SelectContext(ctx, &importantDates, `
 		SELECT * FROM important_dates
 		WHERE telegram_id = $1 OR partner_id = $1
 		ORDER BY created_at;
@@ -42,8 +48,8 @@ func (s *Storage) GetImportantDates(ctx context.Context, telegramID sql.NullInt6
 	return importantDates, nil
 }
 
-func (s *Storage) GetImportantDateByID(ctx context.Context, id int64) (importantDate domain.ImportantDate, err error) {
-	err = s.DB.QueryRowContext(ctx, `SELECT * FROM important_dates WHERE id=$1`, id).Scan(&importantDate.ID, &importantDate.TelegramID,
+func (s *importantDatesRepo) GetImportantDateByID(ctx context.Context, id int64) (importantDate domain.ImportantDate, err error) {
+	err = s.db.QueryRowContext(ctx, `SELECT * FROM important_dates WHERE id=$1`, id).Scan(&importantDate.ID, &importantDate.TelegramID,
 		&importantDate.PartnerID, &importantDate.Title, &importantDate.Date, &importantDate.IsActive,
 		&importantDate.LastNotificationAt, &importantDate.NotifyBeforeDays, &importantDate.CreatedAt)
 	if err != nil {
@@ -52,8 +58,8 @@ func (s *Storage) GetImportantDateByID(ctx context.Context, id int64) (important
 	return importantDate, err
 }
 
-func (s *Storage) DeleteImportantDate(ctx context.Context, id int64) error {
-	tx, err := s.DB.BeginTx(ctx, nil)
+func (s *importantDatesRepo) DeleteImportantDate(ctx context.Context, id int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -70,8 +76,8 @@ func (s *Storage) DeleteImportantDate(ctx context.Context, id int64) error {
 	return tx.Commit()
 }
 
-func (s *Storage) EditImportantDate(ctx context.Context, date domain.ImportantDate) error {
-	tx, err := s.DB.BeginTx(ctx, nil)
+func (s *importantDatesRepo) EditImportantDate(ctx context.Context, date domain.ImportantDate) error {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -105,9 +111,9 @@ func (s *Storage) EditImportantDate(ctx context.Context, date domain.ImportantDa
 	return tx.Commit()
 }
 
-func (s *Storage) GetAllActiveImportantDates(ctx context.Context) (importantDates []domain.ImportantDate, err error) {
+func (s *importantDatesRepo) GetAllActiveImportantDates(ctx context.Context) (importantDates []domain.ImportantDate, err error) {
 	importantDates = make([]domain.ImportantDate, 0)
-	err = s.DB.SelectContext(ctx, &importantDates, `
+	err = s.db.SelectContext(ctx, &importantDates, `
 		SELECT * FROM important_dates
 		WHERE is_active = TRUE
 	`)
@@ -117,8 +123,8 @@ func (s *Storage) GetAllActiveImportantDates(ctx context.Context) (importantDate
 	return importantDates, nil
 }
 
-func (s *Storage) UpdateLastNotificationAt(ctx context.Context, id int64, timestamp time.Time) error {
-	_, err := s.DB.ExecContext(ctx, `
+func (s *importantDatesRepo) UpdateLastNotificationAt(ctx context.Context, id int64, timestamp time.Time) error {
+	_, err := s.db.ExecContext(ctx, `
 		UPDATE important_dates SET last_notification_at=$1 WHERE id=$2;
 	`, timestamp, id)
 	return err

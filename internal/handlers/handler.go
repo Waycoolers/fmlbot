@@ -55,12 +55,12 @@ func (h *Handler) Reply(chatID int64, text string) {
 }
 
 func (h *Handler) DoMidnightTasks(ctx context.Context) {
-	err := h.Store.ClearComplimentsCount(ctx)
+	err := h.Store.Scheduler.ClearComplimentsCount(ctx)
 	if err != nil {
 		log.Printf("Ошибка при очистке количества полученных комплиментов: %v", err)
 	}
 
-	err = h.Store.ClearComplimentTokenBucket(ctx)
+	err = h.Store.Scheduler.ClearComplimentTokenBucket(ctx)
 	if err != nil {
 		log.Printf("Ошибка при очистке ведра для доступных комплиментов: %v", err)
 	}

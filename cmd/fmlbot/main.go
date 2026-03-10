@@ -10,7 +10,6 @@ import (
 	"github.com/Waycoolers/fmlbot/internal/config"
 	"github.com/Waycoolers/fmlbot/internal/redis_store"
 	"github.com/Waycoolers/fmlbot/internal/storage"
-	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -24,12 +23,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Ошибка подключения к БД: %v", err)
 	}
-	defer func(DB *sqlx.DB) {
-		er := DB.Close()
-		if er != nil {
-			log.Printf("Ошибка при закрытии подключения к БД: %v", er)
-		}
-	}(store.DB)
+	defer store.Close()
 
 	err = store.Migrate()
 	if err != nil {
@@ -54,11 +48,5 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	go func() {
-		<-ctx.Done()
-		log.Println("Выключение...")
-		b.Client.StopReceivingUpdates()
-	}()
-
 	b.Run(ctx)
 }

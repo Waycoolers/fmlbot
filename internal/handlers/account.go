@@ -22,7 +22,7 @@ func (h *Handler) Register(ctx context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 	username := msg.From.UserName
 
-	exists, err := h.Store.IsUserExists(ctx, userID)
+	exists, err := h.Store.Users.IsUserExists(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при проверке пользователя", err)
 		return
@@ -34,7 +34,7 @@ func (h *Handler) Register(ctx context.Context, msg *tgbotapi.Message) {
 			return
 		}
 
-		er := h.Store.AddUser(ctx, userID, username)
+		er := h.Store.Users.AddUser(ctx, userID, username)
 		if er != nil {
 			h.HandleErr(chatID, "Ошибка при регистрации", err)
 			return
@@ -71,7 +71,7 @@ func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *tgbotapi.Callback
 
 	switch cq.Data {
 	case "account:delete:confirm":
-		partnerID, err := h.Store.GetPartnerID(ctx, userID)
+		partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
 			h.HandleErr(chatID, "Ошибка при попытке получить id партнера", err)
@@ -79,21 +79,21 @@ func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *tgbotapi.Callback
 		}
 
 		if partnerID != 0 {
-			err = h.Store.RemovePartners(ctx, userID, partnerID)
+			err = h.Store.Users.RemovePartners(ctx, userID, partnerID)
 			if err != nil {
 				h.ui.RemoveButtons(chatID, messageID)
 				h.HandleErr(chatID, "Ошибка при попытке удалить партнеров", err)
 				return
 			}
 
-			err = h.Store.DeleteUser(ctx, userID)
+			err = h.Store.Users.DeleteUser(ctx, userID)
 			if err != nil {
 				h.ui.RemoveButtons(chatID, messageID)
 				h.HandleErr(chatID, "Ошибка при попытке удалить юзера", err)
 				return
 			}
 
-			err = h.Store.SetDefault(ctx, partnerID)
+			err = h.Store.UserConfig.SetDefault(ctx, partnerID)
 			if err != nil {
 				h.ui.RemoveButtons(chatID, messageID)
 				h.HandleErr(chatID, "Ошибка при сбросе конфига", err)
@@ -102,7 +102,7 @@ func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *tgbotapi.Callback
 
 			h.Reply(partnerID, "Твой партнёр удалил свой аккаунт 💔")
 		} else {
-			err = h.Store.DeleteUser(ctx, userID)
+			err = h.Store.Users.DeleteUser(ctx, userID)
 			if err != nil {
 				h.ui.RemoveButtons(chatID, messageID)
 				h.HandleErr(chatID, "Ошибка при попытке удалить юзера", err)

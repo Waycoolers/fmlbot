@@ -1,9 +1,17 @@
 package storage
 
-import "context"
+import (
+	"context"
 
-func (s *Storage) ClearComplimentsCount(ctx context.Context) error {
-	_, err := s.DB.ExecContext(ctx, `
+	"github.com/jmoiron/sqlx"
+)
+
+type schedulerRepo struct {
+	db *sqlx.DB
+}
+
+func (s *schedulerRepo) ClearComplimentsCount(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `
 		UPDATE user_config SET compliment_count=0 WHERE TRUE
 	`)
 	if err != nil {
@@ -12,8 +20,8 @@ func (s *Storage) ClearComplimentsCount(ctx context.Context) error {
 	return nil
 }
 
-func (s *Storage) ClearComplimentTokenBucket(ctx context.Context) error {
-	_, err := s.DB.ExecContext(ctx, `
+func (s *schedulerRepo) ClearComplimentTokenBucket(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `
 		UPDATE user_config SET compliment_token_bucket=2 WHERE TRUE
 	`)
 	if err != nil {

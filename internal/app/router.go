@@ -55,7 +55,6 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		string(domain.Partner),
 		string(domain.Compliments),
 		string(domain.ImportantDates),
-		string(domain.Register),
 		string(domain.DeleteAccount),
 		string(domain.AddPartner),
 		string(domain.DeletePartner),
@@ -71,17 +70,23 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	// Если введена команда, то сбрасываем state
-	for _, command := range commands {
-		if text == command {
-			err := r.h.Store.SetUserState(ctx, userID, domain.Empty)
-			if err != nil {
-				r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-				return
+	exists, err := r.h.Store.Users.IsUserExists(ctx, userID)
+	if err != nil {
+		r.h.HandleErr(chatID, "Ошибка при проверке существования пользователя", err)
+	}
+	if exists {
+		for _, command := range commands {
+			if text == command {
+				err = r.h.Store.Users.SetUserState(ctx, userID, domain.Empty)
+				if err != nil {
+					r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
+					return
+				}
 			}
 		}
 	}
 
-	username, err := r.h.Store.GetUsername(ctx, userID)
+	username, err := r.h.Store.Users.GetUsername(ctx, userID)
 	if err != nil {
 		r.h.HandleErr(chatID, "Ошибка при получении юзернейма", err)
 		return
@@ -96,7 +101,7 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
-	state, err := r.h.Store.GetUserState(ctx, userID)
+	state, err := r.h.Store.Users.GetUserState(ctx, userID)
 	if err != nil {
 		r.h.HandleErr(chatID, "Ошибка при получении состояния", err)
 		return

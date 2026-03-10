@@ -113,7 +113,7 @@ func (h *Handler) ShowImportantDatesMenu(ctx context.Context, msg *tgbotapi.Mess
 	userID := msg.From.ID
 	var text string
 
-	importantDates, err := h.Store.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
+	importantDates, err := h.Store.ImportantDates.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка важных дат", err)
 		return
@@ -141,7 +141,7 @@ func (h *Handler) AddImportantDate(ctx context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 	userID := msg.From.ID
 
-	err := h.Store.SetUserState(ctx, userID, domain.AwaitingTitleImportantDate)
+	err := h.Store.Users.SetUserState(ctx, userID, domain.AwaitingTitleImportantDate)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния", err)
 		return
@@ -168,7 +168,7 @@ func (h *Handler) HandleTitleImportantDate(ctx context.Context, msg *tgbotapi.Me
 		return
 	}
 
-	err = h.Store.SetUserState(ctx, userID, domain.AwaitingDateImportantDate)
+	err = h.Store.Users.SetUserState(ctx, userID, domain.AwaitingDateImportantDate)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния", err)
 		return
@@ -207,7 +207,7 @@ func (h *Handler) HandlePartnerImportantDate(ctx context.Context, cq *tgbotapi.C
 			return
 		}
 	case "important_dates:add:partner:true":
-		partnerID, er := h.Store.GetPartnerID(ctx, userID)
+		partnerID, er := h.Store.Users.GetPartnerID(ctx, userID)
 		if er != nil {
 			h.HandleErr(chatID, "Ошибка при получении id партнера", er)
 			return
@@ -231,7 +231,7 @@ func (h *Handler) HandlePartnerImportantDate(ctx context.Context, cq *tgbotapi.C
 		h.HandleErr(chatID, "Ошибка при удалении сообщения", err)
 	}
 
-	err = h.Store.SetUserState(ctx, userID, domain.AwaitingNotifyBeforeImportantDate)
+	err = h.Store.Users.SetUserState(ctx, userID, domain.AwaitingNotifyBeforeImportantDate)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния", err)
 		return
@@ -284,7 +284,7 @@ func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *tgbot
 		return
 	}
 
-	err = h.Store.SetUserState(ctx, userID, domain.Empty)
+	err = h.Store.Users.SetUserState(ctx, userID, domain.Empty)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния", err)
 		return
@@ -296,7 +296,7 @@ func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *tgbot
 		return
 	}
 
-	partnerID, err := h.Store.GetPartnerID(ctx, userID)
+	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
 		return
@@ -310,7 +310,7 @@ func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *tgbot
 		time.Local,
 	)
 
-	_, err = h.Store.AddImportantDate(ctx, sql.NullInt64{Int64: userID, Valid: true}, finalDraft.PartnerID, finalDraft.Title,
+	_, err = h.Store.ImportantDates.AddImportantDate(ctx, sql.NullInt64{Int64: userID, Valid: true}, finalDraft.PartnerID, finalDraft.Title,
 		date, finalDraft.NotifyBeforeDays)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при добавлении важной даты", err)
@@ -334,7 +334,7 @@ func (h *Handler) GetImportantDates(ctx context.Context, msg *tgbotapi.Message) 
 	chatID := msg.Chat.ID
 	userID := msg.From.ID
 
-	importantDates, err := h.Store.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
+	importantDates, err := h.Store.ImportantDates.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка важных дат", err)
 		return
@@ -372,7 +372,7 @@ func (h *Handler) DeleteImportantDate(ctx context.Context, msg *tgbotapi.Message
 	chatID := msg.Chat.ID
 	userID := msg.From.ID
 
-	importantDates, err := h.Store.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
+	importantDates, err := h.Store.ImportantDates.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка важных дат", err)
 		return
@@ -419,14 +419,14 @@ func (h *Handler) HandleDeleteImportantDate(ctx context.Context, cq *tgbotapi.Ca
 		importantDateIDStr := strings.TrimPrefix(data, "important_dates:delete:confirm:")
 		importantDateID, _ := strconv.Atoi(importantDateIDStr)
 
-		partnerID, err := h.Store.GetPartnerID(ctx, userID)
+		partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
 			h.HandleErr(chatID, "Ошибка при получении id партнера", err)
 			return
 		}
 
-		importantDate, err := h.Store.GetImportantDateByID(ctx, int64(importantDateID))
+		importantDate, err := h.Store.ImportantDates.GetImportantDateByID(ctx, int64(importantDateID))
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
 			h.HandleErr(chatID, "Ошибка при получении важной даты", err)
@@ -436,7 +436,7 @@ func (h *Handler) HandleDeleteImportantDate(ctx context.Context, cq *tgbotapi.Ca
 		title := importantDate.Title
 		date := importantDate.Date.Format("02.01.2006")
 
-		err = h.Store.DeleteImportantDate(ctx, int64(importantDateID))
+		err = h.Store.ImportantDates.DeleteImportantDate(ctx, int64(importantDateID))
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
 			h.HandleErr(chatID, "Ошибка при удалении важной даты", err)
@@ -461,7 +461,7 @@ func (h *Handler) EditImportantDate(ctx context.Context, msg *tgbotapi.Message) 
 	chatID := msg.Chat.ID
 	userID := msg.From.ID
 
-	importantDates, err := h.Store.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
+	importantDates, err := h.Store.ImportantDates.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка важных дат", err)
 		return
@@ -509,7 +509,7 @@ func (h *Handler) HandleEditImportantDate(ctx context.Context, cq *tgbotapi.Call
 	} else {
 		id, _ := strconv.Atoi(data)
 
-		importantDate, err := h.Store.GetImportantDateByID(ctx, int64(id))
+		importantDate, err := h.Store.ImportantDates.GetImportantDateByID(ctx, int64(id))
 		if err != nil {
 			h.HandleErr(chatID, "Ошибка при получении важной даты", err)
 			return
@@ -577,7 +577,7 @@ func (h *Handler) HandleEditTitleImportantDate(ctx context.Context, cq *tgbotapi
 		return
 	}
 
-	err = h.Store.SetUserState(ctx, userID, domain.AwaitingEditTitleImportantDate)
+	err = h.Store.Users.SetUserState(ctx, userID, domain.AwaitingEditTitleImportantDate)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния", err)
 		return
@@ -600,7 +600,7 @@ func (h *Handler) HandleEditTitleImportantDateText(ctx context.Context, msg *tgb
 		return
 	}
 
-	date, err := h.Store.GetImportantDateByID(ctx, draft.ImportantDateID)
+	date, err := h.Store.ImportantDates.GetImportantDateByID(ctx, draft.ImportantDateID)
 	if err != nil {
 		h.HandleErr(chatID, "Дата не найдена", err)
 		return
@@ -608,14 +608,14 @@ func (h *Handler) HandleEditTitleImportantDateText(ctx context.Context, msg *tgb
 
 	date.Title = msg.Text
 
-	err = h.Store.EditImportantDate(ctx, date)
+	err = h.Store.ImportantDates.EditImportantDate(ctx, date)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при обновлении названия", err)
 		return
 	}
 
 	_ = h.importantDateEditDrafts.Delete(ctx, userID)
-	err = h.Store.SetUserState(ctx, userID, domain.Empty)
+	err = h.Store.Users.SetUserState(ctx, userID, domain.Empty)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния", err)
 		return
@@ -639,7 +639,7 @@ func (h *Handler) HandleEditDateImportantDate(ctx context.Context, cq *tgbotapi.
 		return
 	}
 
-	err = h.Store.SetUserState(ctx, userID, domain.AwaitingEditDateImportantDate)
+	err = h.Store.Users.SetUserState(ctx, userID, domain.AwaitingEditDateImportantDate)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния", err)
 		return
@@ -693,7 +693,7 @@ func (h *Handler) HandleEditPartnerImportantDateSelect(ctx context.Context, cq *
 		return
 	}
 
-	date, err := h.Store.GetImportantDateByID(ctx, draft.ImportantDateID)
+	date, err := h.Store.ImportantDates.GetImportantDateByID(ctx, draft.ImportantDateID)
 	if err != nil {
 		h.HandleErr(chatID, "Дата не найдена", err)
 		return
@@ -703,11 +703,11 @@ func (h *Handler) HandleEditPartnerImportantDateSelect(ctx context.Context, cq *
 	case "important_dates:edit:partner:false":
 		date.PartnerID = sql.NullInt64{Valid: false}
 	case "important_dates:edit:partner:true":
-		partnerID, _ := h.Store.GetPartnerID(ctx, userID)
+		partnerID, _ := h.Store.Users.GetPartnerID(ctx, userID)
 		date.PartnerID = sql.NullInt64{Int64: partnerID, Valid: true}
 	}
 
-	err = h.Store.EditImportantDate(ctx, date)
+	err = h.Store.ImportantDates.EditImportantDate(ctx, date)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при обновлении партнёра", err)
 		return
@@ -761,7 +761,7 @@ func (h *Handler) HandleEditNotifyBeforeImportantDateSelect(ctx context.Context,
 
 	days, _ := strconv.Atoi(strings.TrimPrefix(cq.Data, "important_dates:edit:notify_before:"))
 
-	date, err := h.Store.GetImportantDateByID(ctx, draft.ImportantDateID)
+	date, err := h.Store.ImportantDates.GetImportantDateByID(ctx, draft.ImportantDateID)
 	if err != nil {
 		h.HandleErr(chatID, "Дата не найдена", err)
 		return
@@ -769,7 +769,7 @@ func (h *Handler) HandleEditNotifyBeforeImportantDateSelect(ctx context.Context,
 
 	date.NotifyBeforeDays = days
 
-	err = h.Store.EditImportantDate(ctx, date)
+	err = h.Store.ImportantDates.EditImportantDate(ctx, date)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при обновлении уведомлений", err)
 		return
@@ -790,7 +790,7 @@ func (h *Handler) HandleEditIsActiveImportantDate(ctx context.Context, cq *tgbot
 
 	id, _ := strconv.Atoi(strings.TrimPrefix(cq.Data, "important_dates:update:is_active:"))
 
-	date, err := h.Store.GetImportantDateByID(ctx, int64(id))
+	date, err := h.Store.ImportantDates.GetImportantDateByID(ctx, int64(id))
 	if err != nil {
 		h.HandleErr(chatID, "Дата не найдена", err)
 		return
@@ -798,7 +798,7 @@ func (h *Handler) HandleEditIsActiveImportantDate(ctx context.Context, cq *tgbot
 
 	date.IsActive = !date.IsActive
 
-	err = h.Store.EditImportantDate(ctx, date)
+	err = h.Store.ImportantDates.EditImportantDate(ctx, date)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при обновлении активности", err)
 		return
@@ -851,14 +851,14 @@ func (h *Handler) HandleYearImportantDateUniversal(ctx context.Context, cq *tgbo
 				return
 			}
 
-			date, err := h.Store.GetImportantDateByID(ctx, draft.ImportantDateID)
+			date, err := h.Store.ImportantDates.GetImportantDateByID(ctx, draft.ImportantDateID)
 			if err != nil {
 				h.HandleErr(chatID, "Дата не найдена", err)
 				return
 			}
 
 			date.Date = time.Date(year, date.Date.Month(), date.Date.Day(), 0, 0, 0, 0, time.Local)
-			if er := h.Store.EditImportantDate(ctx, date); er != nil {
+			if er := h.Store.ImportantDates.EditImportantDate(ctx, date); er != nil {
 				h.HandleErr(chatID, "Ошибка при обновлении года", er)
 				return
 			}
@@ -923,13 +923,13 @@ func (h *Handler) HandleMonthImportantDateUniversal(ctx context.Context, cq *tgb
 				h.HandleErr(chatID, "Сессия редактирования истекла", err)
 				return
 			}
-			date, err := h.Store.GetImportantDateByID(ctx, draft.ImportantDateID)
+			date, err := h.Store.ImportantDates.GetImportantDateByID(ctx, draft.ImportantDateID)
 			if err != nil {
 				h.HandleErr(chatID, "Дата не найдена", err)
 				return
 			}
 			date.Date = time.Date(date.Date.Year(), time.Month(month), date.Date.Day(), 0, 0, 0, 0, time.Local)
-			if er := h.Store.EditImportantDate(ctx, date); er != nil {
+			if er := h.Store.ImportantDates.EditImportantDate(ctx, date); er != nil {
 				h.HandleErr(chatID, "Ошибка при обновлении месяца", er)
 				return
 			}
@@ -991,20 +991,20 @@ func (h *Handler) HandleDayImportantDateUniversal(ctx context.Context, cq *tgbot
 				return
 			}
 
-			date, err := h.Store.GetImportantDateByID(ctx, draft.ImportantDateID)
+			date, err := h.Store.ImportantDates.GetImportantDateByID(ctx, draft.ImportantDateID)
 			if err != nil {
 				h.HandleErr(chatID, "Дата не найдена", err)
 				return
 			}
 
 			date.Date = time.Date(date.Date.Year(), date.Date.Month(), day, 0, 0, 0, 0, time.Local)
-			if er := h.Store.EditImportantDate(ctx, date); er != nil {
+			if er := h.Store.ImportantDates.EditImportantDate(ctx, date); er != nil {
 				h.HandleErr(chatID, "Ошибка при обновлении дня", er)
 				return
 			}
 
 			_ = h.importantDateEditDrafts.Delete(ctx, userID)
-			_ = h.Store.SetUserState(ctx, userID, domain.Empty)
+			_ = h.Store.Users.SetUserState(ctx, userID, domain.Empty)
 
 			if er := h.ui.Client.DeleteMessage(chatID, messageID); er != nil {
 				h.HandleErr(chatID, "Ошибка при удалении сообщения", er)
@@ -1029,7 +1029,7 @@ func (h *Handler) HandleDayImportantDateUniversal(ctx context.Context, cq *tgbot
 			}
 
 			// Далее переход к выбору партнера / уведомлений
-			partnerID, er := h.Store.GetPartnerID(ctx, userID)
+			partnerID, er := h.Store.Users.GetPartnerID(ctx, userID)
 			if er != nil {
 				h.HandleErr(chatID, "Ошибка при получении id партнера", er)
 				return
@@ -1037,10 +1037,10 @@ func (h *Handler) HandleDayImportantDateUniversal(ctx context.Context, cq *tgbot
 
 			if partnerID == 0 {
 				h.Reply(chatID, "✨ Так как у тебя пока нет партнёра, памятная дата будет твоей личной")
-				_ = h.Store.SetUserState(ctx, userID, domain.AwaitingNotifyBeforeImportantDate)
+				_ = h.Store.Users.SetUserState(ctx, userID, domain.AwaitingNotifyBeforeImportantDate)
 				_ = h.ui.SendNotifyBeforeKeyboard(chatID, isEdit)
 			} else {
-				_ = h.Store.SetUserState(ctx, userID, domain.AwaitingPartnerImportantDate)
+				_ = h.Store.Users.SetUserState(ctx, userID, domain.AwaitingPartnerImportantDate)
 				_ = h.ui.SendPartnerKeyboard(chatID, isEdit)
 			}
 		}
@@ -1060,7 +1060,7 @@ func (h *Handler) NotifyImportantDatesCron(ctx context.Context) {
 		time.Local,
 	)
 
-	importantDates, err := h.Store.GetAllActiveImportantDates(ctx)
+	importantDates, err := h.Store.ImportantDates.GetAllActiveImportantDates(ctx)
 	if err != nil {
 		log.Println("Ошибка получения всех важных дат:", err)
 		return
@@ -1125,6 +1125,6 @@ func (h *Handler) NotifyImportantDatesCron(ctx context.Context) {
 			h.Reply(importantDate.PartnerID.Int64, text)
 		}
 
-		_ = h.Store.UpdateLastNotificationAt(ctx, importantDate.ID, now)
+		_ = h.Store.ImportantDates.UpdateLastNotificationAt(ctx, importantDate.ID, now)
 	}
 }

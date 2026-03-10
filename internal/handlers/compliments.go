@@ -19,7 +19,7 @@ func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *tgbotapi.Message
 	text := "❤️ Комплименты"
 	count := 0
 	maxCount := 1
-	partnerID, err := h.Store.GetPartnerID(ctx, userID)
+	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
 		return
@@ -28,12 +28,12 @@ func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *tgbotapi.Message
 	if partnerID == 0 {
 		text = "🤍 Добавь партнёра, и здесь появится магия комплиментов ✨"
 	} else {
-		count, err = h.Store.GetComplimentCount(ctx, partnerID)
+		count, err = h.Store.UserConfig.GetComplimentCount(ctx, partnerID)
 		if err != nil {
 			h.HandleErr(chatID, "Ошибка при получении количества полученных комплиментов", err)
 			return
 		}
-		maxCount, err = h.Store.GetComplimentMaxCount(ctx, partnerID)
+		maxCount, err = h.Store.UserConfig.GetComplimentMaxCount(ctx, partnerID)
 		if err != nil {
 			h.HandleErr(chatID, "Ошибка при получении максимального количества комплиментов", err)
 			return
@@ -62,7 +62,7 @@ func (h *Handler) AddCompliment(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 
-	err := h.Store.SetUserState(ctx, userID, domain.AwaitingCompliment)
+	err := h.Store.Users.SetUserState(ctx, userID, domain.AwaitingCompliment)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при установке состояния awaiting_compliment", err)
 		return
@@ -77,7 +77,7 @@ func (h *Handler) ProcessCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	complimentText := msg.Text
 
 	if complimentText == "" {
-		err := h.Store.SetUserState(ctx, userID, domain.Empty)
+		err := h.Store.Users.SetUserState(ctx, userID, domain.Empty)
 		if err != nil {
 			h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 			return
@@ -86,13 +86,13 @@ func (h *Handler) ProcessCompliment(ctx context.Context, msg *tgbotapi.Message) 
 		return
 	}
 
-	err := h.Store.SetUserState(ctx, userID, domain.Empty)
+	err := h.Store.Users.SetUserState(ctx, userID, domain.Empty)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
 		return
 	}
 
-	_, err = h.Store.AddCompliment(ctx, userID, complimentText)
+	_, err = h.Store.Compliments.AddCompliment(ctx, userID, complimentText)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при добавлении комплимента", err)
 		return
@@ -106,7 +106,7 @@ func (h *Handler) GetCompliments(ctx context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 	var reply string
 
-	compliments, err := h.Store.GetCompliments(ctx, userID)
+	compliments, err := h.Store.Compliments.GetCompliments(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка комплиментов", err)
 		return
@@ -150,7 +150,7 @@ func (h *Handler) DeleteCompliment(ctx context.Context, msg *tgbotapi.Message) {
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 
-	compliments, err := h.Store.GetCompliments(ctx, userID)
+	compliments, err := h.Store.Compliments.GetCompliments(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка комплиментов", err)
 		return
@@ -203,7 +203,7 @@ func (h *Handler) HandleDeleteCompliment(ctx context.Context, cb *tgbotapi.Callb
 		complimentIDStr := strings.TrimPrefix(data, "compliments:delete:confirm:")
 		complimentID, _ := strconv.Atoi(complimentIDStr)
 
-		err := h.Store.DeleteCompliment(ctx, cb.From.ID, int64(complimentID))
+		err := h.Store.Compliments.DeleteCompliment(ctx, cb.From.ID, int64(complimentID))
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
 			h.HandleErr(chatID, "Ошибка при попытке удалить комплимент", err)
@@ -221,7 +221,7 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 
-	partnerID, err := h.Store.GetPartnerID(ctx, userID)
+	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
 		return
@@ -232,12 +232,12 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 		return
 	}
 
-	count, err := h.Store.GetComplimentCount(ctx, partnerID)
+	count, err := h.Store.UserConfig.GetComplimentCount(ctx, partnerID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении количества полученных комплиментов", err)
 		return
 	}
-	maxCount, err := h.Store.GetComplimentMaxCount(ctx, partnerID)
+	maxCount, err := h.Store.UserConfig.GetComplimentMaxCount(ctx, partnerID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении максимального количества комплиментов", err)
 		return
@@ -249,12 +249,12 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	}
 	count++
 
-	bucket, err := h.Store.GetComplimentsBucket(ctx, partnerID)
+	bucket, err := h.Store.UserConfig.GetComplimentsBucket(ctx, partnerID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении ведра комплиментов", err)
 		return
 	}
-	lastBucketUpdate, err := h.Store.GetLastBucketUpdate(ctx, partnerID)
+	lastBucketUpdate, err := h.Store.UserConfig.GetLastBucketUpdate(ctx, partnerID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении последнего обновления ведра комплиментов", err)
 		return
@@ -268,7 +268,7 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 			newBucket = 2
 		}
 		if newBucket != bucket {
-			err = h.Store.UpdateComplimentBucket(ctx, partnerID, newBucket, now)
+			err = h.Store.UserConfig.UpdateComplimentBucket(ctx, partnerID, newBucket, now)
 			if err != nil {
 				h.HandleErr(chatID, "Ошибка при обновлении ведра комплиментов", err)
 				return
@@ -289,7 +289,7 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 		return
 	}
 
-	allCompliments, err := h.Store.GetCompliments(ctx, partnerID)
+	allCompliments, err := h.Store.Compliments.GetCompliments(ctx, partnerID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении списка комплиментов", err)
 		return
@@ -309,7 +309,7 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	}
 
 	compliment := compliments[0]
-	err = h.Store.MarkComplimentSent(ctx, compliment.ID)
+	err = h.Store.Compliments.MarkComplimentSent(ctx, compliment.ID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке отметить комплимент как отправленный", err)
 		return
@@ -327,17 +327,17 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 		"💌 <b>Комплимент доставлен</b>\n\nТы только что порадовал(а) своего партнёра ✨\n\n«"+compliment.Text+"»",
 	)
 
-	err = h.Store.SetComplimentTime(ctx, partnerID)
+	err = h.Store.UserConfig.SetComplimentTime(ctx, partnerID)
 	if err != nil {
 		log.Printf("Ошибка при попытке установить время получения комплимента: %v", err)
 	}
 
-	err = h.Store.TakeComplimentFromBucket(ctx, partnerID)
+	err = h.Store.UserConfig.TakeComplimentFromBucket(ctx, partnerID)
 	if err != nil {
 		log.Printf("Ошибка при взятии комплимента из ведра: %v", err)
 	}
 
-	err = h.Store.SetComplimentCount(ctx, partnerID, count)
+	err = h.Store.UserConfig.SetComplimentCount(ctx, partnerID, count)
 	if err != nil {
 		log.Printf("Ошибка при попытке изменить количество полученных комплиментов: %v", err)
 	}
@@ -347,12 +347,12 @@ func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *tgbotapi.Mes
 	userID := msg.From.ID
 	chatID := msg.Chat.ID
 
-	actualFreq, err := h.Store.GetComplimentMaxCount(ctx, userID)
+	actualFreq, err := h.Store.UserConfig.GetComplimentMaxCount(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке получить частоту комплиментов", err)
 		return
 	}
-	count, err := h.Store.GetComplimentCount(ctx, userID)
+	count, err := h.Store.UserConfig.GetComplimentCount(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении количества комплиментов", err)
 		return
@@ -369,7 +369,7 @@ func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *tgbotapi.Mes
 		"• отправь число\n" +
 		"• или «-», чтобы убрать лимит"
 
-	err = h.Store.SetUserState(ctx, userID, domain.AwaitingComplimentFrequency)
+	err = h.Store.Users.SetUserState(ctx, userID, domain.AwaitingComplimentFrequency)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при попытке установить состояние", err)
 		return
@@ -400,7 +400,7 @@ func (h *Handler) ProcessComplimentFrequency(ctx context.Context, msg *tgbotapi.
 		}
 	}
 
-	err := h.Store.SetComplimentMaxCount(ctx, userID, freqInt)
+	err := h.Store.UserConfig.SetComplimentMaxCount(ctx, userID, freqInt)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при изменении лимита", err)
 		return

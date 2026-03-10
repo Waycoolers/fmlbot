@@ -5,10 +5,15 @@ import (
 	"log"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
+	"github.com/jmoiron/sqlx"
 )
 
-func (s *Storage) AddCompliment(ctx context.Context, telegramID int64, text string) (*domain.Compliment, error) {
-	tx, err := s.DB.BeginTxx(ctx, nil)
+type complimentsRepo struct {
+	db *sqlx.DB
+}
+
+func (s *complimentsRepo) AddCompliment(ctx context.Context, telegramID int64, text string) (*domain.Compliment, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -42,9 +47,9 @@ func (s *Storage) AddCompliment(ctx context.Context, telegramID int64, text stri
 	return &compliment, tx.Commit()
 }
 
-func (s *Storage) GetCompliments(ctx context.Context, telegramID int64) (compliments []domain.Compliment, err error) {
+func (s *complimentsRepo) GetCompliments(ctx context.Context, telegramID int64) (compliments []domain.Compliment, err error) {
 	compliments = []domain.Compliment{}
-	err = s.DB.SelectContext(ctx, &compliments, `
+	err = s.db.SelectContext(ctx, &compliments, `
 		SELECT c.id, c.text, c.is_sent, c.created_at
 		FROM compliments AS c
 		JOIN user_compliment AS uc ON c.id = uc.compliment_id
@@ -58,8 +63,8 @@ func (s *Storage) GetCompliments(ctx context.Context, telegramID int64) (complim
 	return compliments, nil
 }
 
-func (s *Storage) DeleteCompliment(ctx context.Context, telegramID int64, complimentID int64) error {
-	tx, err := s.DB.BeginTxx(ctx, nil)
+func (s *complimentsRepo) DeleteCompliment(ctx context.Context, telegramID int64, complimentID int64) error {
+	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -83,8 +88,8 @@ func (s *Storage) DeleteCompliment(ctx context.Context, telegramID int64, compli
 	return tx.Commit()
 }
 
-func (s *Storage) MarkComplimentSent(ctx context.Context, complimentID int64) error {
-	_, err := s.DB.ExecContext(ctx, `
+func (s *complimentsRepo) MarkComplimentSent(ctx context.Context, complimentID int64) error {
+	_, err := s.db.ExecContext(ctx, `
 		UPDATE compliments SET is_sent=true WHERE id=$1;
 	`, complimentID)
 	return err
