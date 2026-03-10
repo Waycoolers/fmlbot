@@ -9,7 +9,12 @@ import (
 )
 
 type Storage struct {
-	DB *sqlx.DB
+	db             *sqlx.DB
+	Compliments    *complimentsRepo
+	ImportantDates *importantDatesRepo
+	Scheduler      *schedulerRepo
+	UserConfig     *userConfigRepo
+	Users          *usersRepo
 }
 
 func New(cfg *config.DatabaseConfig) (*Storage, error) {
@@ -32,5 +37,29 @@ func New(cfg *config.DatabaseConfig) (*Storage, error) {
 	}
 
 	log.Println("БД успешно подключена")
-	return &Storage{DB: db}, nil
+
+	compliments := complimentsRepo{
+		db: db,
+	}
+
+	importantDates := importantDatesRepo{
+		db: db,
+	}
+
+	scheduler := schedulerRepo{
+		db: db,
+	}
+
+	userConfig := userConfigRepo{
+		db: db,
+	}
+
+	return &Storage{db: db, Compliments: &compliments, ImportantDates: &importantDates, Scheduler: &scheduler, UserConfig: &userConfig}, nil
+}
+
+func (s *Storage) Close() {
+	err := s.db.Close()
+	if err != nil {
+		log.Printf("Ошибка при закрытии подключения к бд: %v", err)
+	}
 }

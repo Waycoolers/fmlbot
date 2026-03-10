@@ -19,7 +19,7 @@ func (s *Storage) Migrate() error {
 	if err != nil {
 		return err
 	}
-	driver, err := pgx.WithInstance(s.DB.DB, &pgx.Config{})
+	driver, err := pgx.WithInstance(s.db.DB, &pgx.Config{})
 	if err != nil {
 		return err
 	}

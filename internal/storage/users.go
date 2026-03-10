@@ -4,10 +4,15 @@ import (
 	"context"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
+	"github.com/jmoiron/sqlx"
 )
 
-func (s *Storage) AddUser(ctx context.Context, telegramID int64, username string) error {
-	tx, err := s.DB.BeginTxx(ctx, nil)
+type usersRepo struct {
+	db *sqlx.DB
+}
+
+func (s *usersRepo) AddUser(ctx context.Context, telegramID int64, username string) error {
+	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -40,61 +45,61 @@ func (s *Storage) AddUser(ctx context.Context, telegramID int64, username string
 	return tx.Commit()
 }
 
-func (s *Storage) GetUserIDByUsername(ctx context.Context, username string) (int64, error) {
+func (s *usersRepo) GetUserIDByUsername(ctx context.Context, username string) (int64, error) {
 	var id int64
-	err := s.DB.QueryRowContext(ctx, `SELECT telegram_id FROM users WHERE LOWER(username)=LOWER($1)`, username).Scan(&id)
+	err := s.db.QueryRowContext(ctx, `SELECT telegram_id FROM users WHERE LOWER(username)=LOWER($1)`, username).Scan(&id)
 	return id, err
 }
 
-func (s *Storage) IsUserExists(ctx context.Context, userID int64) (bool, error) {
+func (s *usersRepo) IsUserExists(ctx context.Context, userID int64) (bool, error) {
 	var exists bool
-	err := s.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE telegram_id=$1)`, userID).Scan(&exists)
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE telegram_id=$1)`, userID).Scan(&exists)
 	return exists, err
 }
 
-func (s *Storage) IsUserExistsByUsername(ctx context.Context, username string) (bool, error) {
+func (s *usersRepo) IsUserExistsByUsername(ctx context.Context, username string) (bool, error) {
 	var exists bool
-	err := s.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(username)=LOWER($1))`, username).Scan(&exists)
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(username)=LOWER($1))`, username).Scan(&exists)
 	return exists, err
 }
 
-func (s *Storage) SetPartner(ctx context.Context, telegramID int64, partnerID int64) error {
-	_, err := s.DB.ExecContext(ctx, `
+func (s *usersRepo) SetPartner(ctx context.Context, telegramID int64, partnerID int64) error {
+	_, err := s.db.ExecContext(ctx, `
         UPDATE users SET partner_id = $1 WHERE telegram_id = $2;
     `, partnerID, telegramID)
 	return err
 }
 
-func (s *Storage) GetUsername(ctx context.Context, userID int64) (string, error) {
+func (s *usersRepo) GetUsername(ctx context.Context, userID int64) (string, error) {
 	var username string
-	err := s.DB.QueryRowContext(ctx, `SELECT username FROM users WHERE telegram_id=$1;`, userID).Scan(&username)
+	err := s.db.QueryRowContext(ctx, `SELECT username FROM users WHERE telegram_id=$1;`, userID).Scan(&username)
 	if err != nil {
 		return "", nil
 	}
 	return username, nil
 }
 
-func (s *Storage) GetPartnerID(ctx context.Context, userID int64) (int64, error) {
+func (s *usersRepo) GetPartnerID(ctx context.Context, userID int64) (int64, error) {
 	var id int64
 	query := `SELECT partner_id FROM users WHERE telegram_id = $1;`
 
-	err := s.DB.QueryRowContext(ctx, query, userID).Scan(&id)
+	err := s.db.QueryRowContext(ctx, query, userID).Scan(&id)
 	if err != nil {
 		return 0, nil
 	}
 	return id, nil
 }
 
-func (s *Storage) SetUserState(ctx context.Context, userID int64, state domain.State) error {
-	_, err := s.DB.ExecContext(ctx, `
+func (s *usersRepo) SetUserState(ctx context.Context, userID int64, state domain.State) error {
+	_, err := s.db.ExecContext(ctx, `
 		UPDATE users SET state=$1 WHERE telegram_id=$2;
 	`, state, userID)
 	return err
 }
 
-func (s *Storage) GetUserState(ctx context.Context, userID int64) (domain.State, error) {
+func (s *usersRepo) GetUserState(ctx context.Context, userID int64) (domain.State, error) {
 	var state domain.State
-	err := s.DB.QueryRowContext(ctx, `
+	err := s.db.QueryRowContext(ctx, `
 		SELECT state FROM users WHERE telegram_id=$1;
 	`, userID).Scan(&state)
 	if err != nil {
@@ -103,8 +108,8 @@ func (s *Storage) GetUserState(ctx context.Context, userID int64) (domain.State,
 	return state, nil
 }
 
-func (s *Storage) SetPartners(ctx context.Context, userID, partnerID int64) error {
-	tx, err := s.DB.BeginTx(ctx, nil)
+func (s *usersRepo) SetPartners(ctx context.Context, userID, partnerID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -136,8 +141,8 @@ func (s *Storage) SetPartners(ctx context.Context, userID, partnerID int64) erro
 	return tx.Commit()
 }
 
-func (s *Storage) RemovePartners(ctx context.Context, userID, partnerID int64) error {
-	tx, err := s.DB.BeginTx(ctx, nil)
+func (s *usersRepo) RemovePartners(ctx context.Context, userID, partnerID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -169,8 +174,8 @@ func (s *Storage) RemovePartners(ctx context.Context, userID, partnerID int64) e
 	return tx.Commit()
 }
 
-func (s *Storage) DeleteUser(ctx context.Context, userID int64) error {
-	_, err := s.DB.ExecContext(ctx, `
+func (s *usersRepo) DeleteUser(ctx context.Context, userID int64) error {
+	_, err := s.db.ExecContext(ctx, `
 		DELETE FROM users WHERE telegram_id=$1
 	`, userID)
 	return err
