@@ -20,7 +20,7 @@ func main() {
 		log.Fatalf("Ошибка загрузки конфигурации: %v", err)
 	}
 
-	store, err := storage.New(&cfg.DB)
+	store, err := storage.New(cfg.DB)
 	if err != nil {
 		log.Fatalf("Ошибка подключения к БД: %v", err)
 	}
@@ -36,7 +36,7 @@ func main() {
 		log.Fatalf("Ошибка при запуске миграций: %v", err)
 	}
 
-	rdb, err := redis_store.New(&cfg.RDB)
+	rdb, err := redis_store.New(cfg.RDB)
 	if err != nil {
 		log.Fatalf("Ошибка подключения к redis_store: %v", err)
 	}
