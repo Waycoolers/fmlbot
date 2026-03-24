@@ -8,7 +8,6 @@ import (
 	"github.com/Waycoolers/fmlbot/internal/redis_store"
 	"github.com/Waycoolers/fmlbot/internal/storage"
 	"github.com/Waycoolers/fmlbot/internal/ui"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type Handler struct {
@@ -31,8 +30,8 @@ func (h *Handler) ShowStartMenu(_ context.Context, chatID int64) {
 	}
 }
 
-func (h *Handler) ShowMainMenu(_ context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
+func (h *Handler) ShowMainMenu(_ context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
 	msgText := msg.Text
 	text := "🌿 Выбери, что хочешь сделать"
 
@@ -68,13 +67,13 @@ func (h *Handler) DoMidnightTasks(ctx context.Context) {
 	log.Print("Задачи выполнены")
 }
 
-func (h *Handler) ReplyUnknownCallback(_ context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
+func (h *Handler) ReplyUnknownCallback(_ context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
 	h.Reply(chatID, "🤍 Лучше воспользуйся кнопками — так будет проще")
 }
 
-func (h *Handler) ReplyUnknownMessage(_ context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
+func (h *Handler) ReplyUnknownMessage(_ context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
 	h.Reply(chatID, "🤔 Я пока не понимаю это сообщение\nПопробуй выбрать действие с кнопок ниже")
 }
 

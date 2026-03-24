@@ -7,7 +7,6 @@ import (
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
 	"github.com/Waycoolers/fmlbot/internal/handlers"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func parseCallbackData(data string) (section, action, payload string) {
@@ -30,7 +29,7 @@ func NewRouter(h *handlers.Handler) *Router {
 	return &Router{h: h}
 }
 
-func (r *Router) HandleUpdate(ctx context.Context, update tgbotapi.Update) {
+func (r *Router) HandleUpdate(ctx context.Context, update domain.Update) {
 	if update.CallbackQuery != nil {
 		r.handleCallback(ctx, update.CallbackQuery)
 		return
@@ -42,9 +41,9 @@ func (r *Router) HandleUpdate(ctx context.Context, update tgbotapi.Update) {
 	}
 }
 
-func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (r *Router) handleMessage(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 	text := msg.Text
 
 	commands := []string{
@@ -164,12 +163,12 @@ func (r *Router) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	}
 }
 
-func (r *Router) handleCallback(ctx context.Context, cq *tgbotapi.CallbackQuery) {
+func (r *Router) handleCallback(ctx context.Context, cq *domain.CallbackQuery) {
 	data := cq.Data
-	username := cq.From.UserName
+	username := cq.UserName
 	text := ""
-	if cq.Message != nil {
-		text = cq.Message.Text
+	if cq.Message != "" {
+		text = cq.Message
 	}
 	log.Printf("Клиент %v написал: %v", username, text)
 
@@ -189,7 +188,7 @@ func (r *Router) handleCallback(ctx context.Context, cq *tgbotapi.CallbackQuery)
 	}
 }
 
-func (r *Router) handleAccount(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
+func (r *Router) handleAccount(ctx context.Context, cq *domain.CallbackQuery, action string, payload string) {
 	switch action {
 	case "delete":
 		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
@@ -200,7 +199,7 @@ func (r *Router) handleAccount(ctx context.Context, cq *tgbotapi.CallbackQuery, 
 	}
 }
 
-func (r *Router) handlePartner(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
+func (r *Router) handlePartner(ctx context.Context, cq *domain.CallbackQuery, action string, payload string) {
 	switch action {
 	case "delete":
 		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
@@ -211,7 +210,7 @@ func (r *Router) handlePartner(ctx context.Context, cq *tgbotapi.CallbackQuery, 
 	}
 }
 
-func (r *Router) handleCompliments(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
+func (r *Router) handleCompliments(ctx context.Context, cq *domain.CallbackQuery, action string, payload string) {
 	switch action {
 	case "delete":
 		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
@@ -222,7 +221,7 @@ func (r *Router) handleCompliments(ctx context.Context, cq *tgbotapi.CallbackQue
 	}
 }
 
-func (r *Router) handleImportantDates(ctx context.Context, cq *tgbotapi.CallbackQuery, action string, payload string) {
+func (r *Router) handleImportantDates(ctx context.Context, cq *domain.CallbackQuery, action string, payload string) {
 	switch action {
 	case "add":
 		switch {

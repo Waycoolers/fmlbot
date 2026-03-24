@@ -108,9 +108,9 @@ func (h *Handler) nearestImportantDate(dates []domain.ImportantDate, now time.Ti
 	return nearest, found
 }
 
-func (h *Handler) ShowImportantDatesMenu(ctx context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
-	userID := msg.From.ID
+func (h *Handler) ShowImportantDatesMenu(ctx context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
+	userID := msg.UserID
 	var text string
 
 	importantDates, err := h.Store.ImportantDates.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
@@ -137,9 +137,9 @@ func (h *Handler) ShowImportantDatesMenu(ctx context.Context, msg *tgbotapi.Mess
 	}
 }
 
-func (h *Handler) AddImportantDate(ctx context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
-	userID := msg.From.ID
+func (h *Handler) AddImportantDate(ctx context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
+	userID := msg.UserID
 
 	err := h.Store.Users.SetUserState(ctx, userID, domain.AwaitingTitleImportantDate)
 	if err != nil {
@@ -155,9 +155,9 @@ func (h *Handler) AddImportantDate(ctx context.Context, msg *tgbotapi.Message) {
 	)
 }
 
-func (h *Handler) HandleTitleImportantDate(ctx context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
-	userID := msg.From.ID
+func (h *Handler) HandleTitleImportantDate(ctx context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
+	userID := msg.UserID
 	title := msg.Text
 	draft := domain.ImportantDateDraft{}
 
@@ -181,10 +181,10 @@ func (h *Handler) HandleTitleImportantDate(ctx context.Context, msg *tgbotapi.Me
 	}
 }
 
-func (h *Handler) HandlePartnerImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandlePartnerImportantDate(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 
 	draft, err := h.importantDateDrafts.Get(ctx, userID)
 	if err != nil {
@@ -244,10 +244,10 @@ func (h *Handler) HandlePartnerImportantDate(ctx context.Context, cq *tgbotapi.C
 	}
 }
 
-func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 
 	h.ui.RemoveButtons(chatID, messageID)
 
@@ -330,9 +330,9 @@ func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *tgbot
 	}
 }
 
-func (h *Handler) GetImportantDates(ctx context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
-	userID := msg.From.ID
+func (h *Handler) GetImportantDates(ctx context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
+	userID := msg.UserID
 
 	importantDates, err := h.Store.ImportantDates.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
 	if err != nil {
@@ -368,9 +368,9 @@ func (h *Handler) GetImportantDates(ctx context.Context, msg *tgbotapi.Message) 
 	h.Reply(chatID, reply)
 }
 
-func (h *Handler) DeleteImportantDate(ctx context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
-	userID := msg.From.ID
+func (h *Handler) DeleteImportantDate(ctx context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
+	userID := msg.UserID
 
 	importantDates, err := h.Store.ImportantDates.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
 	if err != nil {
@@ -409,11 +409,11 @@ func (h *Handler) DeleteImportantDate(ctx context.Context, msg *tgbotapi.Message
 	}
 }
 
-func (h *Handler) HandleDeleteImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
+func (h *Handler) HandleDeleteImportantDate(ctx context.Context, cq *domain.CallbackQuery) {
 	data := cq.Data
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 
 	if strings.HasPrefix(data, "important_dates:delete:confirm") {
 		importantDateIDStr := strings.TrimPrefix(data, "important_dates:delete:confirm:")
@@ -457,9 +457,9 @@ func (h *Handler) HandleDeleteImportantDate(ctx context.Context, cq *tgbotapi.Ca
 	_ = h.ui.Client.DeleteMessage(chatID, messageID)
 }
 
-func (h *Handler) EditImportantDate(ctx context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
-	userID := msg.From.ID
+func (h *Handler) EditImportantDate(ctx context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
+	userID := msg.UserID
 
 	importantDates, err := h.Store.ImportantDates.GetImportantDates(ctx, sql.NullInt64{Int64: userID, Valid: true})
 	if err != nil {
@@ -498,10 +498,10 @@ func (h *Handler) EditImportantDate(ctx context.Context, msg *tgbotapi.Message) 
 	}
 }
 
-func (h *Handler) HandleEditImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
+func (h *Handler) HandleEditImportantDate(ctx context.Context, cq *domain.CallbackQuery) {
 	data := cq.Data
-	chatID := cq.Message.Chat.ID
-	messageID := cq.Message.MessageID
+	chatID := cq.ChatID
+	messageID := cq.MessageID
 
 	data = strings.TrimPrefix(data, "important_dates:update_menu:")
 	if data == "cancel" {
@@ -551,9 +551,9 @@ func (h *Handler) HandleEditImportantDate(ctx context.Context, cq *tgbotapi.Call
 	}
 }
 
-func (h *Handler) CancelCallbackImportantDate(_ context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) CancelCallbackImportantDate(_ context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	messageID := cq.MessageID
 
 	if er := h.ui.Client.DeleteMessage(chatID, messageID); er != nil {
 		h.HandleErr(chatID, "Ошибка при удалении сообщения", er)
@@ -562,10 +562,10 @@ func (h *Handler) CancelCallbackImportantDate(_ context.Context, cq *tgbotapi.Ca
 	h.Reply(chatID, "😉 Действие отменено")
 }
 
-func (h *Handler) HandleEditTitleImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleEditTitleImportantDate(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 
 	id, _ := strconv.Atoi(strings.TrimPrefix(cq.Data, "important_dates:update:title:"))
 
@@ -590,9 +590,9 @@ func (h *Handler) HandleEditTitleImportantDate(ctx context.Context, cq *tgbotapi
 	h.Reply(chatID, "✍️ Введи новое название памятной даты")
 }
 
-func (h *Handler) HandleEditTitleImportantDateText(ctx context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
-	userID := msg.From.ID
+func (h *Handler) HandleEditTitleImportantDateText(ctx context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
+	userID := msg.UserID
 
 	draft, err := h.importantDateEditDrafts.Get(ctx, userID)
 	if err != nil || draft == nil {
@@ -624,10 +624,10 @@ func (h *Handler) HandleEditTitleImportantDateText(ctx context.Context, msg *tgb
 	h.Reply(chatID, "✅ Отлично! Название обновлено")
 }
 
-func (h *Handler) HandleEditDateImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleEditDateImportantDate(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 
 	id, _ := strconv.Atoi(strings.TrimPrefix(cq.Data, "important_dates:update:date:"))
 
@@ -656,10 +656,10 @@ func (h *Handler) HandleEditDateImportantDate(ctx context.Context, cq *tgbotapi.
 	}
 }
 
-func (h *Handler) HandleEditPartnerImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleEditPartnerImportantDate(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 
 	id, _ := strconv.Atoi(strings.TrimPrefix(cq.Data, "important_dates:update:partner:"))
 
@@ -682,10 +682,10 @@ func (h *Handler) HandleEditPartnerImportantDate(ctx context.Context, cq *tgbota
 	}
 }
 
-func (h *Handler) HandleEditPartnerImportantDateSelect(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleEditPartnerImportantDateSelect(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 
 	draft, err := h.importantDateEditDrafts.Get(ctx, userID)
 	if err != nil || draft == nil {
@@ -722,10 +722,10 @@ func (h *Handler) HandleEditPartnerImportantDateSelect(ctx context.Context, cq *
 	h.Reply(chatID, "👥 Партнёр успешно обновлён")
 }
 
-func (h *Handler) HandleEditNotifyBeforeImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleEditNotifyBeforeImportantDate(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 
 	id, _ := strconv.Atoi(strings.TrimPrefix(cq.Data, "important_dates:update:notify_before:"))
 
@@ -748,10 +748,10 @@ func (h *Handler) HandleEditNotifyBeforeImportantDate(ctx context.Context, cq *t
 	}
 }
 
-func (h *Handler) HandleEditNotifyBeforeImportantDateSelect(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleEditNotifyBeforeImportantDateSelect(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 
 	draft, err := h.importantDateEditDrafts.Get(ctx, userID)
 	if err != nil || draft == nil {
@@ -784,9 +784,9 @@ func (h *Handler) HandleEditNotifyBeforeImportantDateSelect(ctx context.Context,
 	h.Reply(chatID, "⏰ Уведомления успешно обновлены")
 }
 
-func (h *Handler) HandleEditIsActiveImportantDate(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleEditIsActiveImportantDate(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	messageID := cq.MessageID
 
 	id, _ := strconv.Atoi(strings.TrimPrefix(cq.Data, "important_dates:update:is_active:"))
 
@@ -813,10 +813,10 @@ func (h *Handler) HandleEditIsActiveImportantDate(ctx context.Context, cq *tgbot
 	}
 }
 
-func (h *Handler) HandleYearImportantDateUniversal(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleYearImportantDateUniversal(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 	data := cq.Data
 
 	// Определяем flow: add или edit
@@ -900,10 +900,10 @@ func (h *Handler) HandleYearImportantDateUniversal(ctx context.Context, cq *tgbo
 	h.HandleErr(chatID, "Неизвестный callback для года", nil)
 }
 
-func (h *Handler) HandleMonthImportantDateUniversal(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleMonthImportantDateUniversal(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 	data := cq.Data
 
 	var isEdit bool
@@ -967,10 +967,10 @@ func (h *Handler) HandleMonthImportantDateUniversal(ctx context.Context, cq *tgb
 	h.HandleErr(chatID, "Неизвестный callback для месяца", nil)
 }
 
-func (h *Handler) HandleDayImportantDateUniversal(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	chatID := cq.Message.Chat.ID
-	userID := cq.From.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleDayImportantDateUniversal(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+	userID := cq.UserID
+	messageID := cq.MessageID
 	data := cq.Data
 
 	var isEdit bool

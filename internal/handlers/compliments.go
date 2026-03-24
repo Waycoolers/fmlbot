@@ -13,9 +13,9 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 	text := "❤️ Комплименты"
 	count := 0
 	maxCount := 1
@@ -58,9 +58,9 @@ func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *tgbotapi.Message
 	}
 }
 
-func (h *Handler) AddCompliment(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) AddCompliment(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 
 	err := h.Store.Users.SetUserState(ctx, userID, domain.AwaitingCompliment)
 	if err != nil {
@@ -71,9 +71,9 @@ func (h *Handler) AddCompliment(ctx context.Context, msg *tgbotapi.Message) {
 	h.Reply(chatID, "💌 Напиши комплимент")
 }
 
-func (h *Handler) ProcessCompliment(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) ProcessCompliment(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 	complimentText := msg.Text
 
 	if complimentText == "" {
@@ -101,9 +101,9 @@ func (h *Handler) ProcessCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	h.Reply(chatID, "✨ Готово! Комплимент сохранён и ждёт своего часа 💛")
 }
 
-func (h *Handler) GetCompliments(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) GetCompliments(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 	var reply string
 
 	compliments, err := h.Store.Compliments.GetCompliments(ctx, userID)
@@ -146,9 +146,9 @@ func truncateText(text string, maxLength int) string {
 	return string(runes[:maxLength-3]) + "..."
 }
 
-func (h *Handler) DeleteCompliment(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) DeleteCompliment(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 
 	compliments, err := h.Store.Compliments.GetCompliments(ctx, userID)
 	if err != nil {
@@ -194,16 +194,17 @@ func (h *Handler) DeleteCompliment(ctx context.Context, msg *tgbotapi.Message) {
 	}
 }
 
-func (h *Handler) HandleDeleteCompliment(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+func (h *Handler) HandleDeleteCompliment(ctx context.Context, cb *domain.CallbackQuery) {
 	data := cb.Data
-	chatID := cb.Message.Chat.ID
-	messageID := cb.Message.MessageID
+	chatID := cb.ChatID
+	userID := cb.UserID
+	messageID := cb.MessageID
 
 	if strings.HasPrefix(data, "compliments:delete:confirm:") {
 		complimentIDStr := strings.TrimPrefix(data, "compliments:delete:confirm:")
 		complimentID, _ := strconv.Atoi(complimentIDStr)
 
-		err := h.Store.Compliments.DeleteCompliment(ctx, cb.From.ID, int64(complimentID))
+		err := h.Store.Compliments.DeleteCompliment(ctx, userID, int64(complimentID))
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
 			h.HandleErr(chatID, "Ошибка при попытке удалить комплимент", err)
@@ -217,9 +218,9 @@ func (h *Handler) HandleDeleteCompliment(ctx context.Context, cb *tgbotapi.Callb
 	_ = h.ui.Client.DeleteMessage(chatID, messageID)
 }
 
-func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) ReceiveCompliment(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 
 	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
 	if err != nil {
@@ -343,9 +344,9 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *tgbotapi.Message) 
 	}
 }
 
-func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 
 	actualFreq, err := h.Store.UserConfig.GetComplimentMaxCount(ctx, userID)
 	if err != nil {
@@ -382,9 +383,9 @@ func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *tgbotapi.Mes
 	}
 }
 
-func (h *Handler) ProcessComplimentFrequency(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) ProcessComplimentFrequency(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 	freq := msg.Text
 	freqInt := 1
 
