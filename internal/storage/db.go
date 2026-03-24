@@ -54,7 +54,17 @@ func New(cfg *config.DatabaseConfig) (*Storage, error) {
 		db: db,
 	}
 
-	return &Storage{db: db, Compliments: &compliments, ImportantDates: &importantDates, Scheduler: &scheduler, UserConfig: &userConfig}, nil
+	users := usersRepo{
+		db: db,
+	}
+
+	return &Storage{db: db,
+		Compliments:    &compliments,
+		ImportantDates: &importantDates,
+		Scheduler:      &scheduler,
+		UserConfig:     &userConfig,
+		Users:          &users,
+	}, nil
 }
 
 func (s *Storage) Close() {
