@@ -4,11 +4,12 @@ import (
 	"context"
 	"log"
 
+	"github.com/Waycoolers/fmlbot/internal/domain"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) ShowAccountMenu(_ context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
+func (h *Handler) ShowAccountMenu(_ context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
 	text := "⚙️ Здесь можно управлять своим аккаунтом"
 	err := h.ui.AccountMenu(chatID, text)
 	if err != nil {
@@ -17,10 +18,10 @@ func (h *Handler) ShowAccountMenu(_ context.Context, msg *tgbotapi.Message) {
 	}
 }
 
-func (h *Handler) Register(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
-	username := msg.From.UserName
+func (h *Handler) Register(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
+	username := msg.UserName
 
 	exists, err := h.Store.Users.IsUserExists(ctx, userID)
 	if err != nil {
@@ -44,8 +45,8 @@ func (h *Handler) Register(ctx context.Context, msg *tgbotapi.Message) {
 	h.ShowMainMenu(ctx, msg)
 }
 
-func (h *Handler) DeleteAccount(_ context.Context, msg *tgbotapi.Message) {
-	chatID := msg.Chat.ID
+func (h *Handler) DeleteAccount(_ context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
 
 	buttons := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -64,10 +65,10 @@ func (h *Handler) DeleteAccount(_ context.Context, msg *tgbotapi.Message) {
 	}
 }
 
-func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *tgbotapi.CallbackQuery) {
-	userID := cq.From.ID
-	chatID := cq.Message.Chat.ID
-	messageID := cq.Message.MessageID
+func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *domain.CallbackQuery) {
+	userID := cq.UserID
+	chatID := cq.ChatID
+	messageID := cq.MessageID
 
 	switch cq.Data {
 	case "account:delete:confirm":

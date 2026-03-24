@@ -5,6 +5,28 @@ import (
 	"time"
 )
 
+type Message struct {
+	ChatID    int64
+	UserID    int64
+	UserName  string
+	FirstName string
+	Text      string
+}
+
+type CallbackQuery struct {
+	ChatID    int64
+	UserID    int64
+	MessageID int
+	Data      string
+	UserName  string
+	Message   string
+}
+
+type Update struct {
+	Message       *Message
+	CallbackQuery *CallbackQuery
+}
+
 type Compliment struct {
 	ID        int64     `db:"id"`
 	Text      string    `db:"text"`

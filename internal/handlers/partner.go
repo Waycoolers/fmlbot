@@ -9,9 +9,9 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 	text := "👤 Партнёр"
 
 	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
@@ -39,9 +39,9 @@ func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *tgbotapi.Message) {
 	}
 }
 
-func (h *Handler) SetPartner(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) SetPartner(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 
 	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
 	if err != nil {
@@ -70,11 +70,11 @@ func (h *Handler) SetPartner(ctx context.Context, msg *tgbotapi.Message) {
 	}
 }
 
-func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 	partnerUsername := msg.Text
-	userUsername := msg.From.UserName
+	userUsername := msg.UserName
 
 	if strings.HasPrefix(partnerUsername, "@") {
 		partnerUsername = partnerUsername[1:]
@@ -170,9 +170,9 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *tgbotapi.Mess
 	h.Reply(chatID, fmt.Sprintf("✨ Готово! Партнёр @%s добавлен", correctPartnerUsername))
 }
 
-func (h *Handler) DeletePartner(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-	chatID := msg.Chat.ID
+func (h *Handler) DeletePartner(ctx context.Context, msg *domain.Message) {
+	userID := msg.UserID
+	chatID := msg.ChatID
 	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
@@ -207,10 +207,10 @@ func (h *Handler) DeletePartner(ctx context.Context, msg *tgbotapi.Message) {
 	}
 }
 
-func (h *Handler) HandleDeletePartner(ctx context.Context, cb *tgbotapi.CallbackQuery) {
-	userID := cb.From.ID
-	chatID := cb.Message.Chat.ID
-	messageID := cb.Message.MessageID
+func (h *Handler) HandleDeletePartner(ctx context.Context, cb *domain.CallbackQuery) {
+	userID := cb.UserID
+	chatID := cb.ChatID
+	messageID := cb.MessageID
 
 	switch cb.Data {
 	case "partner:delete:confirm":

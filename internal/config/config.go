@@ -2,16 +2,23 @@ package config
 
 import (
 	"errors"
+	"log"
 	"log/slog"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	Token string
-	DB    *DatabaseConfig
-	RDB   *RedisConfig
+	Bot *BotConfig
+	DB  *DatabaseConfig
+	RDB *RedisConfig
+}
+
+type BotConfig struct {
+	Token          string
+	UpdatesTimeout int
 }
 
 type DatabaseConfig struct {
@@ -32,9 +39,9 @@ type RedisConfig struct {
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
-	token := os.Getenv("TELEGRAM_BOT_TOKEN")
-	if token == "" {
-		return nil, errors.New("не найден TELEGRAM_BOT_TOKEN")
+	bot, err := loadBotConfig()
+	if err != nil {
+		return nil, err
 	}
 
 	db, err := loadDatabaseConfig()
@@ -48,9 +55,30 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Token: token,
-		DB:    db,
-		RDB:   rdb,
+		Bot: bot,
+		DB:  db,
+		RDB: rdb,
+	}, nil
+}
+
+func loadBotConfig() (*BotConfig, error) {
+	token := os.Getenv("TELEGRAM_BOT_TOKEN")
+	if token == "" {
+		return nil, errors.New("не найден TELEGRAM_BOT_TOKEN")
+	}
+	updatesTimeout := os.Getenv("BOT_UPDATES_TIMEOUT")
+	if updatesTimeout == "" {
+		updatesTimeout = "60"
+		log.Printf("Не найден BOT_UPDATES_TIMEOUT")
+	}
+	intUpdatesTimeout, err := strconv.Atoi(updatesTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BotConfig{
+		Token:          token,
+		UpdatesTimeout: intUpdatesTimeout,
 	}, nil
 }
 

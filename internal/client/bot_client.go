@@ -35,16 +35,45 @@ func clearOldUpdates(api *tgbotapi.BotAPI) error {
 	return nil
 }
 
+func convertUpdate(upd tgbotapi.Update) domain.Update {
+	if upd.Message != nil {
+		return domain.Update{
+			Message: &domain.Message{
+				ChatID:    upd.Message.Chat.ID,
+				UserID:    upd.Message.From.ID,
+				UserName:  upd.Message.From.UserName,
+				FirstName: upd.Message.From.FirstName,
+				Text:      upd.Message.Text,
+			},
+			CallbackQuery: nil,
+		}
+	} else if upd.CallbackQuery != nil {
+		return domain.Update{
+			Message: nil,
+			CallbackQuery: &domain.CallbackQuery{
+				ChatID:    upd.CallbackQuery.Message.Chat.ID,
+				UserID:    upd.CallbackQuery.From.ID,
+				MessageID: upd.CallbackQuery.Message.MessageID,
+				Data:      upd.CallbackQuery.Data,
+				UserName:  upd.CallbackQuery.From.UserName,
+				Message:   upd.CallbackQuery.Message.Text,
+			},
+		}
+	}
+	return domain.Update{}
+}
+
 type TelegramClient struct {
-	api *tgbotapi.BotAPI
+	api            *tgbotapi.BotAPI
+	updatesTimeout int
 }
 
 func NewTelegramClient(cfg *config.Config) domain.BotClient {
-	api, err := tgbotapi.NewBotAPI(cfg.Token)
+	api, err := tgbotapi.NewBotAPI(cfg.Bot.Token)
 	if err != nil {
 		log.Fatalf("Ошибка при создании бота: %v", err)
 	}
-	return &TelegramClient{api: api}
+	return &TelegramClient{api: api, updatesTimeout: cfg.Bot.UpdatesTimeout}
 }
 
 func (c *TelegramClient) SendMessage(chatID int64, text string) error {
@@ -79,22 +108,43 @@ func (c *TelegramClient) EditMessageReplyMarkup(chatID int64, messageID int, mar
 	return err
 }
 
-func (c *TelegramClient) GetUpdatesChan() <-chan tgbotapi.Update {
+func (c *TelegramClient) GetUpdatesChan() <-chan domain.Update {
 	if err := clearOldUpdates(c.api); err != nil {
 		log.Printf("Ошибка очистки старых апдейтов: %v", err)
 	}
 
 	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-	return c.api.GetUpdatesChan(u)
+	u.Timeout = c.updatesTimeout
+	tgChan := c.api.GetUpdatesChan(u)
+	domainChan := make(chan domain.Update)
+
+	go func() {
+		defer close(domainChan)
+		for update := range tgChan {
+			domainChan <- convertUpdate(update)
+		}
+	}()
+
+	return domainChan
 }
 
 func (c *TelegramClient) StopReceivingUpdates() {
 	c.api.StopReceivingUpdates()
 }
 
-func (c *TelegramClient) Send(msg tgbotapi.Chattable) (tgbotapi.Message, error) {
-	return c.api.Send(msg)
+func (c *TelegramClient) Send(msg tgbotapi.Chattable) (domain.Message, error) {
+	botMessage, err := c.api.Send(msg)
+	if err != nil {
+		return domain.Message{}, err
+	}
+	message := domain.Message{
+		ChatID:    botMessage.Chat.ID,
+		UserID:    botMessage.From.ID,
+		UserName:  botMessage.From.UserName,
+		FirstName: botMessage.From.FirstName,
+		Text:      botMessage.Text,
+	}
+	return message, nil
 }
 
 func (c *TelegramClient) DeleteMessage(chatID int64, messageID int) error {
