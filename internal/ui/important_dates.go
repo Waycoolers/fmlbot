@@ -7,30 +7,28 @@ import (
 	"time"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (ui *MenuUI) ImportantDatesMenu(chatID int64, text string) error {
-	menu := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(string(domain.AddImportantDate)),
-			tgbotapi.NewKeyboardButton(string(domain.GetImportantDates)),
-			tgbotapi.NewKeyboardButton(string(domain.DeleteImportantDate)),
-		),
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(string(domain.EditImportantDate)),
-			tgbotapi.NewKeyboardButton(string(domain.Main)),
-		),
-	)
+	keyboard := domain.Keyboard{
+		Rows: []domain.KeyboardRow{
+			{
+				Buttons: []domain.KeyboardButton{
+					{domain.AddImportantDate},
+					{domain.GetImportantDates},
+					{domain.DeleteImportantDate},
+				},
+			},
+			{
+				Buttons: []domain.KeyboardButton{
+					{domain.EditImportantDate},
+					{domain.Main},
+				},
+			},
+		},
+	}
 
-	menu.ResizeKeyboard = true
-	menu.OneTimeKeyboard = false
-
-	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ParseMode = tgbotapi.ModeHTML
-	msg.ReplyMarkup = menu
-
-	_, err := ui.Client.Send(msg)
+	_, err := ui.Client.SendKeyboard(chatID, text, keyboard)
 	return err
 }
 
@@ -47,7 +45,7 @@ var months = []string{
 }
 
 // ---------------------- YEAR ----------------------
-func (ui *MenuUI) BuildYearKeyboard(pageStart int, isEdit bool) tgbotapi.InlineKeyboardMarkup {
+func (ui *MenuUI) BuildYearKeyboard(pageStart int, isEdit bool) domain.InlineKeyboard {
 	currentYear := time.Now().Year()
 	if pageStart < YearStart {
 		pageStart = YearStart
@@ -61,50 +59,54 @@ func (ui *MenuUI) BuildYearKeyboard(pageStart int, isEdit bool) tgbotapi.InlineK
 		prefix = "important_dates:edit:"
 	}
 
-	var rows [][]tgbotapi.InlineKeyboardButton
+	var rows []domain.InlineKeyboardRow
+	var row domain.InlineKeyboardRow
 	year := pageStart
 	for i := 0; i < YearsPerPage && year >= YearStart; i++ {
-		btn := tgbotapi.NewInlineKeyboardButtonData(
-			strconv.Itoa(year),
-			fmt.Sprintf("%syear:select:%d", prefix, year),
-		)
-
-		if len(rows) == 0 || len(rows[len(rows)-1]) == 3 {
-			rows = append(rows, tgbotapi.NewInlineKeyboardRow(btn))
-		} else {
-			rows[len(rows)-1] = append(rows[len(rows)-1], btn)
+		btn := domain.InlineKeyboardButton{
+			Text: strconv.Itoa(year),
+			Data: fmt.Sprintf("%syear:select:%d", prefix, year),
 		}
-		year--
+
+		if len(row.Buttons) < 3 {
+			row.Buttons = append(row.Buttons, btn)
+			year--
+		} else {
+			rows = append(rows, row)
+			row = domain.InlineKeyboardRow{}
+		}
 	}
 
 	for _, row := range rows {
-		slices.Reverse(row)
+		slices.Reverse(row.Buttons)
 	}
 	slices.Reverse(rows)
 
 	// Навигация
-	var navRow []tgbotapi.InlineKeyboardButton
+	var navRow domain.InlineKeyboardRow
 	if pageStart > YearStart {
-		navRow = append(navRow,
-			tgbotapi.NewInlineKeyboardButtonData(
-				"⬅️ Назад",
-				fmt.Sprintf("%syear:page:%d", prefix, pageStart-YearsPerPage),
-			),
-		)
+		btn := domain.InlineKeyboardButton{
+			Text: "⬅️ Назад",
+			Data: fmt.Sprintf("%syear:page:%d", prefix, pageStart-YearsPerPage),
+		}
+		navRow.Buttons = append(navRow.Buttons, btn)
 	}
 	if pageStart+YearsPerPage <= currentYear {
-		navRow = append(navRow,
-			tgbotapi.NewInlineKeyboardButtonData(
-				"Вперёд ➡️",
-				fmt.Sprintf("%syear:page:%d", prefix, pageStart+YearsPerPage),
-			),
-		)
+		btn := domain.InlineKeyboardButton{
+			Text: "Вперёд ➡️",
+			Data: fmt.Sprintf("%syear:page:%d", prefix, pageStart+YearsPerPage),
+		}
+		navRow.Buttons = append(navRow.Buttons, btn)
 	}
-	if len(navRow) > 0 {
+	if len(navRow.Buttons) > 0 {
 		rows = append(rows, navRow)
 	}
 
-	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+	keyboard := domain.InlineKeyboard{
+		Rows: rows,
+	}
+
+	return keyboard
 }
 
 func (ui *MenuUI) SendYearKeyboard(chatID int64, pageStart int, isEdit bool) error {
@@ -116,23 +118,29 @@ func (ui *MenuUI) SendYearKeyboard(chatID int64, pageStart int, isEdit bool) err
 }
 
 // ---------------------- MONTH ----------------------
-func (ui *MenuUI) BuildMonthKeyboard(isEdit bool) tgbotapi.InlineKeyboardMarkup {
+func (ui *MenuUI) BuildMonthKeyboard(isEdit bool) domain.InlineKeyboard {
 	prefix := "important_dates:add:month:"
 	if isEdit {
 		prefix = "important_dates:edit:month:"
 	}
 
-	var rows [][]tgbotapi.InlineKeyboardButton
+	var rows []domain.InlineKeyboardRow
 	for i := 0; i < 12; i += 3 {
-		row := tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(months[i], fmt.Sprintf("%s%d", prefix, i+1)),
-			tgbotapi.NewInlineKeyboardButtonData(months[i+1], fmt.Sprintf("%s%d", prefix, i+2)),
-			tgbotapi.NewInlineKeyboardButtonData(months[i+2], fmt.Sprintf("%s%d", prefix, i+3)),
-		)
+		row := domain.InlineKeyboardRow{
+			Buttons: []domain.InlineKeyboardButton{
+				{Text: months[i], Data: fmt.Sprintf("%s%d", prefix, i+1)},
+				{Text: months[i+1], Data: fmt.Sprintf("%s%d", prefix, i+2)},
+				{Text: months[i+2], Data: fmt.Sprintf("%s%d", prefix, i+3)},
+			},
+		}
 		rows = append(rows, row)
 	}
 
-	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+	keyboard := domain.InlineKeyboard{
+		Rows: rows,
+	}
+
+	return keyboard
 }
 
 func (ui *MenuUI) SendMonthKeyboard(chatID int64, isEdit bool) error {
@@ -144,28 +152,35 @@ func (ui *MenuUI) SendMonthKeyboard(chatID int64, isEdit bool) error {
 }
 
 // ---------------------- DAY ----------------------
-func (ui *MenuUI) BuildDayKeyboard(year, month int, isEdit bool) tgbotapi.InlineKeyboardMarkup {
+func (ui *MenuUI) BuildDayKeyboard(year, month int, isEdit bool) domain.InlineKeyboard {
 	days := time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, time.Local).Day()
 	prefix := "important_dates:add:day:"
 	if isEdit {
 		prefix = "important_dates:edit:day:"
 	}
 
-	var rows [][]tgbotapi.InlineKeyboardButton
+	var rows []domain.InlineKeyboardRow
+	var row domain.InlineKeyboardRow
 	for d := 1; d <= days; d++ {
-		btn := tgbotapi.NewInlineKeyboardButtonData(
-			strconv.Itoa(d),
-			fmt.Sprintf("%s%d", prefix, d),
-		)
+		btn := domain.InlineKeyboardButton{
+			Text: strconv.Itoa(d),
+			Data: fmt.Sprintf("%s%d", prefix, d),
+		}
 
-		if len(rows) == 0 || len(rows[len(rows)-1]) == 7 {
-			rows = append(rows, tgbotapi.NewInlineKeyboardRow(btn))
+		if len(row.Buttons) < 7 {
+			row.Buttons = append(row.Buttons, btn)
 		} else {
-			rows[len(rows)-1] = append(rows[len(rows)-1], btn)
+			rows = append(rows, row)
+			row = domain.InlineKeyboardRow{}
 		}
 	}
+	rows = append(rows, row)
 
-	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+	keyboard := domain.InlineKeyboard{
+		Rows: rows,
+	}
+
+	return keyboard
 }
 
 func (ui *MenuUI) SendDayKeyboard(chatID int64, year, month int, isEdit bool) error {
@@ -177,20 +192,24 @@ func (ui *MenuUI) SendDayKeyboard(chatID int64, year, month int, isEdit bool) er
 }
 
 // ---------------------- PARTNER ----------------------
-func (ui *MenuUI) BuildPartnerKeyboard(isEdit bool) tgbotapi.InlineKeyboardMarkup {
+func (ui *MenuUI) BuildPartnerKeyboard(isEdit bool) domain.InlineKeyboard {
 	prefix := "important_dates:add:partner:"
 	if isEdit {
 		prefix = "important_dates:edit:partner:"
 	}
 
-	buttons := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("👤 Только для меня", prefix+"false"),
-			tgbotapi.NewInlineKeyboardButtonData("👩‍❤️‍👨 Общая с партнёром", prefix+"true"),
-		),
-	)
+	keyboard := domain.InlineKeyboard{
+		Rows: []domain.InlineKeyboardRow{
+			{
+				Buttons: []domain.InlineKeyboardButton{
+					{Text: "👤 Только для меня", Data: prefix + "false"},
+					{Text: "👩‍❤️‍👨 Общая с партнёром", Data: prefix + "true"},
+				},
+			},
+		},
+	}
 
-	return buttons
+	return keyboard
 }
 
 func (ui *MenuUI) SendPartnerKeyboard(chatID int64, isEdit bool) error {
@@ -202,22 +221,26 @@ func (ui *MenuUI) SendPartnerKeyboard(chatID int64, isEdit bool) error {
 }
 
 // ---------------------- NOTIFY BEFORE ----------------------
-func (ui *MenuUI) BuildNotifyBeforeKeyboard(isEdit bool) tgbotapi.InlineKeyboardMarkup {
+func (ui *MenuUI) BuildNotifyBeforeKeyboard(isEdit bool) domain.InlineKeyboard {
 	prefix := "important_dates:add:notify_before:"
 	if isEdit {
 		prefix = "important_dates:edit:notify_before:"
 	}
 
-	buttons := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("0", prefix+"0"),
-			tgbotapi.NewInlineKeyboardButtonData("1", prefix+"1"),
-			tgbotapi.NewInlineKeyboardButtonData("3", prefix+"3"),
-			tgbotapi.NewInlineKeyboardButtonData("7", prefix+"7"),
-		),
-	)
+	keyboard := domain.InlineKeyboard{
+		Rows: []domain.InlineKeyboardRow{
+			{
+				Buttons: []domain.InlineKeyboardButton{
+					{Text: "0", Data: prefix + "0"},
+					{Text: "1", Data: prefix + "1"},
+					{Text: "3", Data: prefix + "3"},
+					{Text: "7", Data: prefix + "7"},
+				},
+			},
+		},
+	}
 
-	return buttons
+	return keyboard
 }
 
 func (ui *MenuUI) SendNotifyBeforeKeyboard(chatID int64, isEdit bool) error {

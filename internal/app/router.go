@@ -46,36 +46,14 @@ func (r *Router) handleMessage(ctx context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
 	text := msg.Text
 
-	commands := []string{
-		string(domain.Start),
-		string(domain.Main),
-		string(domain.Register),
-		string(domain.Account),
-		string(domain.Partner),
-		string(domain.Compliments),
-		string(domain.ImportantDates),
-		string(domain.DeleteAccount),
-		string(domain.AddPartner),
-		string(domain.DeletePartner),
-		string(domain.AddCompliment),
-		string(domain.DeleteCompliment),
-		string(domain.GetCompliments),
-		string(domain.ReceiveCompliment),
-		string(domain.EditComplimentFrequency),
-		string(domain.AddImportantDate),
-		string(domain.GetImportantDates),
-		string(domain.DeleteImportantDate),
-		string(domain.EditImportantDate),
-	}
-
 	// Если введена команда, то сбрасываем state
 	exists, err := r.h.Store.Users.IsUserExists(ctx, userID)
 	if err != nil {
 		r.h.HandleErr(chatID, "Ошибка при проверке существования пользователя", err)
 	}
 	if exists {
-		for _, command := range commands {
-			if text == command {
+		for _, command := range domain.Commands {
+			if text == string(command) {
 				err = r.h.Store.Users.SetUserState(ctx, userID, domain.Empty)
 				if err != nil {
 					r.h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
@@ -165,12 +143,6 @@ func (r *Router) handleMessage(ctx context.Context, msg *domain.Message) {
 
 func (r *Router) handleCallback(ctx context.Context, cq *domain.CallbackQuery) {
 	data := cq.Data
-	username := cq.UserName
-	text := ""
-	if cq.Message != "" {
-		text = cq.Message
-	}
-	log.Printf("Клиент %v написал: %v", username, text)
 
 	section, action, payload := parseCallbackData(data)
 

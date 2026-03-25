@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *domain.Message) {
@@ -184,12 +183,16 @@ func (h *Handler) DeletePartner(ctx context.Context, msg *domain.Message) {
 		return
 	}
 
-	buttons := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("💔 Да, удалить", "partner:delete:confirm"),
-			tgbotapi.NewInlineKeyboardButtonData("↩️ Передумал(а)", "partner:delete:cancel"),
-		),
-	)
+	keyboard := domain.InlineKeyboard{
+		Rows: []domain.InlineKeyboardRow{
+			{
+				Buttons: []domain.InlineKeyboardButton{
+					{Text: "💔 Да, удалить", Data: "partner:delete:confirm"},
+					{Text: "↩️ Передумал(а)", Data: "partner:delete:cancel"},
+				},
+			},
+		},
+	}
 
 	partnerUsername, err := h.Store.Users.GetUsername(ctx, partnerID)
 	if err != nil {
@@ -200,7 +203,7 @@ func (h *Handler) DeletePartner(ctx context.Context, msg *domain.Message) {
 	text := "💭 Ты уверен(а), что хочешь удалить партнёра @" + partnerUsername + "?\n" +
 		"Все общие настройки будут сброшены."
 
-	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
+	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, keyboard)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
 		return

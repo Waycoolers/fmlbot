@@ -87,7 +87,23 @@ func (c *TelegramClient) SendMessage(chatID int64, text string) error {
 	return err
 }
 
-func (c *TelegramClient) SendWithInlineKeyboard(chatID int64, text string, markup tgbotapi.InlineKeyboardMarkup) error {
+func convertInlineKeyboard(keyboard domain.InlineKeyboard) tgbotapi.InlineKeyboardMarkup {
+	var tgRaws [][]tgbotapi.InlineKeyboardButton
+	for _, raw := range keyboard.Rows {
+		var tgRaw []tgbotapi.InlineKeyboardButton
+		for _, btn := range raw.Buttons {
+			tgBtn := tgbotapi.NewInlineKeyboardButtonData(btn.Text, btn.Data)
+			tgRaw = append(tgRaw, tgBtn)
+		}
+		tgRaws = append(tgRaws, tgRaw)
+	}
+	tgKeyboard := tgbotapi.NewInlineKeyboardMarkup(tgRaws...)
+	return tgKeyboard
+}
+
+func (c *TelegramClient) SendWithInlineKeyboard(chatID int64, text string, keyboard domain.InlineKeyboard) error {
+	markup := convertInlineKeyboard(keyboard)
+
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = markup
 	msg.ParseMode = "HTML"
@@ -99,7 +115,9 @@ func (c *TelegramClient) SendWithInlineKeyboard(chatID int64, text string, marku
 	return err
 }
 
-func (c *TelegramClient) EditMessageReplyMarkup(chatID int64, messageID int, markup tgbotapi.InlineKeyboardMarkup) error {
+func (c *TelegramClient) EditMessageReplyMarkup(chatID int64, messageID int, keyboard domain.InlineKeyboard) error {
+	markup := convertInlineKeyboard(keyboard)
+
 	edit := tgbotapi.NewEditMessageReplyMarkup(chatID, messageID, markup)
 	_, err := c.api.Request(edit)
 	if err != nil {
@@ -132,7 +150,16 @@ func (c *TelegramClient) StopReceivingUpdates() {
 	c.api.StopReceivingUpdates()
 }
 
-func (c *TelegramClient) Send(msg tgbotapi.Chattable) (domain.Message, error) {
+func (c *TelegramClient) SendKeyboard(chatID int64, text string, keyboard domain.Keyboard) (domain.Message, error) {
+	markup := convertKeyboard(keyboard)
+
+	markup.ResizeKeyboard = true
+	markup.OneTimeKeyboard = false
+
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = markup
+
 	botMessage, err := c.api.Send(msg)
 	if err != nil {
 		return domain.Message{}, err
@@ -151,4 +178,18 @@ func (c *TelegramClient) DeleteMessage(chatID int64, messageID int) error {
 	req := tgbotapi.NewDeleteMessage(chatID, messageID)
 	_, err := c.api.Request(req)
 	return err
+}
+
+func convertKeyboard(keyboard domain.Keyboard) tgbotapi.ReplyKeyboardMarkup {
+	var tgRaws [][]tgbotapi.KeyboardButton
+	for _, raw := range keyboard.Rows {
+		var tgRaw []tgbotapi.KeyboardButton
+		for _, btn := range raw.Buttons {
+			tgBtn := tgbotapi.NewKeyboardButton(string(btn.Command))
+			tgRaw = append(tgRaw, tgBtn)
+		}
+		tgRaws = append(tgRaws, tgRaw)
+	}
+	tgKeyboard := tgbotapi.NewReplyKeyboard(tgRaws...)
+	return tgKeyboard
 }

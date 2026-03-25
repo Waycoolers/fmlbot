@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *domain.Message) {
@@ -169,25 +168,31 @@ func (h *Handler) DeleteCompliment(ctx context.Context, msg *domain.Message) {
 		return
 	}
 
-	var keyboard [][]tgbotapi.InlineKeyboardButton
+	var rows []domain.InlineKeyboardRow
 
 	for _, compliment := range compliments {
 		buttonText := truncateText(compliment.Text, 30)
 		callbackData := fmt.Sprintf("compliments:delete:confirm:%d", compliment.ID)
 
-		row := []tgbotapi.InlineKeyboardButton{
-			tgbotapi.NewInlineKeyboardButtonData(buttonText, callbackData),
+		row := domain.InlineKeyboardRow{
+			Buttons: []domain.InlineKeyboardButton{
+				{Text: buttonText, Data: callbackData},
+			},
 		}
-		keyboard = append(keyboard, row)
+		rows = append(rows, row)
 	}
 
-	keyboard = append(keyboard, []tgbotapi.InlineKeyboardButton{
-		tgbotapi.NewInlineKeyboardButtonData("↩️ Передумал(а)", "compliments:delete:cancel"),
+	rows = append(rows, domain.InlineKeyboardRow{
+		Buttons: []domain.InlineKeyboardButton{
+			{Text: "↩️ Передумал(а)", Data: "compliments:delete:cancel"},
+		},
 	})
 
 	text := "🗑 <b>Выбери комплимент, который хочешь убрать</b>"
-	markup := tgbotapi.NewInlineKeyboardMarkup(keyboard...)
-	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, markup)
+	keyboard := domain.InlineKeyboard{
+		Rows: rows,
+	}
+	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, keyboard)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
 		return

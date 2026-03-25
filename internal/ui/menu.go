@@ -4,7 +4,6 @@ import (
 	"log"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type MenuUI struct {
@@ -16,48 +15,51 @@ func New(client domain.BotClient) *MenuUI {
 }
 
 func (ui *MenuUI) StartMenu(chatID int64, text string) error {
-	menu := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(string(domain.Register)),
-		),
-	)
+	keyboard := domain.Keyboard{
+		Rows: []domain.KeyboardRow{
+			{
+				Buttons: []domain.KeyboardButton{
+					{domain.Register},
+				},
+			},
+		},
+	}
 
-	menu.ResizeKeyboard = true
-	menu.OneTimeKeyboard = true
-
-	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ReplyMarkup = menu
-
-	_, err := ui.Client.Send(msg)
+	_, err := ui.Client.SendKeyboard(chatID, text, keyboard)
 	return err
 }
 
 func (ui *MenuUI) MainMenu(chatID int64, text string) error {
-	menu := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(string(domain.Account)),
-			tgbotapi.NewKeyboardButton(string(domain.Partner)),
-		),
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(string(domain.Compliments)),
-			tgbotapi.NewKeyboardButton(string(domain.ImportantDates)),
-		),
-	)
+	keyboard := domain.Keyboard{
+		Rows: []domain.KeyboardRow{
+			{
+				Buttons: []domain.KeyboardButton{
+					{domain.Account},
+					{domain.Partner},
+				},
+			},
+			{
+				Buttons: []domain.KeyboardButton{
+					{domain.Compliments},
+					{domain.ImportantDates},
+				},
+			},
+		},
+	}
 
-	menu.ResizeKeyboard = true
-	menu.OneTimeKeyboard = false
-
-	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ReplyMarkup = menu
-
-	_, err := ui.Client.Send(msg)
+	_, err := ui.Client.SendKeyboard(chatID, text, keyboard)
 	return err
 }
 
 func (ui *MenuUI) RemoveButtons(chatID int64, messageID int) {
-	empty := tgbotapi.InlineKeyboardMarkup{
-		InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{},
+	empty := domain.InlineKeyboard{
+		Rows: []domain.InlineKeyboardRow{
+			{
+				Buttons: []domain.InlineKeyboardButton{},
+			},
+		},
 	}
+
 	if err := ui.Client.EditMessageReplyMarkup(chatID, messageID, empty); err != nil {
 		log.Printf("Ошибка при удалении кнопок: %v", err)
 	}
