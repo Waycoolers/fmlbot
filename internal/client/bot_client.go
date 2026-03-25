@@ -120,9 +120,15 @@ func (c *TelegramClient) EditMessageReplyMarkup(chatID int64, messageID int, key
 
 	edit := tgbotapi.NewEditMessageReplyMarkup(chatID, messageID, markup)
 	_, err := c.api.Request(edit)
-	if err != nil {
-		log.Printf("Ошибка при редактировании кнопок: %v", err)
+	return err
+}
+
+func (c *TelegramClient) DeleteMessageReplyMarkup(chatID int64, messageID int) error {
+	empty := tgbotapi.InlineKeyboardMarkup{
+		InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{},
 	}
+	del := tgbotapi.NewEditMessageReplyMarkup(chatID, messageID, empty)
+	_, err := c.api.Request(del)
 	return err
 }
 
