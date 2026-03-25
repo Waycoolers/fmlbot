@@ -2,12 +2,11 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
 )
@@ -238,115 +237,38 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *domain.Message) {
 		return
 	}
 
-	count, err := h.Store.UserConfig.GetComplimentCount(ctx, partnerID)
+	text, err := h.Store.Compliments.AcquireCompliment(ctx, partnerID)
 	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении количества полученных комплиментов", err)
-		return
-	}
-	maxCount, err := h.Store.UserConfig.GetComplimentMaxCount(ctx, partnerID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении максимального количества комплиментов", err)
-		return
-	}
-
-	if count >= maxCount && maxCount != -1 {
-		h.Reply(chatID, "🌙 На сегодня лимит исчерпан. Завтра будет продолжение 💛")
-		return
-	}
-	count++
-
-	bucket, err := h.Store.UserConfig.GetComplimentsBucket(ctx, partnerID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении ведра комплиментов", err)
-		return
-	}
-	lastBucketUpdate, err := h.Store.UserConfig.GetLastBucketUpdate(ctx, partnerID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении последнего обновления ведра комплиментов", err)
-		return
-	}
-	now := time.Now().UTC()
-	hoursPassed := int(now.Sub(lastBucketUpdate).Hours())
-	updateTime := lastBucketUpdate
-	if hoursPassed > 0 {
-		newBucket := hoursPassed + bucket
-		if newBucket > 2 {
-			newBucket = 2
-		}
-		if newBucket != bucket {
-			err = h.Store.UserConfig.UpdateComplimentBucket(ctx, partnerID, newBucket, now)
-			if err != nil {
-				h.HandleErr(chatID, "Ошибка при обновлении ведра комплиментов", err)
+		var e *domain.ErrBucketEmpty
+		switch {
+		case errors.As(err, &e):
+			h.Reply(chatID, fmt.Sprintf("⏳ Немного терпения\nСледующий комплимент будет доступен через %d мин.", e.Minutes))
+			return
+		default:
+			if errors.Is(err, domain.ErrNoCompliments) {
+				h.Reply(chatID, "📭 Пока для тебя нет новых комплиментов")
 				return
 			}
-			bucket = newBucket
-			updateTime = now
+			if errors.Is(err, domain.ErrLimitExceeded) {
+				h.Reply(chatID, "🌙 На сегодня лимит исчерпан. Завтра будет продолжение 💛")
+				return
+			}
+			h.HandleErr(chatID, "Ошибка при получении комплимента", err)
+			return
 		}
-	}
-
-	if bucket == 0 {
-		hoursSinceUpdate := now.Sub(updateTime).Hours()
-		remaining := updateTime.Add(time.Duration(hoursSinceUpdate+1) * time.Hour).Sub(now)
-		mins := int(remaining.Minutes())
-		if mins < 0 {
-			mins = 0
-		}
-		h.Reply(chatID, fmt.Sprintf("⏳ Немного терпения\nСледующий комплимент будет доступен через %d мин.", mins))
-		return
-	}
-
-	allCompliments, err := h.Store.Compliments.GetCompliments(ctx, partnerID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении списка комплиментов", err)
-		return
-	}
-
-	// Выбираем только активные комплименты
-	var compliments []domain.Compliment
-	for _, compliment := range allCompliments {
-		if !compliment.IsSent {
-			compliments = append(compliments, compliment)
-		}
-	}
-
-	if len(compliments) == 0 {
-		h.Reply(chatID, "📭 Пока для тебя нет новых комплиментов")
-		return
-	}
-
-	compliment := compliments[0]
-	err = h.Store.Compliments.MarkComplimentSent(ctx, compliment.ID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при попытке отметить комплимент как отправленный", err)
-		return
 	}
 
 	var complimentMessages = []string{
-		"💖 <b>Для тебя есть тёплые слова:</b>\n\n«" + compliment.Text + "»",
-		"✨ <b>Небольшое послание от твоего человека:</b>\n\n«" + compliment.Text + "»",
-		"🌷 <b>Тебе отправили комплимент:</b>\n\n«" + compliment.Text + "»",
+		"💖 <b>Для тебя есть тёплые слова:</b>\n\n«" + text + "»",
+		"✨ <b>Небольшое послание от твоего человека:</b>\n\n«" + text + "»",
+		"🌷 <b>Тебе отправили комплимент:</b>\n\n«" + text + "»",
 	}
 
 	randomIndex := rand.Intn(len(complimentMessages))
 	h.Reply(chatID, complimentMessages[randomIndex])
 	h.Reply(partnerID,
-		"💌 <b>Комплимент доставлен</b>\n\nТы только что порадовал(а) своего партнёра ✨\n\n«"+compliment.Text+"»",
+		"💌 <b>Комплимент доставлен</b>\n\nТы только что порадовал(а) своего партнёра ✨\n\n«"+text+"»",
 	)
-
-	err = h.Store.UserConfig.SetComplimentTime(ctx, partnerID)
-	if err != nil {
-		log.Printf("Ошибка при попытке установить время получения комплимента: %v", err)
-	}
-
-	err = h.Store.UserConfig.TakeComplimentFromBucket(ctx, partnerID)
-	if err != nil {
-		log.Printf("Ошибка при взятии комплимента из ведра: %v", err)
-	}
-
-	err = h.Store.UserConfig.SetComplimentCount(ctx, partnerID, count)
-	if err != nil {
-		log.Printf("Ошибка при попытке изменить количество полученных комплиментов: %v", err)
-	}
 }
 
 func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *domain.Message) {
