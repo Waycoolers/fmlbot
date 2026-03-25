@@ -52,15 +52,7 @@ func (ui *MenuUI) MainMenu(chatID int64, text string) error {
 }
 
 func (ui *MenuUI) RemoveButtons(chatID int64, messageID int) {
-	empty := domain.InlineKeyboard{
-		Rows: []domain.InlineKeyboardRow{
-			{
-				Buttons: []domain.InlineKeyboardButton{},
-			},
-		},
-	}
-
-	if err := ui.Client.EditMessageReplyMarkup(chatID, messageID, empty); err != nil {
+	if err := ui.Client.DeleteMessageReplyMarkup(chatID, messageID); err != nil {
 		log.Printf("Ошибка при удалении кнопок: %v", err)
 	}
 }
