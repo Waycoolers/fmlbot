@@ -2,7 +2,9 @@ package storage
 
 import (
 	"context"
-	"log"
+	"database/sql"
+	"errors"
+	"time"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
 	"github.com/jmoiron/sqlx"
@@ -57,7 +59,6 @@ func (s *complimentsRepo) GetCompliments(ctx context.Context, telegramID int64) 
 		ORDER BY c.created_at;
 	`, telegramID)
 	if err != nil {
-		log.Printf("Ошибка получения списка комплиментов: %v", err)
 		return nil, err
 	}
 	return compliments, nil
@@ -93,4 +94,123 @@ func (s *complimentsRepo) MarkComplimentSent(ctx context.Context, complimentID i
 		UPDATE compliments SET is_sent=true WHERE id=$1;
 	`, complimentID)
 	return err
+}
+
+func (s *complimentsRepo) AcquireCompliment(ctx context.Context, partnerID int64) (string, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+
+	var bucket int
+	var lastBucketUpdate time.Time
+	var complimentCount int
+	var maxComplimentCount int
+
+	err = tx.QueryRowContext(ctx, `
+        SELECT compliment_token_bucket, last_bucket_update, compliment_count, max_compliment_count
+        FROM user_config
+        WHERE telegram_id = $1
+        FOR UPDATE
+    `, partnerID).Scan(&bucket, &lastBucketUpdate, &complimentCount, &maxComplimentCount)
+	if err != nil {
+		_ = tx.Rollback()
+		return "", err
+	}
+
+	now := time.Now().UTC()
+
+	const maxBucket = 2
+	refillInterval := time.Hour
+
+	// --- 1. REFILL ---
+	elapsed := now.Sub(lastBucketUpdate)
+	hoursPassed := int(elapsed / refillInterval)
+
+	tokensToAdd := hoursPassed
+	maxAdd := maxBucket - bucket
+	if tokensToAdd > maxAdd {
+		tokensToAdd = maxAdd
+	}
+
+	currentBucket := bucket + tokensToAdd
+	newLastBucketUpdate := lastBucketUpdate.Add(time.Duration(tokensToAdd) * refillInterval)
+
+	// --- 2. ЕСЛИ ПУСТО ---
+	if currentBucket == 0 {
+		nextRefill := lastBucketUpdate.Add(refillInterval)
+		minutes := int(nextRefill.Sub(now).Minutes())
+		if minutes < 0 {
+			minutes = 0
+		}
+		_ = tx.Rollback()
+		return "", &domain.ErrBucketEmpty{Minutes: minutes}
+	}
+
+	// --- 3. ЛИМИТ ---
+	if maxComplimentCount != -1 && complimentCount >= maxComplimentCount {
+		_ = tx.Rollback()
+		return "", domain.ErrLimitExceeded
+	}
+
+	// --- 4. КРИТИЧЕСКАЯ ЛОГИКА ---
+	// если bucket был полный — стартуем таймер заново
+	if currentBucket == maxBucket {
+		newLastBucketUpdate = now
+	}
+
+	// --- 5. СПИСЫВАЕМ ТОКЕН ---
+	newBucket := currentBucket - 1
+	newComplimentCount := complimentCount + 1
+
+	// --- 6. БЕРЁМ КОМПЛИМЕНТ ---
+	var complimentText string
+	var complimentID int64
+
+	err = tx.QueryRowContext(ctx, `
+		WITH candidate AS (
+			SELECT c.id, c.text
+			FROM user_compliment uc
+			JOIN compliments c ON c.id = uc.compliment_id
+			WHERE uc.telegram_id = $1 AND c.is_sent = false
+			ORDER BY c.created_at
+			LIMIT 1
+			FOR UPDATE OF c SKIP LOCKED
+		)
+		UPDATE compliments c
+		SET is_sent = true
+		FROM candidate
+		WHERE c.id = candidate.id
+		RETURNING c.id, c.text
+	`, partnerID).Scan(&complimentID, &complimentText)
+
+	if err != nil {
+		_ = tx.Rollback()
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", domain.ErrNoCompliments
+		}
+		return "", err
+	}
+
+	// --- 7. СОХРАНЯЕМ ---
+	_, err = tx.ExecContext(ctx, `
+        UPDATE user_config
+        SET compliment_token_bucket = $1,
+            compliment_count = $2,
+            last_compliment_at = $3,
+            last_bucket_update = $4
+        WHERE telegram_id = $5
+    `, newBucket, newComplimentCount, now, newLastBucketUpdate, partnerID)
+	if err != nil {
+		_ = tx.Rollback()
+		return "", err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		_ = tx.Rollback()
+		return "", err
+	}
+
+	return complimentText, nil
 }
