@@ -5,7 +5,6 @@ import (
 	"log"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (h *Handler) ShowAccountMenu(_ context.Context, msg *domain.Message) {
@@ -48,17 +47,21 @@ func (h *Handler) Register(ctx context.Context, msg *domain.Message) {
 func (h *Handler) DeleteAccount(_ context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
 
-	buttons := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("💔 Да, удалить", "account:delete:confirm"),
-			tgbotapi.NewInlineKeyboardButtonData("↩️ Передумал(а)", "account:delete:cancel"),
-		),
-	)
+	keyboard := domain.InlineKeyboard{
+		Rows: []domain.InlineKeyboardRow{
+			{
+				Buttons: []domain.InlineKeyboardButton{
+					{Text: "💔 Да, удалить", Data: "account:delete:confirm"},
+					{Text: "↩️ Передумал(а)", Data: "account:delete:cancel"},
+				},
+			},
+		},
+	}
 
 	text := "💭 Ты уверен(а), что хочешь удалить аккаунт?\n\n" +
 		"Все сохранённые данные и тёплые моменты будут удалены без возможности восстановления."
 
-	err := h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
+	err := h.ui.Client.SendWithInlineKeyboard(chatID, text, keyboard)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
 		return

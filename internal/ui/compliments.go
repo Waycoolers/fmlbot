@@ -2,33 +2,33 @@ package ui
 
 import (
 	"github.com/Waycoolers/fmlbot/internal/domain"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (ui *MenuUI) ComplimentsMenu(chatID int64, text string) error {
-	menu := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(string(domain.AddCompliment)),
-			tgbotapi.NewKeyboardButton(string(domain.DeleteCompliment)),
-		),
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(string(domain.GetCompliments)),
-			tgbotapi.NewKeyboardButton(string(domain.ReceiveCompliment)),
-		),
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(string(domain.EditComplimentFrequency)),
-			tgbotapi.NewKeyboardButton(string(domain.Main)),
-		),
-	)
+	keyboard := domain.Keyboard{
+		Rows: []domain.KeyboardRow{
+			{
+				Buttons: []domain.KeyboardButton{
+					{domain.AddCompliment},
+					{domain.DeleteCompliment},
+				},
+			},
+			{
+				Buttons: []domain.KeyboardButton{
+					{domain.GetCompliments},
+					{domain.ReceiveCompliment},
+				},
+			},
+			{
+				Buttons: []domain.KeyboardButton{
+					{domain.EditComplimentFrequency},
+					{domain.Main},
+				},
+			},
+		},
+	}
 
-	menu.ResizeKeyboard = true
-	menu.OneTimeKeyboard = false
-
-	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ParseMode = tgbotapi.ModeHTML
-	msg.ReplyMarkup = menu
-
-	_, err := ui.Client.Send(msg)
+	_, err := ui.Client.SendKeyboard(chatID, text, keyboard)
 	return err
 }
 

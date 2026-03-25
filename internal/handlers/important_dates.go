@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Waycoolers/fmlbot/internal/domain"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (h *Handler) beautifyImportantDates(importantDates []domain.ImportantDate, maxLength int) []domain.ImportantDate {
@@ -385,24 +384,30 @@ func (h *Handler) DeleteImportantDate(ctx context.Context, msg *domain.Message) 
 
 	sortedImportantDates := h.beautifyImportantDates(importantDates, 30)
 
-	var buttons [][]tgbotapi.InlineKeyboardButton
+	var rows []domain.InlineKeyboardRow
 
 	for _, importantDate := range sortedImportantDates {
 		callbackData := fmt.Sprintf("important_dates:delete:confirm:%d", importantDate.ID)
 
-		row := []tgbotapi.InlineKeyboardButton{
-			tgbotapi.NewInlineKeyboardButtonData(importantDate.Title, callbackData),
+		row := domain.InlineKeyboardRow{
+			Buttons: []domain.InlineKeyboardButton{
+				{Text: importantDate.Title, Data: callbackData},
+			},
 		}
-		buttons = append(buttons, row)
+		rows = append(rows, row)
 	}
 
-	buttons = append(buttons, []tgbotapi.InlineKeyboardButton{
-		tgbotapi.NewInlineKeyboardButtonData("❌ Ой, передумал(а)", "important_dates:delete:cancel"),
+	rows = append(rows, domain.InlineKeyboardRow{
+		Buttons: []domain.InlineKeyboardButton{
+			{Text: "❌ Ой, передумал(а)", Data: "important_dates:delete:cancel"},
+		},
 	})
 
 	text := "🗑 Выбери, какую дату мы удалим"
-	markup := tgbotapi.NewInlineKeyboardMarkup(buttons...)
-	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, markup)
+	keyboard := domain.InlineKeyboard{
+		Rows: rows,
+	}
+	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, keyboard)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
 		return
@@ -474,24 +479,30 @@ func (h *Handler) EditImportantDate(ctx context.Context, msg *domain.Message) {
 
 	sortedImportantDates := h.beautifyImportantDates(importantDates, 30)
 
-	var buttons [][]tgbotapi.InlineKeyboardButton
+	var rows []domain.InlineKeyboardRow
 
 	for _, importantDate := range sortedImportantDates {
 		callbackData := fmt.Sprintf("important_dates:update_menu:%d", importantDate.ID)
 
-		row := []tgbotapi.InlineKeyboardButton{
-			tgbotapi.NewInlineKeyboardButtonData(importantDate.Title, callbackData),
+		row := domain.InlineKeyboardRow{
+			Buttons: []domain.InlineKeyboardButton{
+				{Text: importantDate.Title, Data: callbackData},
+			},
 		}
-		buttons = append(buttons, row)
+		rows = append(rows, row)
 	}
 
-	buttons = append(buttons, []tgbotapi.InlineKeyboardButton{
-		tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "important_dates:update_menu:cancel"),
+	rows = append(rows, domain.InlineKeyboardRow{
+		Buttons: []domain.InlineKeyboardButton{
+			{Text: "❌ Отмена", Data: "important_dates:update_menu:cancel"},
+		},
 	})
 
 	text := "🌸 Выбери дату, которую хочешь изменить"
-	markup := tgbotapi.NewInlineKeyboardMarkup(buttons...)
-	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, markup)
+	keyboard := domain.InlineKeyboard{
+		Rows: rows,
+	}
+	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, keyboard)
 	if err != nil {
 		h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
 		return
@@ -522,25 +533,33 @@ func (h *Handler) HandleEditImportantDate(ctx context.Context, cq *domain.Callba
 			active = "Активировать ✨"
 		}
 
-		buttons := tgbotapi.NewInlineKeyboardMarkup(
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("Название 📝", "important_dates:update:title:"+data),
-				tgbotapi.NewInlineKeyboardButtonData("Дата 📅", "important_dates:update:date:"+data),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("Партнёр 💑", "important_dates:update:partner:"+data),
-				tgbotapi.NewInlineKeyboardButtonData("Уведомлять за ⏰", "important_dates:update:notify_before:"+data),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData(active, "important_dates:update:is_active:"+data),
-				tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "important_dates:update:cancel"),
-			),
-		)
+		keyboard := domain.InlineKeyboard{
+			Rows: []domain.InlineKeyboardRow{
+				{
+					Buttons: []domain.InlineKeyboardButton{
+						{Text: "Название 📝", Data: "important_dates:update:title:" + data},
+						{Text: "Дата 📅", Data: "important_dates:update:date:" + data},
+					},
+				},
+				{
+					Buttons: []domain.InlineKeyboardButton{
+						{Text: "Партнёр 💑", Data: "important_dates:update:partner:" + data},
+						{Text: "Уведомлять за ⏰", Data: "important_dates:update:notify_before:" + data},
+					},
+				},
+				{
+					Buttons: []domain.InlineKeyboardButton{
+						{Text: active, Data: "important_dates:update:is_active:" + data},
+						{Text: "❌ Отмена", Data: "important_dates:update:cancel"},
+					},
+				},
+			},
+		}
 
 		title := h.detailImportantDate(importantDate, 256)
 		text := "💌 Что хочешь изменить?\n\n" + title
 
-		err = h.ui.Client.SendWithInlineKeyboard(chatID, text, buttons)
+		err = h.ui.Client.SendWithInlineKeyboard(chatID, text, keyboard)
 		if err != nil {
 			h.HandleErr(chatID, "Ошибка при отправке подтверждения", err)
 			return

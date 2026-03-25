@@ -22,6 +22,31 @@ type CallbackQuery struct {
 	Message   string
 }
 
+type InlineKeyboard struct {
+	Rows []InlineKeyboardRow
+}
+
+type InlineKeyboardRow struct {
+	Buttons []InlineKeyboardButton
+}
+
+type InlineKeyboardButton struct {
+	Text string
+	Data string
+}
+
+type Keyboard struct {
+	Rows []KeyboardRow
+}
+
+type KeyboardRow struct {
+	Buttons []KeyboardButton
+}
+
+type KeyboardButton struct {
+	Command Command
+}
+
 type Update struct {
 	Message       *Message
 	CallbackQuery *CallbackQuery

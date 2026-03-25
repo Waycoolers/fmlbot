@@ -1,15 +1,11 @@
 package domain
 
-import (
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-)
-
 type BotClient interface {
 	SendMessage(chatID int64, text string) error
-	SendWithInlineKeyboard(chatID int64, text string, markup tgbotapi.InlineKeyboardMarkup) error
-	EditMessageReplyMarkup(chatID int64, messageID int, markup tgbotapi.InlineKeyboardMarkup) error
+	SendWithInlineKeyboard(chatID int64, text string, keyboard InlineKeyboard) error
+	EditMessageReplyMarkup(chatID int64, messageID int, keyboard InlineKeyboard) error
 	GetUpdatesChan() <-chan Update
 	StopReceivingUpdates()
-	Send(msg tgbotapi.Chattable) (Message, error)
+	SendKeyboard(chatID int64, text string, keyboard Keyboard) (Message, error)
 	DeleteMessage(chatID int64, messageID int) error
 }
