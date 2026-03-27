@@ -1,9 +1,11 @@
 services:
   bot:
-    build: .
-    container_name: fmlbot
+    build:
+      context: services/bot
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - services/bot/.env
+      - .env
     depends_on:
       - db
       - redis
@@ -15,7 +17,6 @@ services:
 
   db:
     image: postgres:16-alpine
-    container_name: fmlbot-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -33,7 +34,6 @@ services:
 
   redis:
     image: redis:8-alpine
-    container_name: fmlbot-redis
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
