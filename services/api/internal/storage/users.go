@@ -1,0 +1,163 @@
+package storage
+
+import (
+	"context"
+
+	"github.com/jmoiron/sqlx"
+)
+
+type usersRepo struct {
+	db *sqlx.DB
+}
+
+func (s *usersRepo) AddUser(ctx context.Context, telegramID int64, username string) error {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+        INSERT INTO users (telegram_id, username)
+        VALUES ($1, $2)
+        ON CONFLICT (telegram_id) DO NOTHING;
+    `, telegramID, username)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+        INSERT INTO user_config (telegram_id)
+        VALUES ($1)
+    `, telegramID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *usersRepo) GetUserIDByUsername(ctx context.Context, username string) (int64, error) {
+	var id int64
+	err := s.db.QueryRowContext(ctx, `SELECT telegram_id FROM users WHERE LOWER(username)=LOWER($1)`, username).Scan(&id)
+	return id, err
+}
+
+func (s *usersRepo) IsUserExists(ctx context.Context, userID int64) (bool, error) {
+	var exists bool
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE telegram_id=$1)`, userID).Scan(&exists)
+	return exists, err
+}
+
+func (s *usersRepo) IsUserExistsByUsername(ctx context.Context, username string) (bool, error) {
+	var exists bool
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(username)=LOWER($1))`, username).Scan(&exists)
+	return exists, err
+}
+
+func (s *usersRepo) SetPartner(ctx context.Context, telegramID int64, partnerID int64) error {
+	_, err := s.db.ExecContext(ctx, `
+        UPDATE users SET partner_id = $1 WHERE telegram_id = $2;
+    `, partnerID, telegramID)
+	return err
+}
+
+func (s *usersRepo) GetUsername(ctx context.Context, userID int64) (string, error) {
+	var username string
+	err := s.db.QueryRowContext(ctx, `SELECT username FROM users WHERE telegram_id=$1;`, userID).Scan(&username)
+	if err != nil {
+		return "", nil
+	}
+	return username, nil
+}
+
+func (s *usersRepo) GetPartnerID(ctx context.Context, userID int64) (int64, error) {
+	var id int64
+	query := `SELECT partner_id FROM users WHERE telegram_id = $1;`
+
+	err := s.db.QueryRowContext(ctx, query, userID).Scan(&id)
+	if err != nil {
+		return 0, nil
+	}
+	return id, nil
+}
+
+func (s *usersRepo) SetPartners(ctx context.Context, userID, partnerID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// user -> partner
+	_, err = tx.ExecContext(ctx, `
+        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+    `, partnerID, userID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	// partner -> user
+	_, err = tx.ExecContext(ctx, `
+        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+    `, userID, partnerID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *usersRepo) RemovePartners(ctx context.Context, userID, partnerID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// user -> partner
+	_, err = tx.ExecContext(ctx, `
+        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+    `, 0, userID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	// partner -> user
+	_, err = tx.ExecContext(ctx, `
+        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+    `, 0, partnerID)
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *usersRepo) DeleteUser(ctx context.Context, userID int64) error {
+	_, err := s.db.ExecContext(ctx, `
+		DELETE FROM users WHERE telegram_id=$1
+	`, userID)
+	return err
+}
