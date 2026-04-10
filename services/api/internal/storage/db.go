@@ -10,12 +10,8 @@ import (
 )
 
 type Storage struct {
-	db             *sqlx.DB
-	Compliments    domain.ComplimentsRepo
-	ImportantDates domain.ImportantDatesRepo
-	Scheduler      domain.SchedulerRepo
-	UserConfig     domain.UserConfigRepo
-	Users          domain.UsersRepo
+	db    *sqlx.DB
+	Repos *domain.Repos
 }
 
 func New(cfg *config.DatabaseConfig) (*Storage, error) {
@@ -59,12 +55,15 @@ func New(cfg *config.DatabaseConfig) (*Storage, error) {
 		db: db,
 	}
 
-	return &Storage{db: db,
-		Compliments:    &compliments,
-		ImportantDates: &importantDates,
-		Scheduler:      &scheduler,
-		UserConfig:     &userConfig,
-		Users:          &users,
+	return &Storage{
+		db: db,
+		Repos: &domain.Repos{
+			Compliments:    &compliments,
+			ImportantDates: &importantDates,
+			Scheduler:      &scheduler,
+			UserConfig:     &userConfig,
+			Users:          &users,
+		},
 	}, nil
 }
 

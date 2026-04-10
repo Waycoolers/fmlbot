@@ -17,9 +17,11 @@ type UsersRepo interface {
 	SetPartners(ctx context.Context, userID int64, partnerID int64) error
 	RemovePartners(ctx context.Context, userID int64, partnerID int64) error
 	DeleteUser(ctx context.Context, userID int64) error
+	UpdateUser(ctx context.Context, userID int64, username string, partnerID int64) error
 }
 
 type UserConfigRepo interface {
+	GetUserConfig(ctx context.Context, userID int64) (*UserConfig, error)
 	GetComplimentMaxCount(ctx context.Context, userID int64) (int, error)
 	GetComplimentCount(ctx context.Context, userID int64) (int, error)
 	SetComplimentMaxCount(ctx context.Context, userID int64, frequency int) error
@@ -29,22 +31,28 @@ type UserConfigRepo interface {
 type ComplimentsRepo interface {
 	AddCompliment(ctx context.Context, telegramID int64, text string) (*Compliment, error)
 	GetCompliments(ctx context.Context, telegramID int64) (compliments []Compliment, err error)
+	UpdateCompliment(ctx context.Context, userID int64, complimentID int64, text string, isSent bool) error
 	DeleteCompliment(ctx context.Context, telegramID int64, complimentID int64) error
 	MarkComplimentSent(ctx context.Context, complimentID int64) error
 	AcquireCompliment(ctx context.Context, partnerID int64) (string, error)
 }
 
 type ImportantDatesRepo interface {
-	AddImportantDate(ctx context.Context, telegramID sql.NullInt64, partnerID sql.NullInt64, title string, date time.Time, notifyBefore int) (*ImportantDate, error)
-	GetImportantDates(ctx context.Context, telegramID sql.NullInt64) (importantDates []ImportantDate, err error)
-	GetImportantDateByID(ctx context.Context, id int64) (importantDate ImportantDate, err error)
-	DeleteImportantDate(ctx context.Context, id int64) error
-	EditImportantDate(ctx context.Context, date ImportantDate) error
+	AddImportantDate(ctx context.Context, telegramID int64, partnerID sql.NullInt64, title string, date time.Time, notifyBefore int) (*ImportantDate, error)
+	GetImportantDates(ctx context.Context, telegramID int64) (importantDates []ImportantDate, err error)
+	GetImportantDateByID(ctx context.Context, id int64, userID int64) (*ImportantDate, error)
+	DeleteImportantDate(ctx context.Context, id int64, userID int64) error
+	EditImportantDate(ctx context.Context, id int64, userID int64, date ImportantDateRequest) error
 	GetAllActiveImportantDates(ctx context.Context) (importantDates []ImportantDate, err error)
 	UpdateLastNotificationAt(ctx context.Context, id int64, timestamp time.Time) error
+	MakeImportantDatePrivate(ctx context.Context, dateID int64, userID int64) error
+	MakeImportantDateShared(ctx context.Context, dateID int64, userID int64, partnerID int64) error
 }
 
 type SchedulerRepo interface {
-	ClearComplimentsCount(ctx context.Context) error
-	ClearComplimentTokenBucket(ctx context.Context) error
+	DoMidnightTasksWithCompliments(ctx context.Context) error
+}
+
+type Sender interface {
+	SendMessage(ctx context.Context, update any) error
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 )
@@ -9,11 +10,13 @@ type Config struct {
 	Server   *ServerConfig
 	DB       *DatabaseConfig
 	Loglevel string
+	BotURL   string
 }
 
 type ServerConfig struct {
-	Host string
-	Port string
+	Host      string
+	Port      string
+	JwtSecret []byte
 }
 
 type DatabaseConfig struct {
@@ -31,14 +34,33 @@ func Load() (*Config, error) {
 		slog.Warn("not found LOG_LEVEL")
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		slog.Error("not found JWT_SECRET")
+		return nil, errors.New("no JWT_SECRET")
+	}
+
+	botURL := os.Getenv("BOT_URL")
+	if botURL == "" {
+		slog.Error("not found BOT_URL")
+		return nil, errors.New("no BOT_URL")
+	}
+
 	server, err := loadServerConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := loadDatabaseConfig()
 	if err != nil {
 		return nil, err
 	}
 
 	return &Config{
 		Server:   server,
+		DB:       db,
 		Loglevel: loglevel,
+		BotURL:   os.Getenv("BOT_URL"),
 	}, nil
 }
 
@@ -53,7 +75,16 @@ func loadServerConfig() (*ServerConfig, error) {
 		port = "8080"
 		slog.Warn("not found SERVER_PORT")
 	}
-	return &ServerConfig{host, port}, nil
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		slog.Error("not found JWT_SECRET")
+		return nil, errors.New("no JWT_SECRET")
+	}
+	return &ServerConfig{
+		Host:      host,
+		Port:      port,
+		JwtSecret: []byte(jwtSecret),
+	}, nil
 }
 
 func loadDatabaseConfig() (*DatabaseConfig, error) {
