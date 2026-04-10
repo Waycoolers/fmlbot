@@ -16,12 +16,28 @@ func (s *usersRepo) AddUser(ctx context.Context, telegramID int64, username stri
 		return err
 	}
 
-	_, err = tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
         INSERT INTO users (telegram_id, username)
         VALUES ($1, $2)
         ON CONFLICT (telegram_id) DO NOTHING;
     `, telegramID, username)
 	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+
+	aff, err := res.RowsAffected()
+	if err != nil {
+		er := tx.Rollback()
+		if er != nil {
+			return er
+		}
+		return err
+	}
+	if aff != 1 {
 		er := tx.Rollback()
 		if er != nil {
 			return er
@@ -73,7 +89,7 @@ func (s *usersRepo) GetUsername(ctx context.Context, userID int64) (string, erro
 	var username string
 	err := s.db.QueryRowContext(ctx, `SELECT username FROM users WHERE telegram_id=$1;`, userID).Scan(&username)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	return username, nil
 }
@@ -84,7 +100,7 @@ func (s *usersRepo) GetPartnerID(ctx context.Context, userID int64) (int64, erro
 
 	err := s.db.QueryRowContext(ctx, query, userID).Scan(&id)
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 	return id, nil
 }
@@ -159,5 +175,12 @@ func (s *usersRepo) DeleteUser(ctx context.Context, userID int64) error {
 	_, err := s.db.ExecContext(ctx, `
 		DELETE FROM users WHERE telegram_id=$1
 	`, userID)
+	return err
+}
+
+func (s *usersRepo) UpdateUser(ctx context.Context, userID int64, username string, partnerID int64) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE users SET username = $1, partner_id = $2 WHERE telegram_id = $3
+	`, username, partnerID, userID)
 	return err
 }

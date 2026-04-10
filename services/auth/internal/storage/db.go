@@ -3,15 +3,16 @@ package storage
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
-	"github.com/Waycoolers/fmlbot/services/api/internal/config"
-	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
+	"github.com/Waycoolers/fmlbot/services/auth/internal/config"
+	"github.com/Waycoolers/fmlbot/services/auth/internal/domain"
 	"github.com/jmoiron/sqlx"
 )
 
 type Storage struct {
-	db    *sqlx.DB
-	Repos *domain.Repos
+	db     *sqlx.DB
+	Tokens domain.TokensRepo
 }
 
 func New(cfg *config.DatabaseConfig) (*Storage, error) {
@@ -29,41 +30,21 @@ func New(cfg *config.DatabaseConfig) (*Storage, error) {
 		return nil, err
 	}
 
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
+
 	if err = db.Ping(); err != nil {
 		return nil, err
 	}
 
 	slog.Info("Database connection successfully")
 
-	compliments := complimentsRepo{
-		db: db,
-	}
-
-	importantDates := importantDatesRepo{
-		db: db,
-	}
-
-	scheduler := schedulerRepo{
-		db: db,
-	}
-
-	userConfig := userConfigRepo{
-		db: db,
-	}
-
-	users := usersRepo{
-		db: db,
-	}
+	tokens := tokensRepo{db: db}
 
 	return &Storage{
-		db: db,
-		Repos: &domain.Repos{
-			Compliments:    &compliments,
-			ImportantDates: &importantDates,
-			Scheduler:      &scheduler,
-			UserConfig:     &userConfig,
-			Users:          &users,
-		},
+		db:     db,
+		Tokens: &tokens,
 	}, nil
 }
 

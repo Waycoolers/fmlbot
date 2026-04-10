@@ -2,12 +2,20 @@ package storage
 
 import (
 	"context"
+	"time"
 
+	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 	"github.com/jmoiron/sqlx"
 )
 
 type userConfigRepo struct {
 	db *sqlx.DB
+}
+
+func (s *userConfigRepo) GetUserConfig(ctx context.Context, userID int64) (*domain.UserConfig, error) {
+	var userConfig domain.UserConfig
+	err := s.db.QueryRowContext(ctx, `SELECT * FROM user_config WHERE telegram_id = $1;`, userID).Scan(&userConfig)
+	return &userConfig, err
 }
 
 func (s *userConfigRepo) GetComplimentMaxCount(ctx context.Context, userID int64) (int, error) {
@@ -56,9 +64,10 @@ func (s *userConfigRepo) SetDefault(ctx context.Context, userID int64) error {
 		return err
 	}
 
+	now := time.Now().UTC()
 	_, err = tx.ExecContext(ctx, `
-		UPDATE user_config SET compliment_token_bucket=2, last_bucket_update=now() WHERE telegram_id = $1;
-	`, userID)
+		UPDATE user_config SET compliment_token_bucket=2, last_bucket_update=$1 WHERE telegram_id = $2;
+	`, now, userID)
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {

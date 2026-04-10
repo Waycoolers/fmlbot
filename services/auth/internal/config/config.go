@@ -4,19 +4,22 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"strconv"
+	"time"
 )
 
 type Config struct {
-	Server   *ServerConfig
-	DB       *DatabaseConfig
-	Loglevel string
-	BotURL   string
+	DB              *DatabaseConfig
+	Server          *ServerConfig
+	Loglevel        string
+	JwtSecret       []byte
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
 }
 
 type ServerConfig struct {
-	Host      string
-	Port      string
-	JwtSecret []byte
+	Host string
+	Port string
 }
 
 type DatabaseConfig struct {
@@ -39,11 +42,28 @@ func Load() (*Config, error) {
 		slog.Error("not found JWT_SECRET")
 		return nil, errors.New("no JWT_SECRET")
 	}
+	if len(jwtSecret) < 32 {
+		slog.Warn("JWT_SECRET is too short, minimum 32 bytes recommended")
+	}
 
-	botURL := os.Getenv("BOT_URL")
-	if botURL == "" {
-		slog.Error("not found BOT_URL")
-		return nil, errors.New("no BOT_URL")
+	accessTokenTTL := os.Getenv("ACCESS_TOKEN_TTL")
+	if accessTokenTTL == "" {
+		accessTokenTTL = "30"
+		slog.Warn("not found ACCESS_TOKEN_TTL")
+	}
+	intAccessTokenTTL, err := strconv.Atoi(accessTokenTTL)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshTokenTTL := os.Getenv("REFRESH_TOKEN_TTL")
+	if refreshTokenTTL == "" {
+		refreshTokenTTL = "30"
+		slog.Warn("not found REFRESH_TOKEN_TTL")
+	}
+	intRefreshTokenTTL, err := strconv.Atoi(refreshTokenTTL)
+	if err != nil {
+		return nil, err
 	}
 
 	server, err := loadServerConfig()
@@ -57,10 +77,12 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Server:   server,
-		DB:       db,
-		Loglevel: loglevel,
-		BotURL:   os.Getenv("BOT_URL"),
+		DB:              db,
+		Server:          server,
+		Loglevel:        loglevel,
+		JwtSecret:       []byte(jwtSecret),
+		AccessTokenTTL:  time.Duration(intAccessTokenTTL) * time.Minute,
+		RefreshTokenTTL: time.Duration(intRefreshTokenTTL) * 24 * time.Hour,
 	}, nil
 }
 
@@ -72,19 +94,10 @@ func loadServerConfig() (*ServerConfig, error) {
 	}
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
-		port = "8080"
+		port = "8081"
 		slog.Warn("not found SERVER_PORT")
 	}
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		slog.Error("not found JWT_SECRET")
-		return nil, errors.New("no JWT_SECRET")
-	}
-	return &ServerConfig{
-		Host:      host,
-		Port:      port,
-		JwtSecret: []byte(jwtSecret),
-	}, nil
+	return &ServerConfig{host, port}, nil
 }
 
 func loadDatabaseConfig() (*DatabaseConfig, error) {
@@ -110,7 +123,7 @@ func loadDatabaseConfig() (*DatabaseConfig, error) {
 	}
 	name := os.Getenv("DB_NAME")
 	if name == "" {
-		name = "fmlbot"
+		name = "fmlbot_auth"
 		slog.Warn("not found DB_NAME")
 	}
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/Waycoolers/fmlbot/common/errs"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 	"github.com/jmoiron/sqlx"
 )
@@ -70,20 +71,38 @@ func (s *complimentsRepo) DeleteCompliment(ctx context.Context, telegramID int64
 		return err
 	}
 
-	_, err = tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 		DELETE FROM user_compliment WHERE telegram_id=$1 AND compliment_id=$2
 	`, telegramID, complimentID)
 	if err != nil {
 		_ = tx.Rollback()
 		return err
 	}
+	aff, err := res.RowsAffected()
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if aff == 0 {
+		_ = tx.Rollback()
+		return sql.ErrNoRows
+	}
 
-	_, err = tx.ExecContext(ctx, `
+	res, err = tx.ExecContext(ctx, `
 		DELETE FROM compliments WHERE id=$1
 	`, complimentID)
 	if err != nil {
 		_ = tx.Rollback()
 		return err
+	}
+	aff, err = res.RowsAffected()
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if aff == 0 {
+		_ = tx.Rollback()
+		return sql.ErrNoRows
 	}
 
 	return tx.Commit()
@@ -144,13 +163,13 @@ func (s *complimentsRepo) AcquireCompliment(ctx context.Context, partnerID int64
 			minutes = 0
 		}
 		_ = tx.Rollback()
-		return "", &domain.ErrBucketEmpty{Minutes: minutes}
+		return "", &errs.ErrBucketEmpty{Minutes: minutes}
 	}
 
 	// --- 3. ЛИМИТ ---
 	if maxComplimentCount != -1 && complimentCount >= maxComplimentCount {
 		_ = tx.Rollback()
-		return "", domain.ErrLimitExceeded
+		return "", errs.ErrLimitExceeded
 	}
 
 	// --- 4. КРИТИЧЕСКАЯ ЛОГИКА ---
@@ -187,7 +206,7 @@ func (s *complimentsRepo) AcquireCompliment(ctx context.Context, partnerID int64
 	if err != nil {
 		_ = tx.Rollback()
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", domain.ErrNoCompliments
+			return "", errs.ErrNoCompliments
 		}
 		return "", err
 	}
@@ -208,9 +227,32 @@ func (s *complimentsRepo) AcquireCompliment(ctx context.Context, partnerID int64
 
 	err = tx.Commit()
 	if err != nil {
-		_ = tx.Rollback()
 		return "", err
 	}
 
 	return complimentText, nil
+}
+
+func (s *complimentsRepo) UpdateCompliment(ctx context.Context, userID int64, complimentID int64, text string, isSent bool) error {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE compliments AS c
+		SET text = $1, is_sent = $2
+		FROM user_compliment AS uc
+		WHERE c.id = uc.compliment_id
+		AND uc.telegram_id = $3
+		AND uc.compliment_id = $4;
+	`, text, isSent, userID, complimentID)
+	if err != nil {
+		return err
+	}
+
+	aff, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if aff == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }

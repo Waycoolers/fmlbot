@@ -9,9 +9,11 @@ import (
 )
 
 type Config struct {
-	Bot *BotConfig
-	DB  *DatabaseConfig
-	RDB *RedisConfig
+	Bot       *BotConfig
+	DB        *DatabaseConfig
+	RDB       *RedisConfig
+	Loglevel  string
+	JwtSecret []byte
 }
 
 type BotConfig struct {
@@ -35,6 +37,18 @@ type RedisConfig struct {
 }
 
 func Load() (*Config, error) {
+	loglevel := os.Getenv("LOG_LEVEL")
+	if loglevel == "" {
+		loglevel = "info"
+		slog.Warn("not found LOG_LEVEL")
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		slog.Error("not found JWT_SECRET")
+		return nil, errors.New("no JWT_SECRET")
+	}
+
 	bot, err := loadBotConfig()
 	if err != nil {
 		return nil, err
@@ -51,9 +65,11 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Bot: bot,
-		DB:  db,
-		RDB: rdb,
+		Bot:       bot,
+		DB:        db,
+		RDB:       rdb,
+		Loglevel:  loglevel,
+		JwtSecret: []byte(jwtSecret),
 	}, nil
 }
 
