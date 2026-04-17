@@ -143,5 +143,6 @@ services:
 volumes:
   db_data:
     external: true
+    name: fmlbot_db_data
   auth_db_data:
   redis_data:
