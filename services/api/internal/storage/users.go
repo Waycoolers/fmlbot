@@ -10,17 +10,17 @@ type usersRepo struct {
 	db *sqlx.DB
 }
 
-func (s *usersRepo) AddUser(ctx context.Context, telegramID int64, username string) error {
+func (s *usersRepo) AddUser(ctx context.Context, userID int64, username string) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
 	res, err := tx.ExecContext(ctx, `
-        INSERT INTO users (telegram_id, username)
+        INSERT INTO users (user_id, username)
         VALUES ($1, $2)
-        ON CONFLICT (telegram_id) DO NOTHING;
-    `, telegramID, username)
+        ON CONFLICT (user_id) DO NOTHING;
+    `, userID, username)
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {
@@ -46,9 +46,9 @@ func (s *usersRepo) AddUser(ctx context.Context, telegramID int64, username stri
 	}
 
 	_, err = tx.ExecContext(ctx, `
-        INSERT INTO user_config (telegram_id)
+        INSERT INTO user_config (user_id)
         VALUES ($1)
-    `, telegramID)
+    `, userID)
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {
@@ -62,13 +62,13 @@ func (s *usersRepo) AddUser(ctx context.Context, telegramID int64, username stri
 
 func (s *usersRepo) GetUserIDByUsername(ctx context.Context, username string) (int64, error) {
 	var id int64
-	err := s.db.QueryRowContext(ctx, `SELECT telegram_id FROM users WHERE LOWER(username)=LOWER($1)`, username).Scan(&id)
+	err := s.db.QueryRowContext(ctx, `SELECT user_id FROM users WHERE LOWER(username)=LOWER($1)`, username).Scan(&id)
 	return id, err
 }
 
 func (s *usersRepo) IsUserExists(ctx context.Context, userID int64) (bool, error) {
 	var exists bool
-	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE telegram_id=$1)`, userID).Scan(&exists)
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE user_id=$1)`, userID).Scan(&exists)
 	return exists, err
 }
 
@@ -78,16 +78,16 @@ func (s *usersRepo) IsUserExistsByUsername(ctx context.Context, username string)
 	return exists, err
 }
 
-func (s *usersRepo) SetPartner(ctx context.Context, telegramID int64, partnerID int64) error {
+func (s *usersRepo) SetPartner(ctx context.Context, userID int64, partnerID int64) error {
 	_, err := s.db.ExecContext(ctx, `
-        UPDATE users SET partner_id = $1 WHERE telegram_id = $2;
-    `, partnerID, telegramID)
+        UPDATE users SET partner_id = $1 WHERE user_id = $2;
+    `, partnerID, userID)
 	return err
 }
 
 func (s *usersRepo) GetUsername(ctx context.Context, userID int64) (string, error) {
 	var username string
-	err := s.db.QueryRowContext(ctx, `SELECT username FROM users WHERE telegram_id=$1;`, userID).Scan(&username)
+	err := s.db.QueryRowContext(ctx, `SELECT username FROM users WHERE user_id=$1;`, userID).Scan(&username)
 	if err != nil {
 		return "", err
 	}
@@ -96,7 +96,7 @@ func (s *usersRepo) GetUsername(ctx context.Context, userID int64) (string, erro
 
 func (s *usersRepo) GetPartnerID(ctx context.Context, userID int64) (int64, error) {
 	var id int64
-	query := `SELECT partner_id FROM users WHERE telegram_id = $1;`
+	query := `SELECT partner_id FROM users WHERE user_id = $1;`
 
 	err := s.db.QueryRowContext(ctx, query, userID).Scan(&id)
 	if err != nil {
@@ -113,7 +113,7 @@ func (s *usersRepo) SetPartners(ctx context.Context, userID, partnerID int64) er
 
 	// user -> partner
 	_, err = tx.ExecContext(ctx, `
-        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+        UPDATE users SET partner_id = $1 WHERE user_id = $2
     `, partnerID, userID)
 	if err != nil {
 		er := tx.Rollback()
@@ -125,7 +125,7 @@ func (s *usersRepo) SetPartners(ctx context.Context, userID, partnerID int64) er
 
 	// partner -> user
 	_, err = tx.ExecContext(ctx, `
-        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+        UPDATE users SET partner_id = $1 WHERE user_id = $2
     `, userID, partnerID)
 	if err != nil {
 		er := tx.Rollback()
@@ -146,7 +146,7 @@ func (s *usersRepo) RemovePartners(ctx context.Context, userID, partnerID int64)
 
 	// user -> partner
 	_, err = tx.ExecContext(ctx, `
-        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+        UPDATE users SET partner_id = $1 WHERE user_id = $2
     `, 0, userID)
 	if err != nil {
 		er := tx.Rollback()
@@ -158,7 +158,7 @@ func (s *usersRepo) RemovePartners(ctx context.Context, userID, partnerID int64)
 
 	// partner -> user
 	_, err = tx.ExecContext(ctx, `
-        UPDATE users SET partner_id = $1 WHERE telegram_id = $2
+        UPDATE users SET partner_id = $1 WHERE user_id = $2
     `, 0, partnerID)
 	if err != nil {
 		er := tx.Rollback()
@@ -173,14 +173,14 @@ func (s *usersRepo) RemovePartners(ctx context.Context, userID, partnerID int64)
 
 func (s *usersRepo) DeleteUser(ctx context.Context, userID int64) error {
 	_, err := s.db.ExecContext(ctx, `
-		DELETE FROM users WHERE telegram_id=$1
+		DELETE FROM users WHERE user_id=$1
 	`, userID)
 	return err
 }
 
 func (s *usersRepo) UpdateUser(ctx context.Context, userID int64, username string, partnerID int64) error {
 	_, err := s.db.ExecContext(ctx, `
-		UPDATE users SET username = $1, partner_id = $2 WHERE telegram_id = $3
+		UPDATE users SET username = $1, partner_id = $2 WHERE user_id = $3
 	`, username, partnerID, userID)
 	return err
 }

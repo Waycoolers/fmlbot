@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load(".env", "../../.env")
+	_ = godotenv.Load("../../.env")
 
 	jsonHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
 	slog.SetDefault(slog.New(jsonHandler))

@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"context"
-	"log"
+	"errors"
+	"log/slog"
 
+	"github.com/Waycoolers/fmlbot/common/errs"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
 )
 
@@ -18,14 +20,17 @@ func (h *Handler) ShowAccountMenu(_ context.Context, msg *domain.Message) {
 }
 
 func (h *Handler) Register(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
 	username := msg.UserName
 
-	exists, err := h.Store.Users.IsUserExists(ctx, userID)
+	_, err := h.api.GetMe(ctx, chatID)
+	exists := true
 	if err != nil {
-		h.HandleErr(chatID, "Ошибка при проверке пользователя", err)
-		return
+		if !errors.Is(err, errs.ErrUserNotFound) {
+			h.HandleUnknownError(chatID, err)
+			return
+		}
+		exists = false
 	}
 
 	if !exists {
@@ -34,9 +39,13 @@ func (h *Handler) Register(ctx context.Context, msg *domain.Message) {
 			return
 		}
 
-		er := h.Store.Users.AddUser(ctx, userID, username)
-		if er != nil {
-			h.HandleErr(chatID, "Ошибка при регистрации", err)
+		err = h.api.CreateUser(ctx, chatID, username)
+		if err != nil {
+			if errors.Is(err, errs.ErrUserExists) {
+				h.HandleErr(chatID, "Error user exists", err)
+				return
+			}
+			h.HandleUnknownError(chatID, err)
 			return
 		}
 	}
@@ -69,56 +78,52 @@ func (h *Handler) DeleteAccount(_ context.Context, msg *domain.Message) {
 }
 
 func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *domain.CallbackQuery) {
-	userID := cq.UserID
 	chatID := cq.ChatID
 	messageID := cq.MessageID
 
 	switch cq.Data {
 	case "account:delete:confirm":
-		partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
-		if err != nil {
+		user, err := h.api.GetMe(ctx, chatID)
+		if err != nil || user == nil {
 			h.ui.RemoveButtons(chatID, messageID)
-			h.HandleErr(chatID, "Ошибка при попытке получить id партнера", err)
+			if errors.Is(err, errs.ErrUserNotFound) {
+				h.HandleErr(chatID, "Error while trying to get user", err)
+				return
+			}
+			h.HandleUnknownError(chatID, err)
 			return
 		}
 
-		if partnerID != 0 {
-			err = h.Store.Users.RemovePartners(ctx, userID, partnerID)
+		if user.PartnerID != 0 {
+			err = h.api.Unpair(ctx, chatID)
 			if err != nil {
 				h.ui.RemoveButtons(chatID, messageID)
-				h.HandleErr(chatID, "Ошибка при попытке удалить партнеров", err)
+				h.HandleErr(chatID, "Error while trying to delete partners", err)
 				return
 			}
 
-			err = h.Store.Users.DeleteUser(ctx, userID)
+			err = h.api.ResetPartnerUserConfig(ctx, chatID)
 			if err != nil {
 				h.ui.RemoveButtons(chatID, messageID)
-				h.HandleErr(chatID, "Ошибка при попытке удалить юзера", err)
+				h.HandleErr(chatID, "Error resetting config", err)
 				return
 			}
 
-			err = h.Store.UserConfig.SetDefault(ctx, partnerID)
-			if err != nil {
-				h.ui.RemoveButtons(chatID, messageID)
-				h.HandleErr(chatID, "Ошибка при сбросе конфига", err)
-				return
-			}
+			h.Reply(user.PartnerID, "Твой партнёр удалил свой аккаунт 💔")
+		}
 
-			h.Reply(partnerID, "Твой партнёр удалил свой аккаунт 💔")
-		} else {
-			err = h.Store.Users.DeleteUser(ctx, userID)
-			if err != nil {
-				h.ui.RemoveButtons(chatID, messageID)
-				h.HandleErr(chatID, "Ошибка при попытке удалить юзера", err)
-				return
-			}
+		err = h.api.DeleteMe(ctx, chatID)
+		if err != nil {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.HandleErr(chatID, "Error occurred while trying to delete a user", err)
+			return
 		}
 
 		h.Reply(chatID, "🕊️ Аккаунт удалён\nЕсли захочешь — я всегда буду рад(а) начать заново")
 		text := "✨ Хочешь вернуться?\nНажми кнопку ниже, чтобы начать сначала"
 		err = h.ui.StartMenu(chatID, text)
 		if err != nil {
-			log.Printf("Ошибка при вызове стартового меню")
+			slog.Error("Error calling the start menu", "error", err)
 			h.Reply(chatID, "Попробуй перезапустить бота командой /start")
 		}
 	case "account:delete:cancel":

@@ -34,12 +34,6 @@ func Load() (*Config, error) {
 		slog.Warn("not found LOG_LEVEL")
 	}
 
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		slog.Error("not found JWT_SECRET")
-		return nil, errors.New("no JWT_SECRET")
-	}
-
 	botURL := os.Getenv("BOT_URL")
 	if botURL == "" {
 		slog.Error("not found BOT_URL")
@@ -65,15 +59,15 @@ func Load() (*Config, error) {
 }
 
 func loadServerConfig() (*ServerConfig, error) {
-	host := os.Getenv("SERVER_HOST")
+	host := os.Getenv("API_HOST")
 	if host == "" {
 		host = "localhost"
-		slog.Warn("not found SERVER_HOST")
+		slog.Warn("not found API_HOST")
 	}
-	port := os.Getenv("SERVER_PORT")
+	port := os.Getenv("API_PORT")
 	if port == "" {
 		port = "8080"
-		slog.Warn("not found SERVER_PORT")
+		slog.Warn("not found API_PORT")
 	}
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -88,30 +82,30 @@ func loadServerConfig() (*ServerConfig, error) {
 }
 
 func loadDatabaseConfig() (*DatabaseConfig, error) {
-	host := os.Getenv("DB_HOST")
+	host := os.Getenv("API_DB_HOST")
 	if host == "" {
 		host = "localhost"
-		slog.Warn("not found DB_HOST")
+		slog.Warn("not found API_DB_HOST")
 	}
-	port := os.Getenv("DB_PORT")
+	port := os.Getenv("API_DB_PORT")
 	if port == "" {
 		port = "5432"
-		slog.Warn("not found DB_PORT")
+		slog.Warn("not found API_DB_PORT")
 	}
-	user := os.Getenv("DB_USER")
+	user := os.Getenv("API_DB_USER")
 	if user == "" {
 		user = "postgres"
-		slog.Warn("not found DB_USER")
+		slog.Warn("not found API_DB_USER")
 	}
-	password := os.Getenv("DB_PASSWORD")
+	password := os.Getenv("API_DB_PASSWORD")
 	if password == "" {
 		password = "postgres"
-		slog.Warn("not found DB_PASSWORD")
+		slog.Warn("not found API_DB_PASSWORD")
 	}
-	name := os.Getenv("DB_NAME")
+	name := os.Getenv("API_DB_NAME")
 	if name == "" {
 		name = "fmlbot"
-		slog.Warn("not found DB_NAME")
+		slog.Warn("not found API_DB_NAME")
 	}
 
 	return &DatabaseConfig{

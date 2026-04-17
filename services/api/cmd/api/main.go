@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load(".env", "../../.env")
+	_ = godotenv.Load("../../.env")
 
 	jsonHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
 	slog.SetDefault(slog.New(jsonHandler))
@@ -36,6 +36,11 @@ func main() {
 	store, err := storage.New(cfg.DB)
 	if err != nil {
 		slog.Error("Error connecting to database", "error", err)
+		os.Exit(1)
+	}
+	err = store.Migrate()
+	if err != nil {
+		slog.Error("Error migrating database", "error", err)
 		os.Exit(1)
 	}
 
@@ -56,7 +61,7 @@ func main() {
 	<-ctx.Done()
 	sched.Stop()
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err = srv.Stop(shutdownCtx)
 	if err != nil {

@@ -65,6 +65,38 @@ func (uc *UseCase) UpdateUser(ctx context.Context, userID int64, username string
 	return uc.users.UpdateUser(ctx, userID, username, partnerID)
 }
 
+func (uc *UseCase) UpdatePartner(ctx context.Context, userID int64, username string, partnerID int64) error {
+	exists, err := uc.users.IsUserExists(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errs.ErrUserNotFound
+	}
+
+	id, err := uc.users.GetPartnerID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errs.ErrPartnerNotFound
+		}
+		return err
+	}
+
+	return uc.users.UpdateUser(ctx, id, username, partnerID)
+}
+
+func (uc *UseCase) AddPartners(ctx context.Context, userID int64, partnerID int64) error {
+	exists, err := uc.users.IsUserExists(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errs.ErrUserNotFound
+	}
+
+	return uc.users.SetPartners(ctx, userID, partnerID)
+}
+
 func (uc *UseCase) GetMe(ctx context.Context, userID int64) (*domain.UserResponse, error) {
 	exists, err := uc.users.IsUserExists(ctx, userID)
 	if err != nil {
@@ -127,4 +159,35 @@ func (uc *UseCase) GetPartner(ctx context.Context, userID int64) (*domain.UserRe
 		PartnerID: userID,
 		Username:  username,
 	}, nil
+}
+
+func (uc *UseCase) RemovePartners(ctx context.Context, userID int64) error {
+	exists, err := uc.users.IsUserExists(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errs.ErrUserNotFound
+	}
+
+	partnerID, err := uc.users.GetPartnerID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if partnerID == 0 {
+		return errs.ErrPartnerNotFound
+	}
+
+	return uc.users.RemovePartners(ctx, userID, partnerID)
+}
+
+func (uc *UseCase) GetUserByUsername(ctx context.Context, username string) (*domain.UserResponse, error) {
+	userID, err := uc.users.GetUserIDByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errs.ErrUserNotFound
+		}
+		return nil, err
+	}
+	return uc.GetMe(ctx, userID)
 }

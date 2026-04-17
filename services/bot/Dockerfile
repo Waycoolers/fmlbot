@@ -1,35 +1,21 @@
-# syntax=docker/dockerfile:1
 FROM golang:1.25.4-alpine AS builder
-
 WORKDIR /app
+
+# Копируем весь проект
+COPY . .
+
+# Переходим в директорию bot-сервиса
+WORKDIR /app/services/bot
 
 # Скачиваем зависимости
-COPY go.mod go.sum ./
 RUN go mod download
 
-# Копируем проект
-COPY ../.. .
+# Собираем бинарный файл
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bot ./cmd/bot
 
-# Собираем бинарник
-RUN go build -o bot cmd/bot/main.go
-
-# Минимальный образ для запуска
-FROM alpine:3.18
-
-WORKDIR /app
-
-# Устанавливаем таймзону
-RUN apk add --no-cache tzdata
-ENV TZ=Europe/Moscow
-
-# Копируем бинарник из builder
-COPY --from=builder /app/bot .
-
-# Копируем конфиг
-COPY .env .
-
-# Переменные окружения
-ENV GIN_MODE=release
-
-# Запуск
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates tzdata
+WORKDIR /root/
+COPY --from=builder /bot .
+EXPOSE 8082
 CMD ["./bot"]

@@ -3,7 +3,7 @@ package redis_store
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strconv"
 
 	"github.com/Waycoolers/fmlbot/services/bot/internal/config"
@@ -22,7 +22,7 @@ func New(cfg *config.RedisConfig) (*redis.Client, error) {
 	if _, err := rdb.Ping(context.Background()).Result(); err != nil {
 		return nil, err
 	} else {
-		log.Print("Redis подключен")
+		slog.Info("Redis is connected")
 	}
 
 	return rdb, nil

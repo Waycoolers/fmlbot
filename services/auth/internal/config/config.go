@@ -87,44 +87,44 @@ func Load() (*Config, error) {
 }
 
 func loadServerConfig() (*ServerConfig, error) {
-	host := os.Getenv("SERVER_HOST")
+	host := os.Getenv("AUTH_HOST")
 	if host == "" {
 		host = "localhost"
-		slog.Warn("not found SERVER_HOST")
+		slog.Warn("not found AUTH_HOST")
 	}
-	port := os.Getenv("SERVER_PORT")
+	port := os.Getenv("AUTH_PORT")
 	if port == "" {
 		port = "8081"
-		slog.Warn("not found SERVER_PORT")
+		slog.Warn("not found AUTH_PORT")
 	}
 	return &ServerConfig{host, port}, nil
 }
 
 func loadDatabaseConfig() (*DatabaseConfig, error) {
-	host := os.Getenv("DB_HOST")
+	host := os.Getenv("AUTH_DB_HOST")
 	if host == "" {
 		host = "localhost"
-		slog.Warn("not found DB_HOST")
+		slog.Warn("not found AUTH_DB_HOST")
 	}
-	port := os.Getenv("DB_PORT")
+	port := os.Getenv("AUTH_DB_PORT")
 	if port == "" {
 		port = "5432"
-		slog.Warn("not found DB_PORT")
+		slog.Warn("not found AUTH_DB_PORT")
 	}
-	user := os.Getenv("DB_USER")
+	user := os.Getenv("AUTH_DB_USER")
 	if user == "" {
 		user = "postgres"
-		slog.Warn("not found DB_USER")
+		slog.Warn("not found AUTH_DB_USER")
 	}
-	password := os.Getenv("DB_PASSWORD")
+	password := os.Getenv("AUTH_DB_PASSWORD")
 	if password == "" {
 		password = "postgres"
-		slog.Warn("not found DB_PASSWORD")
+		slog.Warn("not found AUTH_DB_PASSWORD")
 	}
-	name := os.Getenv("DB_NAME")
+	name := os.Getenv("AUTH_DB_NAME")
 	if name == "" {
 		name = "fmlbot_auth"
-		slog.Warn("not found DB_NAME")
+		slog.Warn("not found AUTH_DB_NAME")
 	}
 
 	return &DatabaseConfig{

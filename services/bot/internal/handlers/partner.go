@@ -2,75 +2,71 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/Waycoolers/fmlbot/common/errs"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
+	"github.com/Waycoolers/fmlbot/services/bot/internal/state"
 )
 
 func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
 	text := "👤 Партнёр"
 
-	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при попытке получить id партнера", err)
+	user, err := h.api.GetMe(ctx, chatID)
+	if err != nil || user == nil {
+		h.HandleErr(chatID, "Error getting user", err)
 		return
 	}
 
-	if partnerID == 0 {
+	if user.PartnerID == 0 {
 		text = "🤍 У тебя пока нет партнёра"
 	} else {
-		partnerUsername, er := h.Store.Users.GetUsername(ctx, partnerID)
-		if er != nil {
-			h.HandleErr(chatID, "Ошибка при попытке получить username партнера", er)
+		partner, err := h.api.GetPartner(ctx, user.PartnerID)
+		if err != nil || partner == nil {
+			h.HandleErr(chatID, "Error getting partner", err)
 			return
 		}
 
-		text = "💞 Твой партнёр: @" + partnerUsername
+		text = "💞 Твой партнёр: @" + partner.Username
 	}
 
 	err = h.ui.PartnerMenu(chatID, text)
 	if err != nil {
-		h.HandleErr(chatID, "Ошибка при попытке отобразить меню партнеров", err)
+		h.HandleErr(chatID, "Error while trying to display the partners menu", err)
 		return
 	}
 }
 
 func (h *Handler) SetPartner(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
 
-	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при попытке получить id партнёра", err)
+	user, err := h.api.GetMe(ctx, chatID)
+	if err != nil || user == nil {
+		h.HandleErr(chatID, "Error getting user", err)
 		return
 	}
 
-	if partnerID == 0 {
-		er := h.Store.Users.SetUserState(ctx, userID, domain.AwaitingPartner)
-		if er != nil {
-			h.HandleErr(chatID, "Ошибка при установке состояния awaiting_partner", er)
-			return
-		}
+	if user.PartnerID == 0 {
+		h.sm.SetStep(state.AwaitingPartner)
 		h.Reply(chatID, "💌 Отправь username партнёра")
 	} else {
-		partnerUsername, er := h.Store.Users.GetUsername(ctx, partnerID)
-		if er != nil {
-			h.HandleErr(chatID, "Ошибка при попытке получить username партнёра", er)
+		partner, err := h.api.GetPartner(ctx, user.PartnerID)
+		if err != nil || partner == nil {
+			h.HandleErr(chatID, "Error getting partner", err)
 			return
 		}
 		h.Reply(
 			chatID,
-			"💞 Сейчас твой партнёр — @"+partnerUsername+
+			"💞 Сейчас твой партнёр — @"+partner.Username+
 				"\nЕсли хочешь изменить выбор, сначала нужно удалить текущего партнёра",
 		)
 	}
 }
 
 func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
 	partnerUsername := msg.Text
 	userUsername := msg.UserName
@@ -79,10 +75,14 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *domain.Messag
 		partnerUsername = partnerUsername[1:]
 	}
 
-	exists, err := h.Store.Users.IsUserExistsByUsername(ctx, partnerUsername)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при проверке партнёра", err)
-		return
+	partner, err := h.api.GetUserByUsername(ctx, chatID, partnerUsername)
+	exists := true
+	if err != nil || partner == nil {
+		if !errors.Is(err, errs.ErrUserNotFound) {
+			h.HandleErr(chatID, "Error getting user", err)
+			return
+		}
+		exists = false
 	}
 
 	if strings.ToLower(partnerUsername) == strings.ToLower(userUsername) {
@@ -99,86 +99,58 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *domain.Messag
 		return
 	}
 
-	partnerID, err := h.Store.Users.GetUserIDByUsername(ctx, partnerUsername)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
-		return
-	}
-	correctPartnerUsername, _ := h.Store.Users.GetUsername(ctx, partnerID)
-
-	partnerExists, err := h.Store.Users.GetPartnerID(ctx, partnerID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при проверке на существование партнёра", err)
+	user, err := h.api.GetMe(ctx, chatID)
+	if err != nil || user == nil {
+		h.HandleErr(chatID, "Error getting user", err)
 		return
 	}
 
-	if partnerExists != 0 {
-		if partnerExists == userID {
-			h.Reply(chatID, "💛 @"+correctPartnerUsername+" и так ваш партнёр. Приятного времяпрепровождения!")
-			err = h.Store.Users.SetUserState(ctx, userID, domain.Empty)
-			if err != nil {
-				h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-				return
-			}
+	if user.PartnerID != 0 {
+		if user.PartnerID == partner.UserID {
+			h.Reply(chatID, "💛 @"+partner.Username+" и так ваш партнёр. Приятного времяпрепровождения!")
+			h.sm.SetStep(state.Empty)
 			return
 		} else {
 			h.Reply(chatID, "😔 У этого пользователя уже есть партнёр")
-			err = h.Store.Users.SetUserState(ctx, userID, domain.Empty)
-			if err != nil {
-				h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-				return
-			}
+			h.sm.SetStep(state.Empty)
 			return
 		}
 	}
 
-	userPartnerExists, err := h.Store.Users.GetPartnerID(ctx, userID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при проверке на существование партнёра", err)
-		return
-	}
-
-	if userPartnerExists != 0 {
-		err = h.Store.Users.SetPartner(ctx, userPartnerExists, 0)
+	if user.PartnerID != 0 {
+		err = h.api.Unpair(ctx, chatID)
 		if err != nil {
-			h.HandleErr(chatID, "Ошибка при сбросе партнера у партнера", err)
+			h.HandleErr(chatID, "Error when resetting partners", err)
 			return
 		}
-		h.Reply(userPartnerExists, "💔 Твой партнёр добавил другого партнёра")
+		h.Reply(partner.UserID, "💔 Твой партнёр добавил другого партнёра")
 	}
 
-	err = h.Store.Users.SetUserState(ctx, partnerID, domain.Empty)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
+	h.sm.SetStep(state.Empty)
+
+	err = h.api.PairUsers(ctx, chatID, partner.UserID)
+	if errors.Is(err, errs.ErrPartnerNotFound) {
+		h.HandleErr(chatID, "User with this ID not found", err)
+		return
+	} else if err != nil {
+		h.HandleErr(chatID, "Error when resetting partner at partner", err)
 		return
 	}
 
-	err = h.Store.Users.SetUserState(ctx, userID, domain.Empty)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-		return
-	}
-
-	err = h.Store.Users.SetPartners(ctx, userID, partnerID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при связи партнеров", err)
-		return
-	}
-
-	h.Reply(partnerID, "💞 У вас с @"+userUsername+" теперь есть общая история в боте ✨")
-	h.Reply(chatID, fmt.Sprintf("✨ Готово! Партнёр @%s добавлен", correctPartnerUsername))
+	h.Reply(partner.UserID, "💞 У вас с @"+userUsername+" теперь есть общая история в боте ✨")
+	h.Reply(chatID, fmt.Sprintf("✨ Готово! Партнёр @%s добавлен", partner.Username))
 }
 
 func (h *Handler) DeletePartner(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
-	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
+
+	user, err := h.api.GetMe(ctx, chatID)
+	if err != nil || user == nil {
+		h.HandleErr(chatID, "Error getting user", err)
 		return
 	}
 
-	if partnerID == 0 {
+	if user.PartnerID == 0 {
 		h.Reply(chatID, "🤍 У тебя сейчас не добавлен партнёр")
 		return
 	}
@@ -194,13 +166,13 @@ func (h *Handler) DeletePartner(ctx context.Context, msg *domain.Message) {
 		},
 	}
 
-	partnerUsername, err := h.Store.Users.GetUsername(ctx, partnerID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при попытке получить username партнера", err)
+	partner, err := h.api.GetPartner(ctx, user.PartnerID)
+	if err != nil || partner == nil {
+		h.HandleErr(chatID, "Error getting partner", err)
 		return
 	}
 
-	text := "💭 Ты уверен(а), что хочешь удалить партнёра @" + partnerUsername + "?\n" +
+	text := "💭 Ты уверен(а), что хочешь удалить партнёра @" + partner.Username + "?\n" +
 		"Все общие настройки будут сброшены."
 
 	err = h.ui.Client.SendWithInlineKeyboard(chatID, text, keyboard)
@@ -211,41 +183,40 @@ func (h *Handler) DeletePartner(ctx context.Context, msg *domain.Message) {
 }
 
 func (h *Handler) HandleDeletePartner(ctx context.Context, cb *domain.CallbackQuery) {
-	userID := cb.UserID
 	chatID := cb.ChatID
 	messageID := cb.MessageID
 
 	switch cb.Data {
 	case "partner:delete:confirm":
-		partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
-		if err != nil {
+		partner, err := h.api.GetPartner(ctx, chatID)
+		if err != nil || partner == nil {
 			h.ui.RemoveButtons(chatID, messageID)
-			h.HandleErr(chatID, "Ошибка при попытке получить id партнера", err)
+			h.HandleErr(chatID, "Error getting partner", err)
 			return
 		}
 
-		err = h.Store.UserConfig.SetDefault(ctx, userID)
+		err = h.api.ResetMyUserConfig(ctx, chatID)
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
-			h.HandleErr(chatID, "Ошибка при сбросе конфига", err)
+			h.HandleErr(chatID, "Error resetting user config", err)
 			return
 		}
-		err = h.Store.UserConfig.SetDefault(ctx, partnerID)
+		err = h.api.ResetPartnerUserConfig(ctx, chatID)
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
-			h.HandleErr(chatID, "Ошибка при сбросе конфига", err)
+			h.HandleErr(chatID, "Error resetting partner user config", err)
 			return
 		}
 
-		err = h.Store.Users.RemovePartners(ctx, userID, partnerID)
+		err = h.api.Unpair(ctx, chatID)
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
-			h.HandleErr(chatID, "Ошибка при попытке удалить партнеров", err)
+			h.HandleErr(chatID, "Error while trying to delete partners", err)
 			return
 		}
 
 		h.Reply(chatID, "🕊️ Партнёр удалён")
-		h.Reply(partnerID, "💔 Твой партнёр больше не связан с тобой")
+		h.Reply(partner.UserID, "💔 Твой партнёр больше не связан с тобой")
 
 	case "partner:delete:cancel":
 		h.Reply(chatID, "💛 Хорошо, ничего не меняем")
