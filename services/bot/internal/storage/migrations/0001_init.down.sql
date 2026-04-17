@@ -1,3 +1,0 @@
-DROP TABLE IF EXISTS user_compliment;
-DROP TABLE IF EXISTS compliments;
-DROP TABLE IF EXISTS users;

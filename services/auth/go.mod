@@ -3,10 +3,12 @@ module github.com/Waycoolers/fmlbot/services/auth
 go 1.25.4
 
 require (
+	github.com/Waycoolers/fmlbot/common v0.0.0-00010101000000-000000000000
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
+	golang.org/x/crypto v0.45.0
 )
 
 require (
@@ -20,6 +22,7 @@ require (
 	github.com/jackc/pgtype v1.14.0 // indirect
 	github.com/jackc/pgx/v4 v4.18.2 // indirect
 	github.com/lib/pq v1.10.9 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 )
+
+replace github.com/Waycoolers/fmlbot/common => ../../common

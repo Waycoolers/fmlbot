@@ -2,58 +2,35 @@ package app
 
 import (
 	"context"
-	"log"
-	"time"
+	"log/slog"
 
-	"github.com/Waycoolers/fmlbot/services/bot/internal/client"
-	"github.com/Waycoolers/fmlbot/services/bot/internal/config"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
-	"github.com/Waycoolers/fmlbot/services/bot/internal/handlers"
-	"github.com/Waycoolers/fmlbot/services/bot/internal/redis_store"
-	"github.com/Waycoolers/fmlbot/services/bot/internal/scheduler"
-	"github.com/Waycoolers/fmlbot/services/bot/internal/storage"
-	"github.com/Waycoolers/fmlbot/services/bot/internal/ui"
-	"github.com/redis/go-redis/v9"
 )
 
 type Bot struct {
-	Client    domain.BotClient
-	router    *Router
-	scheduler *scheduler.Scheduler
+	Client domain.BotClient
+	router *Router
 }
 
-func New(cfg *config.Config, store *storage.Storage, rdb *redis.Client) (*Bot, error) {
-	telegramClient := client.NewTelegramClient(cfg)
-	menuUI := ui.New(telegramClient)
-	importantDateDrafts := redis_store.NewImportantDateDraftStore(rdb, 15*time.Minute)
-	importantDateEditDrafts := redis_store.NewImportantDateEditDraftStore(rdb, 15*time.Minute)
-	handler := handlers.New(menuUI, store, importantDateDrafts, importantDateEditDrafts)
-	s := scheduler.New(handler)
-	router := NewRouter(handler)
-
-	return &Bot{Client: telegramClient, router: router, scheduler: s}, nil
+func New(c domain.BotClient, r *Router) (*Bot, error) {
+	return &Bot{Client: c, router: r}, nil
 }
 
 func (b *Bot) Run(ctx context.Context) {
-	log.Printf("Бот запущен")
-
-	b.scheduler.Run(ctx)
+	slog.Info("Bot is running")
 
 	updates := b.Client.GetUpdatesChan()
 
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("Контекст завершён, останавливаем бота...")
-			return
-
-		case update, ok := <-updates:
-			if !ok {
-				log.Println("Канал updates закрыт, бот остановлен.")
-				return
-			}
-
+	for update := range updates {
+		if update.Message != nil || update.CallbackQuery != nil {
 			b.router.HandleUpdate(ctx, update)
 		}
+	}
+}
+
+func (b *Bot) Stop() {
+	if b.Client != nil {
+		slog.Info("Bot is stopping")
+		b.Client.StopReceivingUpdates()
 	}
 }

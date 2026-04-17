@@ -14,7 +14,7 @@ var (
 )
 
 type ErrBucketEmpty struct {
-	Minutes int
+	Minutes int `json:"minutes"`
 }
 
 func (e *ErrBucketEmpty) Error() string {

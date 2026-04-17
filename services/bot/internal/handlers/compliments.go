@@ -8,34 +8,36 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Waycoolers/fmlbot/common/errs"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
+	"github.com/Waycoolers/fmlbot/services/bot/internal/state"
 )
 
 func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
 	text := "❤️ Комплименты"
-	count := 0
-	maxCount := 1
-	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
+
+	user, err := h.api.GetMe(ctx, chatID)
+	if err != nil || user == nil {
+		if errors.Is(err, errs.ErrUserNotFound) {
+			h.HandleErr(chatID, "Error while trying to get user", err)
+			return
+		}
+		h.HandleUnknownError(chatID, err)
 		return
 	}
 
-	if partnerID == 0 {
+	if user.PartnerID == 0 {
 		text = "🤍 Добавь партнёра, и здесь появится магия комплиментов ✨"
 	} else {
-		count, err = h.Store.UserConfig.GetComplimentCount(ctx, partnerID)
-		if err != nil {
-			h.HandleErr(chatID, "Ошибка при получении количества полученных комплиментов", err)
+		userConfig, err := h.api.GetPartnerUserConfig(ctx, chatID)
+		if err != nil || userConfig == nil {
+			h.HandleErr(chatID, "Error while trying to get user config", err)
 			return
 		}
-		maxCount, err = h.Store.UserConfig.GetComplimentMaxCount(ctx, partnerID)
-		if err != nil {
-			h.HandleErr(chatID, "Ошибка при получении максимального количества комплиментов", err)
-			return
-		}
+
+		count := userConfig.ComplimentCount
+		maxCount := userConfig.MaxComplimentCount
 
 		if maxCount == -1 {
 			text = "💫 Сегодня ты можешь получить ещё ♾️ комплиментов"
@@ -51,48 +53,32 @@ func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *domain.Message) 
 
 	err = h.ui.ComplimentsMenu(chatID, text)
 	if err != nil {
-		h.HandleErr(chatID, "Ошибка при попытке отобразить меню комплиментов", err)
+		h.HandleErr(chatID, "An error occurred while trying to display the compliments menu.", err)
 		return
 	}
 }
 
-func (h *Handler) AddCompliment(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
+func (h *Handler) AddCompliment(_ context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
-
-	err := h.Store.Users.SetUserState(ctx, userID, domain.AwaitingCompliment)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при установке состояния awaiting_compliment", err)
-		return
-	}
-
+	h.sm.SetStep(state.AwaitingCompliment)
 	h.Reply(chatID, "💌 Напиши комплимент")
 }
 
 func (h *Handler) ProcessCompliment(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
 	complimentText := msg.Text
 
 	if complimentText == "" {
-		err := h.Store.Users.SetUserState(ctx, userID, domain.Empty)
-		if err != nil {
-			h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-			return
-		}
+		h.sm.SetStep(state.Empty)
 		h.Reply(chatID, "Кажется, тут пусто 🙈 Попробуй ещё раз")
 		return
 	}
 
-	err := h.Store.Users.SetUserState(ctx, userID, domain.Empty)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при сбросе состояния", err)
-		return
-	}
+	h.sm.SetStep(state.Empty)
 
-	_, err = h.Store.Compliments.AddCompliment(ctx, userID, complimentText)
+	_, err := h.api.AddCompliment(ctx, chatID, complimentText)
 	if err != nil {
-		h.HandleErr(chatID, "Ошибка при добавлении комплимента", err)
+		h.HandleErr(chatID, "Error adding compliment", err)
 		return
 	}
 
@@ -100,13 +86,12 @@ func (h *Handler) ProcessCompliment(ctx context.Context, msg *domain.Message) {
 }
 
 func (h *Handler) GetCompliments(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
 	var reply string
 
-	compliments, err := h.Store.Compliments.GetCompliments(ctx, userID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении списка комплиментов", err)
+	compliments, err := h.api.GetAllCompliments(ctx, chatID)
+	if err != nil || compliments == nil {
+		h.HandleErr(chatID, "Error getting list of compliments", err)
 		return
 	}
 
@@ -137,7 +122,7 @@ func (h *Handler) GetCompliments(ctx context.Context, msg *domain.Message) {
 
 func truncateText(text string, maxLength int) string {
 	text = strings.TrimSpace(text)
-	runes := []rune(text) // конвертируем в руны
+	runes := []rune(text)
 	if len(runes) <= maxLength {
 		return text
 	}
@@ -145,12 +130,11 @@ func truncateText(text string, maxLength int) string {
 }
 
 func (h *Handler) DeleteCompliment(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
 
-	compliments, err := h.Store.Compliments.GetCompliments(ctx, userID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении списка комплиментов", err)
+	compliments, err := h.api.GetAllCompliments(ctx, chatID)
+	if err != nil || compliments == nil {
+		h.HandleErr(chatID, "Error getting list of compliments", err)
 		return
 	}
 
@@ -201,17 +185,16 @@ func (h *Handler) DeleteCompliment(ctx context.Context, msg *domain.Message) {
 func (h *Handler) HandleDeleteCompliment(ctx context.Context, cb *domain.CallbackQuery) {
 	data := cb.Data
 	chatID := cb.ChatID
-	userID := cb.UserID
 	messageID := cb.MessageID
 
 	if strings.HasPrefix(data, "compliments:delete:confirm:") {
 		complimentIDStr := strings.TrimPrefix(data, "compliments:delete:confirm:")
 		complimentID, _ := strconv.Atoi(complimentIDStr)
 
-		err := h.Store.Compliments.DeleteCompliment(ctx, userID, int64(complimentID))
+		err := h.api.DeleteCompliment(ctx, chatID, int64(complimentID))
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
-			h.HandleErr(chatID, "Ошибка при попытке удалить комплимент", err)
+			h.HandleErr(chatID, "Error deleting compliment", err)
 			return
 		}
 
@@ -223,68 +206,63 @@ func (h *Handler) HandleDeleteCompliment(ctx context.Context, cb *domain.Callbac
 }
 
 func (h *Handler) ReceiveCompliment(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
 
-	partnerID, err := h.Store.Users.GetPartnerID(ctx, userID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении id партнера", err)
+	user, err := h.api.GetMe(ctx, chatID)
+	if err != nil || user == nil {
+		h.HandleErr(chatID, "Error getting user", err)
 		return
 	}
 
-	if partnerID == 0 {
+	if user.PartnerID == 0 {
 		h.Reply(chatID, "🤍 Чтобы получать комплименты, сначала добавь партнёра")
 		return
 	}
 
-	text, err := h.Store.Compliments.AcquireCompliment(ctx, partnerID)
+	compliment, err := h.api.ReceiveNextCompliment(ctx, chatID)
 	if err != nil {
-		var e *domain.ErrBucketEmpty
+		var e *errs.ErrBucketEmpty
 		switch {
 		case errors.As(err, &e):
 			h.Reply(chatID, fmt.Sprintf("⏳ Немного терпения\nСледующий комплимент будет доступен через %d мин.", e.Minutes))
 			return
 		default:
-			if errors.Is(err, domain.ErrNoCompliments) {
+			if errors.Is(err, errs.ErrNoCompliments) {
 				h.Reply(chatID, "📭 Пока для тебя нет новых комплиментов")
 				return
 			}
-			if errors.Is(err, domain.ErrLimitExceeded) {
+			if errors.Is(err, errs.ErrLimitExceeded) {
 				h.Reply(chatID, "🌙 На сегодня лимит исчерпан. Завтра будет продолжение 💛")
 				return
 			}
-			h.HandleErr(chatID, "Ошибка при получении комплимента", err)
+			h.HandleErr(chatID, "Error when receiving a compliment", err)
 			return
 		}
 	}
 
 	var complimentMessages = []string{
-		"💖 <b>Для тебя есть тёплые слова:</b>\n\n«" + text + "»",
-		"✨ <b>Небольшое послание от твоего человека:</b>\n\n«" + text + "»",
-		"🌷 <b>Тебе отправили комплимент:</b>\n\n«" + text + "»",
+		"💖 <b>Для тебя есть тёплые слова:</b>\n\n«" + compliment.Text + "»",
+		"✨ <b>Небольшое послание от твоего человека:</b>\n\n«" + compliment.Text + "»",
+		"🌷 <b>Тебе отправили комплимент:</b>\n\n«" + compliment.Text + "»",
 	}
 
 	randomIndex := rand.Intn(len(complimentMessages))
 	h.Reply(chatID, complimentMessages[randomIndex])
-	h.Reply(partnerID,
-		"💌 <b>Комплимент доставлен</b>\n\nТы только что порадовал(а) своего партнёра ✨\n\n«"+text+"»",
+	h.Reply(user.PartnerID,
+		"💌 <b>Комплимент доставлен</b>\n\nТы только что порадовал(а) своего партнёра ✨\n\n«"+compliment.Text+"»",
 	)
 }
 
 func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
 
-	actualFreq, err := h.Store.UserConfig.GetComplimentMaxCount(ctx, userID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при попытке получить частоту комплиментов", err)
+	userConfig, err := h.api.GetMyUserConfig(ctx, chatID)
+	if err != nil || userConfig == nil {
+		h.HandleErr(chatID, "Error getting user config", err)
 		return
 	}
-	count, err := h.Store.UserConfig.GetComplimentCount(ctx, userID)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при получении количества комплиментов", err)
-		return
-	}
+	actualFreq := userConfig.MaxComplimentCount
+	count := userConfig.ComplimentCount
 
 	actualFreqStr := strconv.Itoa(actualFreq)
 	countStr := strconv.Itoa(count)
@@ -297,11 +275,7 @@ func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *domain.Messa
 		"• отправь число\n" +
 		"• или «-», чтобы убрать лимит"
 
-	err = h.Store.Users.SetUserState(ctx, userID, domain.AwaitingComplimentFrequency)
-	if err != nil {
-		h.HandleErr(chatID, "Ошибка при попытке установить состояние", err)
-		return
-	}
+	h.sm.SetStep(state.AwaitingComplimentFrequency)
 
 	err = h.ui.EditComplimentFrequencyMenu(chatID, text)
 	if err != nil {
@@ -311,7 +285,6 @@ func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *domain.Messa
 }
 
 func (h *Handler) ProcessComplimentFrequency(ctx context.Context, msg *domain.Message) {
-	userID := msg.UserID
 	chatID := msg.ChatID
 	freq := msg.Text
 	freqInt := 1
@@ -328,9 +301,9 @@ func (h *Handler) ProcessComplimentFrequency(ctx context.Context, msg *domain.Me
 		}
 	}
 
-	err := h.Store.UserConfig.SetComplimentMaxCount(ctx, userID, freqInt)
+	err := h.api.UpdateUserConfig(ctx, chatID, &freqInt)
 	if err != nil {
-		h.HandleErr(chatID, "Ошибка при изменении лимита", err)
+		h.HandleErr(chatID, "Error changing limit", err)
 		return
 	}
 

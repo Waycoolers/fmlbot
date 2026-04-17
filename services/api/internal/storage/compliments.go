@@ -15,7 +15,7 @@ type complimentsRepo struct {
 	db *sqlx.DB
 }
 
-func (s *complimentsRepo) AddCompliment(ctx context.Context, telegramID int64, text string) (*domain.Compliment, error) {
+func (s *complimentsRepo) AddCompliment(ctx context.Context, userID int64, text string) (*domain.Compliment, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -36,9 +36,9 @@ func (s *complimentsRepo) AddCompliment(ctx context.Context, telegramID int64, t
 	}
 
 	_, err = tx.ExecContext(ctx, `
-        INSERT INTO user_compliment (telegram_id, compliment_id)
+        INSERT INTO user_compliment (user_id, compliment_id)
         VALUES ($1, $2)
-    `, telegramID, compliment.ID)
+    `, userID, compliment.ID)
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {
@@ -50,30 +50,30 @@ func (s *complimentsRepo) AddCompliment(ctx context.Context, telegramID int64, t
 	return &compliment, tx.Commit()
 }
 
-func (s *complimentsRepo) GetCompliments(ctx context.Context, telegramID int64) (compliments []domain.Compliment, err error) {
+func (s *complimentsRepo) GetCompliments(ctx context.Context, userID int64) (compliments []domain.Compliment, err error) {
 	compliments = []domain.Compliment{}
 	err = s.db.SelectContext(ctx, &compliments, `
 		SELECT c.id, c.text, c.is_sent, c.created_at
 		FROM compliments AS c
 		JOIN user_compliment AS uc ON c.id = uc.compliment_id
-		WHERE uc.telegram_id = $1
+		WHERE uc.user_id = $1
 		ORDER BY c.created_at;
-	`, telegramID)
+	`, userID)
 	if err != nil {
 		return nil, err
 	}
 	return compliments, nil
 }
 
-func (s *complimentsRepo) DeleteCompliment(ctx context.Context, telegramID int64, complimentID int64) error {
+func (s *complimentsRepo) DeleteCompliment(ctx context.Context, userID int64, complimentID int64) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
 	res, err := tx.ExecContext(ctx, `
-		DELETE FROM user_compliment WHERE telegram_id=$1 AND compliment_id=$2
-	`, telegramID, complimentID)
+		DELETE FROM user_compliment WHERE user_id=$1 AND compliment_id=$2
+	`, userID, complimentID)
 	if err != nil {
 		_ = tx.Rollback()
 		return err
@@ -129,7 +129,7 @@ func (s *complimentsRepo) AcquireCompliment(ctx context.Context, partnerID int64
 	err = tx.QueryRowContext(ctx, `
         SELECT compliment_token_bucket, last_bucket_update, compliment_count, max_compliment_count
         FROM user_config
-        WHERE telegram_id = $1
+        WHERE user_id = $1
         FOR UPDATE
     `, partnerID).Scan(&bucket, &lastBucketUpdate, &complimentCount, &maxComplimentCount)
 	if err != nil {
@@ -191,7 +191,7 @@ func (s *complimentsRepo) AcquireCompliment(ctx context.Context, partnerID int64
 			SELECT c.id, c.text
 			FROM user_compliment uc
 			JOIN compliments c ON c.id = uc.compliment_id
-			WHERE uc.telegram_id = $1 AND c.is_sent = false
+			WHERE uc.user_id = $1 AND c.is_sent = false
 			ORDER BY c.created_at
 			LIMIT 1
 			FOR UPDATE OF c SKIP LOCKED
@@ -218,7 +218,7 @@ func (s *complimentsRepo) AcquireCompliment(ctx context.Context, partnerID int64
             compliment_count = $2,
             last_compliment_at = $3,
             last_bucket_update = $4
-        WHERE telegram_id = $5
+        WHERE user_id = $5
     `, newBucket, newComplimentCount, now, newLastBucketUpdate, partnerID)
 	if err != nil {
 		_ = tx.Rollback()
@@ -239,7 +239,7 @@ func (s *complimentsRepo) UpdateCompliment(ctx context.Context, userID int64, co
 		SET text = $1, is_sent = $2
 		FROM user_compliment AS uc
 		WHERE c.id = uc.compliment_id
-		AND uc.telegram_id = $3
+		AND uc.user_id = $3
 		AND uc.compliment_id = $4;
 	`, text, isSent, userID, complimentID)
 	if err != nil {

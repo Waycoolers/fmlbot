@@ -144,11 +144,18 @@ func (h *Handler) ReceiveCompliment(w http.ResponseWriter, r *http.Request) {
 
 	compliment, err := h.uc.AcquireCompliment(ctx, userID)
 	if err != nil {
-		if errors.Is(err, errs.ErrUserNotFound) || errors.Is(err, errs.ErrNoCompliments) {
+		if errors.Is(err, errs.ErrUserNotFound) {
 			body := map[string]string{
 				"error": err.Error(),
 			}
 			sendJson(w, http.StatusNotFound, body)
+			return
+		}
+		if errors.Is(err, errs.ErrNoCompliments) {
+			body := map[string]string{
+				"error": err.Error(),
+			}
+			sendJson(w, http.StatusGone, body)
 			return
 		}
 		if errors.Is(err, errs.ErrLimitExceeded) {

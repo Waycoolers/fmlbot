@@ -32,10 +32,16 @@ func (s *Server) newServer() *http.Server {
 	mux.HandleFunc("GET /users/partner", s.h.GetPartner)
 	mux.HandleFunc("DELETE /users/me", s.h.DeleteUser)
 	mux.HandleFunc("PUT /users/me", s.h.UpdateUser)
+	mux.HandleFunc("PUT /users/partner", s.h.UpdatePartner)
+	mux.HandleFunc("POST /users/pair", s.h.AddPartners)
+	mux.HandleFunc("PATCH /users/unpair", s.h.DeletePartners)
+	mux.HandleFunc("GET /users/by-username/{username}", s.h.GetUserByUsername)
 
 	mux.HandleFunc("GET /user_config/me", s.h.GetMyUserConfig)
 	mux.HandleFunc("GET /user_config/partner", s.h.GetPartnerUserConfig)
 	mux.HandleFunc("PATCH /user_config/me", s.h.UpdateUserConfig)
+	mux.HandleFunc("POST /user_config/reset/me", s.h.ResetMyUserConfig)
+	mux.HandleFunc("POST /user_config/reset/partner", s.h.ResetPartnerUserConfig)
 
 	mux.HandleFunc("POST /compliments", s.h.AddCompliment)
 	mux.HandleFunc("GET /compliments", s.h.GetAllCompliments)

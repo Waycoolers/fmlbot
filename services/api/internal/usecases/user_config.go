@@ -27,12 +27,9 @@ func (uc *UseCase) GetMyUserConfig(ctx context.Context, userID int64) (*domain.U
 	}
 
 	return &domain.UserConfigResponse{
-		DailyMessageTime:      userConfig.DailyMessageTime,
-		MaxComplimentCount:    userConfig.MaxComplimentCount,
-		ComplimentCount:       userConfig.ComplimentCount,
-		LastComplimentAt:      userConfig.LastComplimentAt,
-		ComplimentTokenBucket: userConfig.ComplimentTokenBucket,
-		LastBucketUpdate:      userConfig.LastBucketUpdate,
+		DailyMessageTime:   userConfig.DailyMessageTime,
+		MaxComplimentCount: userConfig.MaxComplimentCount,
+		ComplimentCount:    userConfig.ComplimentCount,
 	}, nil
 }
 
@@ -65,12 +62,9 @@ func (uc *UseCase) GetPartnerUserConfig(ctx context.Context, userID int64) (*dom
 	}
 
 	return &domain.UserConfigResponse{
-		DailyMessageTime:      userConfig.DailyMessageTime,
-		MaxComplimentCount:    userConfig.MaxComplimentCount,
-		ComplimentCount:       userConfig.ComplimentCount,
-		LastComplimentAt:      userConfig.LastComplimentAt,
-		ComplimentTokenBucket: userConfig.ComplimentTokenBucket,
-		LastBucketUpdate:      userConfig.LastBucketUpdate,
+		DailyMessageTime:   userConfig.DailyMessageTime,
+		MaxComplimentCount: userConfig.MaxComplimentCount,
+		ComplimentCount:    userConfig.ComplimentCount,
 	}, nil
 }
 
@@ -90,4 +84,36 @@ func (uc *UseCase) UpdateUserConfig(ctx context.Context, userID int64, userConfi
 		}
 	}
 	return nil
+}
+
+func (uc *UseCase) ResetMyUserConfig(ctx context.Context, userID int64) error {
+	exists, err := uc.users.IsUserExists(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errs.ErrUserNotFound
+	}
+
+	return uc.userConfig.SetDefault(ctx, userID)
+}
+
+func (uc *UseCase) ResetPartnerUserConfig(ctx context.Context, userID int64) error {
+	exists, err := uc.users.IsUserExists(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errs.ErrUserNotFound
+	}
+
+	partnerID, err := uc.users.GetPartnerID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if partnerID == 0 {
+		return errs.ErrPartnerNotFound
+	}
+
+	return uc.userConfig.SetDefault(ctx, partnerID)
 }

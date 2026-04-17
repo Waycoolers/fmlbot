@@ -10,8 +10,10 @@ import (
 
 type Config struct {
 	Bot       *BotConfig
-	DB        *DatabaseConfig
 	RDB       *RedisConfig
+	Server    *ServerConfig
+	Api       *ApiConfig
+	Auth      *AuthConfig
 	Loglevel  string
 	JwtSecret []byte
 }
@@ -20,20 +22,28 @@ type BotConfig struct {
 	Token          string
 	UpdatesTimeout int
 }
-
-type DatabaseConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	Name     string
-}
-
 type RedisConfig struct {
 	Host     string
 	Port     string
 	Password string
 	DB       string
+}
+
+type ServerConfig struct {
+	Host string
+	Port int
+}
+
+type ApiConfig struct {
+	Host        string
+	Port        int
+	HTTPTimeout int
+}
+
+type AuthConfig struct {
+	Host        string
+	Port        int
+	HTTPTimeout int
 }
 
 func Load() (*Config, error) {
@@ -54,20 +64,32 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	db, err := loadDatabaseConfig()
+	rdb, err := loadRedisConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	rdb, err := loadRedisConfig()
+	server, err := loadServerConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	api, err := loadApiConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	auth, err := loadAuthConfig()
 	if err != nil {
 		return nil, err
 	}
 
 	return &Config{
 		Bot:       bot,
-		DB:        db,
 		RDB:       rdb,
+		Server:    server,
+		Api:       api,
+		Auth:      auth,
 		Loglevel:  loglevel,
 		JwtSecret: []byte(jwtSecret),
 	}, nil
@@ -94,42 +116,6 @@ func loadBotConfig() (*BotConfig, error) {
 	}, nil
 }
 
-func loadDatabaseConfig() (*DatabaseConfig, error) {
-	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "localhost"
-		slog.Warn("not found DB_HOST")
-	}
-	port := os.Getenv("DB_PORT")
-	if port == "" {
-		port = "5432"
-		slog.Warn("not found DB_PORT")
-	}
-	user := os.Getenv("DB_USER")
-	if user == "" {
-		user = "postgres"
-		slog.Warn("not found DB_USER")
-	}
-	password := os.Getenv("DB_PASSWORD")
-	if password == "" {
-		password = "postgres"
-		slog.Warn("not found DB_PASSWORD")
-	}
-	name := os.Getenv("DB_NAME")
-	if name == "" {
-		name = "fmlbot"
-		slog.Warn("not found DB_NAME")
-	}
-
-	return &DatabaseConfig{
-		Host:     host,
-		Port:     port,
-		User:     user,
-		Password: password,
-		Name:     name,
-	}, nil
-}
-
 func loadRedisConfig() (*RedisConfig, error) {
 	host := os.Getenv("REDIS_HOST")
 	if host == "" {
@@ -153,5 +139,93 @@ func loadRedisConfig() (*RedisConfig, error) {
 		Port:     port,
 		Password: password,
 		DB:       name,
+	}, nil
+}
+
+func loadServerConfig() (*ServerConfig, error) {
+	port := os.Getenv("BOT_PORT")
+	if port == "" {
+		port = "8080"
+		slog.Warn("not found BOT_PORT")
+	}
+	host := os.Getenv("BOT_HOST")
+	if host == "" {
+		host = "localhost"
+		slog.Warn("not found BOT_HOST")
+	}
+
+	intPort, err := strconv.Atoi(port)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ServerConfig{
+		Host: host,
+		Port: intPort,
+	}, nil
+}
+
+func loadApiConfig() (*ApiConfig, error) {
+	host := os.Getenv("API_HOST")
+	if host == "" {
+		host = "localhost"
+		slog.Warn("not found API_HOST")
+	}
+	port := os.Getenv("API_PORT")
+	if port == "" {
+		port = "8080"
+		slog.Warn("not found API_PORT")
+	}
+	intPort, err := strconv.Atoi(port)
+	if err != nil {
+		return nil, err
+	}
+
+	httpTimeout := os.Getenv("API_HTTP_TIMEOUT")
+	if httpTimeout == "" {
+		httpTimeout = "60"
+		slog.Warn("not found HTTP_TIMEOUT")
+	}
+	intHTTPTimeout, err := strconv.Atoi(httpTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ApiConfig{
+		Host:        host,
+		Port:        intPort,
+		HTTPTimeout: intHTTPTimeout,
+	}, nil
+}
+
+func loadAuthConfig() (*AuthConfig, error) {
+	host := os.Getenv("AUTH_HOST")
+	if host == "" {
+		host = "localhost"
+		slog.Warn("not found AUTH_HOST")
+	}
+	port := os.Getenv("AUTH_PORT")
+	if port == "" {
+		port = "8080"
+		slog.Warn("not found AUTH_PORT")
+	}
+	intPort, err := strconv.Atoi(port)
+	if err != nil {
+		return nil, err
+	}
+	httpTimeout := os.Getenv("AUTH_HTTP_TIMEOUT")
+	if httpTimeout == "" {
+		httpTimeout = "60"
+		slog.Warn("not found AUTH_HTTP_TIMEOUT")
+	}
+	intHTTPTimeout, err := strconv.Atoi(httpTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AuthConfig{
+		Host:        host,
+		Port:        intPort,
+		HTTPTimeout: intHTTPTimeout,
 	}, nil
 }

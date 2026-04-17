@@ -85,13 +85,13 @@ func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context) ([]domain.I
 			ImportantDateID: importantDate.ID,
 			Message:         text,
 		}
-		if importantDate.TelegramID.Valid && importantDate.TelegramID.Int64 != 0 {
-			tgIDs = append(tgIDs, importantDate.TelegramID.Int64)
+		if importantDate.UserID.Valid && importantDate.UserID.Int64 != 0 {
+			tgIDs = append(tgIDs, importantDate.UserID.Int64)
 		}
 		if importantDate.PartnerID.Valid && importantDate.PartnerID.Int64 != 0 {
 			tgIDs = append(tgIDs, importantDate.PartnerID.Int64)
 		}
-		message.TgIDs = tgIDs
+		message.UserIDs = tgIDs
 		messages = append(messages, message)
 	}
 	return messages, nil
