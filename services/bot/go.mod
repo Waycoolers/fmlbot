@@ -3,7 +3,6 @@ module github.com/Waycoolers/fmlbot/services/bot
 go 1.25.4
 
 require (
-	github.com/Waycoolers/fmlbot/common v0.0.0-00010101000000-000000000000
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/joho/godotenv v1.5.1
 	github.com/redis/go-redis/v9 v9.18.0
@@ -17,5 +16,3 @@ require (
 	github.com/stretchr/testify v1.10.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 )
-
-replace github.com/Waycoolers/fmlbot/common => ../../common

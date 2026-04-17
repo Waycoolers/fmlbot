@@ -1,16 +1,16 @@
 FROM golang:1.25.4-alpine AS builder
 WORKDIR /app
 
-# Копируем весь проект (включая common и все сервисы)
+# Копируем ВЕСЬ проект (корневой каталог)
 COPY . .
 
-# Переходим в директорию api-сервиса
+# Переходим в директорию сервиса
 WORKDIR /app/services/api
 
-# Скачиваем зависимости (теперь common уже на месте)
+# Скачиваем зависимости
 RUN go mod download
 
-# Собираем бинарный файл
+# Собираем бинарник
 RUN CGO_ENABLED=0 GOOS=linux go build -o /api ./cmd/api
 
 FROM alpine:latest

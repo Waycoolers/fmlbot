@@ -3,7 +3,6 @@ module github.com/Waycoolers/fmlbot/services/api
 go 1.25.4
 
 require (
-	github.com/Waycoolers/fmlbot/common v0.0.0-00010101000000-000000000000
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
@@ -25,7 +24,3 @@ require (
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 )
-
-replace github.com/Waycoolers/fmlbot/services/auth => ../auth
-
-replace github.com/Waycoolers/fmlbot/common => ../../common
