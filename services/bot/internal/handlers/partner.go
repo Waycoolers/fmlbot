@@ -24,7 +24,7 @@ func (h *Handler) ShowPartnerMenu(ctx context.Context, msg *domain.Message) {
 	if user.PartnerID == 0 {
 		text = "🤍 У тебя пока нет партнёра"
 	} else {
-		partner, err := h.api.GetPartner(ctx, user.PartnerID)
+		partner, err := h.api.GetPartner(ctx, chatID)
 		if err != nil || partner == nil {
 			h.HandleErr(chatID, "Error getting partner", err)
 			return
@@ -53,7 +53,7 @@ func (h *Handler) SetPartner(ctx context.Context, msg *domain.Message) {
 		h.sm.SetStep(state.AwaitingPartner)
 		h.Reply(chatID, "💌 Отправь username партнёра")
 	} else {
-		partner, err := h.api.GetPartner(ctx, user.PartnerID)
+		partner, err := h.api.GetPartner(ctx, chatID)
 		if err != nil || partner == nil {
 			h.HandleErr(chatID, "Error getting partner", err)
 			return
@@ -166,7 +166,7 @@ func (h *Handler) DeletePartner(ctx context.Context, msg *domain.Message) {
 		},
 	}
 
-	partner, err := h.api.GetPartner(ctx, user.PartnerID)
+	partner, err := h.api.GetPartner(ctx, chatID)
 	if err != nil || partner == nil {
 		h.HandleErr(chatID, "Error getting partner", err)
 		return
