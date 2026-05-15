@@ -20,7 +20,9 @@ func Middleware(secret []byte, publicPaths ...string) func(http.Handler) http.Ha
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Пропускаем публичные пути
 			for _, path := range publicPaths {
-				if r.URL.Path == path {
+				method := strings.Split(path, " ")[0]
+				url := strings.TrimPrefix(path, method+" ")
+				if strings.HasPrefix(r.URL.Path, url) && r.Method == method {
 					next.ServeHTTP(w, r)
 					return
 				}
