@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/Waycoolers/fmlbot/common/errs"
@@ -59,6 +60,35 @@ func (s *complimentsRepo) GetCompliments(ctx context.Context, userID int64) (com
 		WHERE uc.user_id = $1
 		ORDER BY c.created_at;
 	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	return compliments, nil
+}
+
+func (s *complimentsRepo) GetReceivedCompliments(ctx context.Context, userID int64) (compliments []domain.Compliment, err error) {
+	var partnerID int64
+	err = s.db.GetContext(ctx, &partnerID, `
+		SELECT partner_id FROM users WHERE user_id = $1
+	`, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return []domain.Compliment{}, nil
+		}
+		return nil, err
+	}
+	if partnerID == 0 {
+		return []domain.Compliment{}, nil
+	}
+
+	compliments = []domain.Compliment{}
+	err = s.db.SelectContext(ctx, &compliments, `
+		SELECT c.id, c.text, c.is_sent, c.created_at
+		FROM compliments AS c
+		JOIN user_compliment AS uc ON c.id = uc.compliment_id
+		WHERE uc.user_id = $1 AND c.is_sent = true
+		ORDER BY c.created_at;
+	`, partnerID)
 	if err != nil {
 		return nil, err
 	}

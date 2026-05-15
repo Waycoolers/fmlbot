@@ -45,6 +45,7 @@ func (s *Server) newServer() *http.Server {
 
 	mux.HandleFunc("POST /compliments", s.h.AddCompliment)
 	mux.HandleFunc("GET /compliments", s.h.GetAllCompliments)
+	mux.HandleFunc("GET /compliments/received", s.h.GetAllReceivedCompliments)
 	mux.HandleFunc("PUT /compliments/{id}", s.h.UpdateCompliment)
 	mux.HandleFunc("DELETE /compliments/{id}", s.h.RemoveCompliment)
 	mux.HandleFunc("POST /compliments/next", s.h.ReceiveCompliment)
@@ -56,7 +57,7 @@ func (s *Server) newServer() *http.Server {
 	mux.HandleFunc("PATCH /important_dates/{id}/sharing", s.h.UpdateImportantDateSharing)
 	mux.HandleFunc("DELETE /important_dates/{id}", s.h.RemoveImportantDate)
 
-	handler := jwtmiddleware.Middleware(s.config.JwtSecret)(mux)
+	handler := jwtmiddleware.Middleware(s.config.JwtSecret, "GET /users/by-username")(mux)
 	addr := fmt.Sprintf("%s:%s", s.config.Host, s.config.Port)
 	return &http.Server{
 		Addr:    addr,

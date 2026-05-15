@@ -31,6 +31,7 @@ type UserConfigRepo interface {
 type ComplimentsRepo interface {
 	AddCompliment(ctx context.Context, userID int64, text string) (*Compliment, error)
 	GetCompliments(ctx context.Context, userID int64) (compliments []Compliment, err error)
+	GetReceivedCompliments(ctx context.Context, userID int64) (compliments []Compliment, err error)
 	UpdateCompliment(ctx context.Context, userID int64, complimentID int64, text string, isSent bool) error
 	DeleteCompliment(ctx context.Context, userID int64, complimentID int64) error
 	MarkComplimentSent(ctx context.Context, complimentID int64) error

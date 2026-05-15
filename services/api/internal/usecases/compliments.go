@@ -38,6 +38,22 @@ func (uc *UseCase) GetAllCompliments(ctx context.Context, userID int64) (*[]doma
 	return &compliments, nil
 }
 
+func (uc *UseCase) GetAllReceivedCompliments(ctx context.Context, userID int64) (*[]domain.Compliment, error) {
+	exists, err := uc.users.IsUserExists(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errs.ErrUserNotFound
+	}
+
+	compliments, err := uc.compliments.GetReceivedCompliments(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &compliments, nil
+}
+
 func (uc *UseCase) RemoveCompliment(ctx context.Context, userID int64, complimentID int64) error {
 	exists, err := uc.users.IsUserExists(ctx, userID)
 	if err != nil {
