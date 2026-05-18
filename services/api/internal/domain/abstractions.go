@@ -55,5 +55,5 @@ type SchedulerRepo interface {
 }
 
 type Sender interface {
-	SendMessage(ctx context.Context, update any) error
+	SendMessage(ctx context.Context, path string, update any) error
 }

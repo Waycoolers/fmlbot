@@ -14,9 +14,10 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Host      string
-	Port      string
-	JwtSecret []byte
+	InternalSecret []byte
+	Host           string
+	Port           string
+	JwtSecret      []byte
 }
 
 type DatabaseConfig struct {
@@ -59,6 +60,11 @@ func Load() (*Config, error) {
 }
 
 func loadServerConfig() (*ServerConfig, error) {
+	secret := os.Getenv("INTERNAL_API_SECRET")
+	if secret == "" {
+		slog.Error("not found INTERNAL_API_SECRET")
+		return nil, errors.New("no INTERNAL_API_SECRET")
+	}
 	host := os.Getenv("API_HOST")
 	if host == "" {
 		host = "localhost"
@@ -75,9 +81,10 @@ func loadServerConfig() (*ServerConfig, error) {
 		return nil, errors.New("no JWT_SECRET")
 	}
 	return &ServerConfig{
-		Host:      host,
-		Port:      port,
-		JwtSecret: []byte(jwtSecret),
+		InternalSecret: []byte(secret),
+		Host:           host,
+		Port:           port,
+		JwtSecret:      []byte(jwtSecret),
 	}, nil
 }
 

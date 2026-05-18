@@ -29,9 +29,10 @@ type UserRequest struct {
 }
 
 type UserResponse struct {
-	ID        int64  `db:"user_id" json:"user_id"`
-	Username  string `db:"username" json:"username"`
-	PartnerID int64  `db:"partner_id" json:"partner_id"`
+	ID           int64  `db:"user_id" json:"user_id"`
+	Username     string `db:"username" json:"username"`
+	PartnerID    int64  `db:"partner_id" json:"partner_id"`
+	PasswordHash string `db:"password_hash" json:"password_hash"`
 }
 
 type UserConfig struct {

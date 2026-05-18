@@ -49,7 +49,7 @@ func main() {
 
 	srv := server.New(cfg.Server, h)
 
-	snd := sender.NewHTTPSender(cfg.BotURL)
+	snd := sender.NewHTTPSender(cfg.BotURL, cfg.Server.InternalSecret)
 	sched := scheduler.New(h, snd)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
