@@ -23,8 +23,9 @@ func (h *Handler) NotifyImportantDatesCron(ctx context.Context, s domain.Sender)
 		return
 	}
 
+	path := "/updates/important_dates"
 	for _, msg := range messages {
-		err = s.SendMessage(ctx, msg)
+		err = s.SendMessage(ctx, path, msg)
 		if err != nil {
 			slog.Error("Error sending message to important dates", "error", err)
 			continue

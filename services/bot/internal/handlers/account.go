@@ -2,12 +2,25 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
 
 	"github.com/Waycoolers/fmlbot/common/errs"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
 )
+
+func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
+	var message domain.MessageRequest
+	err := json.NewDecoder(r.Body).Decode(&message)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	h.Reply(message.UserID, message.Text)
+}
 
 func (h *Handler) ShowAccountMenu(_ context.Context, msg *domain.Message) {
 	chatID := msg.ChatID

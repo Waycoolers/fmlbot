@@ -95,6 +95,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       LOG_LEVEL: ${LOG_LEVEL}
       BOT_URL: ${BOT_URL}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
     ports:
       - "${API_PORT}:${API_PORT}"
     depends_on:
@@ -128,6 +129,7 @@ services:
       AUTH_HTTP_TIMEOUT: ${AUTH_HTTP_TIMEOUT}
       LOG_LEVEL: ${LOG_LEVEL}
       JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
     ports:
       - "${BOT_PORT}:${BOT_PORT}"
     depends_on:

@@ -30,8 +30,9 @@ type RedisConfig struct {
 }
 
 type ServerConfig struct {
-	Host string
-	Port int
+	InternalSecret []byte
+	Host           string
+	Port           int
 }
 
 type ApiConfig struct {
@@ -154,14 +155,21 @@ func loadServerConfig() (*ServerConfig, error) {
 		slog.Warn("not found BOT_HOST")
 	}
 
+	secret := os.Getenv("INTERNAL_API_SECRET")
+	if secret == "" {
+		slog.Error("not found INTERNAL_API_SECRET")
+		return nil, errors.New("no INTERNAL_API_SECRET")
+	}
+
 	intPort, err := strconv.Atoi(port)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ServerConfig{
-		Host: host,
-		Port: intPort,
+		InternalSecret: []byte(secret),
+		Host:           host,
+		Port:           intPort,
 	}, nil
 }
 
