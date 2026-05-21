@@ -1,4 +1,4 @@
-package jwtmiddleware
+package middlewares
 
 import (
 	"context"

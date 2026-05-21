@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/Waycoolers/fmlbot/common/errs"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
 

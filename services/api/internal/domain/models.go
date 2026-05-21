@@ -29,10 +29,9 @@ type UserRequest struct {
 }
 
 type UserResponse struct {
-	ID           int64  `db:"user_id" json:"user_id"`
-	Username     string `db:"username" json:"username"`
-	PartnerID    int64  `db:"partner_id" json:"partner_id"`
-	PasswordHash string `db:"password_hash" json:"password_hash"`
+	ID        int64  `db:"user_id" json:"user_id"`
+	Username  string `db:"username" json:"username"`
+	PartnerID int64  `db:"partner_id" json:"partner_id"`
 }
 
 type UserConfig struct {
@@ -81,10 +80,16 @@ type Repos struct {
 	Compliments    ComplimentsRepo
 	ImportantDates ImportantDatesRepo
 	Scheduler      SchedulerRepo
+	FCM            FCMRepo
 }
 
 type ImportantDateMessage struct {
 	ImportantDateID int64   `db:"important_date_id" json:"important_date_id"`
 	UserIDs         []int64 `db:"user_ids" json:"user_ids"`
 	Message         string  `db:"message" json:"message"`
+}
+
+type MessageRequest struct {
+	Text   string `json:"text"`
+	UserID int64  `json:"user_id"`
 }

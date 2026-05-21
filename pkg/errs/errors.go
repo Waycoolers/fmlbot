@@ -11,6 +11,9 @@ var (
 	ErrImportantDateNotFound = errors.New("important date not found")
 	ErrPartnerNotFound       = errors.New("partner not found")
 	ErrUserConfigNotFound    = errors.New("user config not found")
+	ErrWrongPassword         = errors.New("wrong password")
+	ErrBadRequest            = errors.New("bad request")
+	ErrFCMTokenNotFound      = errors.New("fcm token not found")
 )
 
 type ErrBucketEmpty struct {

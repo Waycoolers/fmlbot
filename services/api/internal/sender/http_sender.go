@@ -25,7 +25,19 @@ func NewHTTPSender(botURL string, secret []byte) domain.Sender {
 	}
 }
 
-func (s *HTTPSender) SendMessage(ctx context.Context, path string, update any) error {
+func (s *HTTPSender) SendMessage(ctx context.Context, update domain.MessageRequest) error {
+	path := "/updates/message"
+	err := s.send(ctx, path, update)
+	return err
+}
+
+func (s *HTTPSender) SendImportantDatesNotification(ctx context.Context, update domain.ImportantDateMessage) error {
+	path := "/updates/important_dates"
+	err := s.send(ctx, path, update)
+	return err
+}
+
+func (s *HTTPSender) send(ctx context.Context, path string, update any) error {
 	data, err := json.Marshal(update)
 	if err != nil {
 		return err

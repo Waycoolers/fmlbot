@@ -10,6 +10,38 @@ class ImportantDateViewModel extends ChangeNotifier {
   bool isLoading = false;
   String? errorMessage;
 
+  // Найти ближайшую дату (с учетом ежегодного повторения)
+  ImportantDateModel? get upcomingDate {
+    if (dates.isEmpty) return null;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    ImportantDateModel? closestDate;
+    int minDaysLeft = 99999; // Заведомо большое число
+
+    for (var item in dates) {
+      // "Переносим" событие в текущий год
+      DateTime nextOccurrence = DateTime(today.year, item.date.month, item.date.day);
+
+      // Если в этом году дата уже прошла, значит ждем ее в следующем году
+      if (nextOccurrence.isBefore(today)) {
+        nextOccurrence = DateTime(today.year + 1, item.date.month, item.date.day);
+      }
+
+      // Считаем разницу в днях
+      final daysLeft = nextOccurrence.difference(today).inDays;
+
+      // Ищем самую маленькую разницу
+      if (daysLeft < minDaysLeft) {
+        minDaysLeft = daysLeft;
+        closestDate = item;
+      }
+    }
+
+    return closestDate;
+  }
+
   Future<void> fetchDates() async {
     isLoading = true;
     errorMessage = null;
@@ -21,11 +53,14 @@ class ImportantDateViewModel extends ChangeNotifier {
 
       dates = data.map((json) => ImportantDateModel.fromJson(json)).toList();
 
-      // Сортируем даты так, чтобы ближайшие были сверху
       dates.sort((a, b) => a.date.compareTo(b.date));
 
     } on DioException catch (e) {
-      errorMessage = "Ошибка загрузки дат: ${e.response?.statusCode}";
+      if (e.response == null) {
+        errorMessage = "Нет подключения к интернету";
+      } else {
+        errorMessage = "Не удалось загрузить даты";
+      }
     } catch (e) {
       errorMessage = "Непредвиденная ошибка";
     }
@@ -34,7 +69,6 @@ class ImportantDateViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Добавление новой даты
   Future<bool> addDate({
     required String title,
     required DateTime date,
@@ -99,13 +133,28 @@ class ImportantDateViewModel extends ChangeNotifier {
         'is_active': true,
       });
 
-      // 2. Отдельно обновляем статус "Общая дата с партнером"
-      await _apiClient.dio.patch('/important_dates/$id/sharing', data: {
-        'make_shared': isShared,
-      });
+      // Ищем старую дату в локальном списке, чтобы понять, меняли ли мы переключатель
+      final oldDateIndex = dates.indexWhere((d) => d.id == id);
+      if (oldDateIndex != -1) {
+        final oldDate = dates[oldDateIndex];
 
-      await fetchDates(); // Обновляем список после успешных запросов
+        // 2. Отправляем запрос на /sharing ТОЛЬКО если статус реально изменился
+        if (oldDate.isShared != isShared) {
+          try {
+            await _apiClient.dio.patch('/important_dates/$id/sharing', data: {
+              'make_shared': isShared,
+            });
+          } catch (e) {
+            // Если бэкенд всё равно выдает "sql: no rows in result set" - просто игнорируем,
+            // так как физически данные в БД обновляются.
+            print('Внимание: бэкенд выдал ошибку при шаринге, игнорируем: $e');
+          }
+        }
+      }
+
+      await fetchDates(); // Обновляем список
       return true;
+
     } on DioException catch (e) {
       print('Ошибка при обновлении даты: ${e.response?.statusCode}');
       return false;

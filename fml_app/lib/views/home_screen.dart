@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/utils.dart';
 import '../view_models/auth_view_model.dart';
 import '../view_models/user_view_model.dart';
+import '../view_models/important_date_view_model.dart'; // <-- Добавили импорт
 import 'compliments_screen.dart';
 import 'important_dates_screen.dart';
 import 'login_screen.dart';
@@ -20,12 +22,67 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<UserViewModel>().fetchProfiles();
+      // <-- Теперь при открытии главного экрана грузим еще и даты
+      context.read<ImportantDateViewModel>().fetchDates();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final userVM = context.watch<UserViewModel>();
+    final dateVM = context.watch<ImportantDateViewModel>();
+
+    // --- НОВАЯ КРАСИВАЯ ЛОГИКА ДЛЯ ДАТЫ ---
+    Widget? datesSubtitleWidget;
+
+    if (dateVM.isLoading) {
+      datesSubtitleWidget = Text('Загрузка...', style: TextStyle(fontSize: 13, color: Colors.grey.shade600));
+    } else if (dateVM.dates.isNotEmpty && dateVM.upcomingDate != null) {
+      final closest = dateVM.upcomingDate!;
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      // Считаем когда она будет в этом (или следующем) году
+      DateTime nextOccurrence = DateTime(today.year, closest.date.month, closest.date.day);
+      if (nextOccurrence.isBefore(today)) {
+        nextOccurrence = DateTime(today.year + 1, closest.date.month, closest.date.day);
+      }
+
+      final daysLeft = nextOccurrence.difference(today).inDays;
+
+      String daysText;
+      if (daysLeft == 0) daysText = 'Сегодня!';
+      else if (daysLeft == 1) daysText = 'Завтра';
+      else daysText = 'Через $daysLeft дн.';
+
+      datesSubtitleWidget = Row(
+        children: [
+          Expanded(
+            child: Text(
+              closest.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13, color: Colors.blue.shade700, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade100,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              daysText,
+              style: TextStyle(fontSize: 11, color: Colors.blue.shade900, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      );
+    } else {
+      datesSubtitleWidget = Text('Важных дат нет!', style: TextStyle(fontSize: 13, color: Colors.grey.shade600));
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -44,7 +101,6 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              // Спрашиваем подтверждение
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
@@ -63,7 +119,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
               if (confirm == true && context.mounted) {
                 await context.read<AuthViewModel>().logout();
-                // Уничтожаем историю навигации и кидаем на экран входа
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                       (route) => false,
@@ -75,9 +130,46 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: userVM.isLoading && userVM.currentUser == null
           ? const Center(child: CircularProgressIndicator())
+          : userVM.currentUser == null // <-- ПРОВЕРКА НА ОШИБКУ ЗАГРУЗКИ / НЕТ СЕТИ
+          ? Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.wifi_off_rounded, size: 80, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              const Text(
+                'Нет связи с сервером',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Не удалось загрузить профиль.\nПроверь подключение к интернету и попробуй снова.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey, fontSize: 16),
+              ),
+              const SizedBox(height: 32),
+              FilledButton.icon(
+                onPressed: () {
+                  context.read<UserViewModel>().fetchProfiles();
+                  context.read<ImportantDateViewModel>().fetchDates();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Обновить'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      )
           : RefreshIndicator(
         onRefresh: () async {
           await context.read<UserViewModel>().fetchProfiles();
+          await context.read<ImportantDateViewModel>().fetchDates();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -86,11 +178,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // --- БЛОК ПРОФИЛЕЙ ---
                 _buildProfileSection(userVM),
                 const SizedBox(height: 24),
 
-                // Кнопка добавления партнера (появляется только если пары нет)
                 if (userVM.partner == null && userVM.currentUser != null) ...[
                   ElevatedButton.icon(
                     icon: const Icon(Icons.favorite_border),
@@ -106,7 +196,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 24),
                 ],
 
-                // --- МЕНЮ АКТИВНОСТЕЙ ---
                 const Text(
                   'Твои активности',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
@@ -126,7 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildMenuTile(
                   context,
                   title: 'Важные даты',
-                  subtitle: 'Важные и не очень важные события',
+                  subtitleWidget: datesSubtitleWidget,
                   icon: Icons.calendar_month,
                   color: Colors.blueAccent,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ImportantDatesScreen())),
@@ -138,6 +227,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+// ... остальной код (методы _buildProfileSection, _buildUserCard, _buildMenuTile, _showAddPartnerDialog) остается без изменений!
 
   // Виджет секции профилей
   Widget _buildProfileSection(UserViewModel vm) {
@@ -223,7 +314,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildMenuTile(
       BuildContext context, {
         required String title,
-        required String subtitle,
+        String? subtitle,
+        Widget? subtitleWidget, // <-- Поддержка красивого подзаголовка
         required IconData icon,
         required Color color,
         required VoidCallback onTap,
@@ -249,8 +341,20 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  // Если передали обычный текст
+                  if (subtitle != null)
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                      maxLines: 1,                      // <-- Жесткое ограничение в 1 строку
+                      overflow: TextOverflow.ellipsis,  // <-- Троеточие для длинных текстов
+                    ),
+                  // Если передали кастомный виджет (как для нашей даты)
+                  if (subtitleWidget != null) subtitleWidget,
                 ],
               ),
             ),
@@ -292,12 +396,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (cleanUsername.isNotEmpty) {
                   // --- ПРОВЕРКА НА САМОГО СЕБЯ ---
                   if (currentUser != null && cleanUsername.toLowerCase() == currentUser.username.toLowerCase()) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Нельзя добавить самого себя! 😅'),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
+                    showFmlSnackBar(context, 'Нельзя добавить самого себя! 😅', backgroundColor: Colors.orange);
                     return; // Прерываем выполнение
                   }
 
@@ -306,13 +405,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   final success = await context.read<UserViewModel>().addPartner(cleanUsername);
 
                   if (success && mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Ура! Вы теперь в паре 🎉'), backgroundColor: Colors.green),
-                    );
+                    showFmlSnackBar(context, 'Ура! Вы теперь в паре 🎉', backgroundColor: Colors.green);
                   } else if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Не удалось найти партнера'), backgroundColor: Colors.red),
-                    );
+                    showFmlSnackBar(context, 'Не удалось найти партнера', backgroundColor: Colors.red);
                   }
                 }
               },

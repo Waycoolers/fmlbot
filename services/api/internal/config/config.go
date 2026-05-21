@@ -9,6 +9,7 @@ import (
 type Config struct {
 	Server   *ServerConfig
 	DB       *DatabaseConfig
+	FCM      *FCMConfig
 	Loglevel string
 	BotURL   string
 }
@@ -26,6 +27,10 @@ type DatabaseConfig struct {
 	User     string
 	Password string
 	Name     string
+}
+
+type FCMConfig struct {
+	CredentialsFile string
 }
 
 func Load() (*Config, error) {
@@ -51,9 +56,15 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	fcm, err := loadFCMConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Server:   server,
 		DB:       db,
+		FCM:      fcm,
 		Loglevel: loglevel,
 		BotURL:   os.Getenv("BOT_URL"),
 	}, nil
@@ -122,4 +133,13 @@ func loadDatabaseConfig() (*DatabaseConfig, error) {
 		Password: password,
 		Name:     name,
 	}, nil
+}
+
+func loadFCMConfig() (*FCMConfig, error) {
+	cred := os.Getenv("FCM_CREDENTIALS")
+	if cred == "" {
+		slog.Error("not found FCM_CREDENTIALS")
+		return nil, errors.New("no FCM_CREDENTIALS")
+	}
+	return &FCMConfig{CredentialsFile: cred}, nil
 }

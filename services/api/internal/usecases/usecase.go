@@ -1,6 +1,8 @@
 package usecases
 
-import "github.com/Waycoolers/fmlbot/services/api/internal/domain"
+import (
+	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
+)
 
 type UseCase struct {
 	users          domain.UsersRepo
@@ -8,6 +10,7 @@ type UseCase struct {
 	compliments    domain.ComplimentsRepo
 	importantDates domain.ImportantDatesRepo
 	scheduler      domain.SchedulerRepo
+	fcm            domain.FCMRepo
 }
 
 func New(repos *domain.Repos) *UseCase {
@@ -17,5 +20,6 @@ func New(repos *domain.Repos) *UseCase {
 		compliments:    repos.Compliments,
 		importantDates: repos.ImportantDates,
 		scheduler:      repos.Scheduler,
+		fcm:            repos.FCM,
 	}
 }

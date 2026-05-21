@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/Waycoolers/fmlbot/common/errs"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 	"github.com/jmoiron/sqlx"
 )

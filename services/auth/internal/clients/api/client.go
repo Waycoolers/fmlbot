@@ -1,0 +1,79 @@
+package api
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+
+	"github.com/Waycoolers/fmlbot/pkg/errs"
+	"github.com/Waycoolers/fmlbot/services/auth/internal/config"
+	"github.com/Waycoolers/fmlbot/services/auth/internal/domain"
+)
+
+type client struct {
+	baseURL    string
+	httpClient *http.Client
+	secret     []byte
+}
+
+func New(cfg *config.APIConfig, internalSecret []byte) domain.APIClient {
+	url := fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
+	httpClient := &http.Client{
+		Timeout: cfg.HTTPTimeout,
+	}
+	return &client{
+		baseURL:    url,
+		httpClient: httpClient,
+		secret:     internalSecret,
+	}
+}
+
+func (c *client) VerifyUser(ctx context.Context, username string, password string) (int64, error) {
+	body := struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}{
+		Username: username,
+		Password: password,
+	}
+	reqBody, err := json.Marshal(body)
+	if err != nil {
+		return 0, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/auth/verify", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Secret", string(c.secret))
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusUnauthorized {
+			return 0, errs.ErrWrongPassword
+		}
+		if resp.StatusCode == http.StatusNotFound {
+			return 0, errs.ErrUserNotFound
+		}
+		if resp.StatusCode == http.StatusBadRequest {
+			return 0, errs.ErrBadRequest
+		}
+		return 0, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+	var respBody struct {
+		UserID int64 `json:"user_id"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&respBody)
+	if err != nil {
+		return 0, err
+	}
+	return respBody.UserID, nil
+}

@@ -9,13 +9,14 @@ import (
 )
 
 type Config struct {
-	Bot       *BotConfig
-	RDB       *RedisConfig
-	Server    *ServerConfig
-	Api       *ApiConfig
-	Auth      *AuthConfig
-	Loglevel  string
-	JwtSecret []byte
+	Bot            *BotConfig
+	RDB            *RedisConfig
+	Server         *ServerConfig
+	Api            *ApiConfig
+	Auth           *AuthConfig
+	Loglevel       string
+	JwtSecret      []byte
+	InternalSecret []byte
 }
 
 type BotConfig struct {
@@ -30,9 +31,8 @@ type RedisConfig struct {
 }
 
 type ServerConfig struct {
-	InternalSecret []byte
-	Host           string
-	Port           int
+	Host string
+	Port int
 }
 
 type ApiConfig struct {
@@ -58,6 +58,12 @@ func Load() (*Config, error) {
 	if jwtSecret == "" {
 		slog.Error("not found JWT_SECRET")
 		return nil, errors.New("no JWT_SECRET")
+	}
+
+	secret := os.Getenv("INTERNAL_API_SECRET")
+	if secret == "" {
+		slog.Error("not found INTERNAL_API_SECRET")
+		return nil, errors.New("no INTERNAL_API_SECRET")
 	}
 
 	bot, err := loadBotConfig()
@@ -86,13 +92,14 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Bot:       bot,
-		RDB:       rdb,
-		Server:    server,
-		Api:       api,
-		Auth:      auth,
-		Loglevel:  loglevel,
-		JwtSecret: []byte(jwtSecret),
+		Bot:            bot,
+		RDB:            rdb,
+		Server:         server,
+		Api:            api,
+		Auth:           auth,
+		Loglevel:       loglevel,
+		JwtSecret:      []byte(jwtSecret),
+		InternalSecret: []byte(secret),
 	}, nil
 }
 
@@ -155,21 +162,14 @@ func loadServerConfig() (*ServerConfig, error) {
 		slog.Warn("not found BOT_HOST")
 	}
 
-	secret := os.Getenv("INTERNAL_API_SECRET")
-	if secret == "" {
-		slog.Error("not found INTERNAL_API_SECRET")
-		return nil, errors.New("no INTERNAL_API_SECRET")
-	}
-
 	intPort, err := strconv.Atoi(port)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ServerConfig{
-		InternalSecret: []byte(secret),
-		Host:           host,
-		Port:           intPort,
+		Host: host,
+		Port: intPort,
 	}, nil
 }
 

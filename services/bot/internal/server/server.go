@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/Waycoolers/fmlbot/common/jwtmiddleware"
+	"github.com/Waycoolers/fmlbot/pkg/middlewares"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/config"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/handlers"
 )
@@ -18,7 +18,7 @@ type HTTPServer struct {
 	h   *handlers.Handler
 }
 
-func NewHTTPServer(cfg *config.ServerConfig, h *handlers.Handler) *HTTPServer {
+func NewHTTPServer(cfg *config.ServerConfig, h *handlers.Handler, internalSecret []byte) *HTTPServer {
 	addr := fmt.Sprintf(":%d", cfg.Port)
 
 	mux := http.NewServeMux()
@@ -28,7 +28,7 @@ func NewHTTPServer(cfg *config.ServerConfig, h *handlers.Handler) *HTTPServer {
 	return &HTTPServer{
 		s: &http.Server{
 			Addr:    addr,
-			Handler: jwtmiddleware.InternalAuthMiddleware(string(cfg.InternalSecret))(mux),
+			Handler: middlewares.InternalAuthMiddlewareWithPublicPaths(string(internalSecret))(mux),
 		},
 		cfg: cfg,
 		h:   h,

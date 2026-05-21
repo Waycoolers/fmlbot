@@ -2,23 +2,56 @@ package usecases
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"errors"
 
-	"github.com/Waycoolers/fmlbot/common/errs"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
+	"golang.org/x/crypto/bcrypt"
 )
 
-func (uc *UseCase) AddUser(ctx context.Context, userID int64, username string) error {
-	exists, err := uc.users.IsUserExists(ctx, userID)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return errs.ErrUserExists
+func generateRandomPassword(length int) (string, error) {
+	if length <= 0 {
+		return "", errors.New("length must be greater than zero")
 	}
 
-	return uc.users.AddUser(ctx, userID, username)
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}<>?/"
+
+	randomBytes := make([]byte, length)
+
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", err
+	}
+
+	charsetLen := len(charset)
+	password := make([]byte, length)
+	for i := 0; i < length; i++ {
+		password[i] = charset[randomBytes[i]%byte(charsetLen)]
+	}
+	return string(password), nil
+}
+
+func (uc *UseCase) AddUser(ctx context.Context, userID int64, username string) (string, error) {
+	exists, err := uc.users.IsUserExists(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if exists {
+		return "", errs.ErrUserExists
+	}
+
+	password, err := generateRandomPassword(10)
+	if err != nil {
+		return "", err
+	}
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
+	return password, uc.users.AddUser(ctx, userID, username, hashedPassword)
 }
 
 func (uc *UseCase) RemoveUser(ctx context.Context, userID int64) error {
@@ -129,6 +162,22 @@ func (uc *UseCase) GetMe(ctx context.Context, userID int64) (*domain.UserRespons
 	}, nil
 }
 
+func (uc *UseCase) ChangePassword(ctx context.Context, userID int64, password []byte) error {
+	exists, err := uc.users.IsUserExists(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errs.ErrUserNotFound
+	}
+
+	err = uc.users.SetPassword(ctx, userID, password)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (uc *UseCase) GetPartner(ctx context.Context, userID int64) (*domain.UserResponse, error) {
 	exists, err := uc.users.IsUserExists(ctx, userID)
 	if err != nil {
@@ -189,5 +238,33 @@ func (uc *UseCase) GetUserByUsername(ctx context.Context, username string) (*dom
 		}
 		return nil, err
 	}
-	return uc.GetMe(ctx, userID)
+	me, err := uc.GetMe(ctx, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errs.ErrUserNotFound
+		}
+		return nil, err
+	}
+	res := &domain.UserResponse{
+		ID:        me.ID,
+		Username:  me.Username,
+		PartnerID: me.PartnerID,
+	}
+	return res, nil
+}
+
+func (uc *UseCase) ProcessFCMToken(ctx context.Context, userID int64, token string) error {
+	exists, err := uc.users.IsUserExists(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errs.ErrUserNotFound
+	}
+
+	err = uc.fcm.SetFCMToken(ctx, userID, token)
+	if err != nil {
+		return err
+	}
+	return nil
 }

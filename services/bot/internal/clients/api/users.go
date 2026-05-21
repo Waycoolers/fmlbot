@@ -8,11 +8,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Waycoolers/fmlbot/common/errs"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
+	"golang.org/x/crypto/bcrypt"
 )
 
-func (c *client) CreateUser(ctx context.Context, chatID int64, username string) error {
+func (c *client) CreateUser(ctx context.Context, chatID int64, username string) (string, error) {
 	reqBody := struct {
 		Username string `json:"username"`
 	}{
@@ -21,19 +22,27 @@ func (c *client) CreateUser(ctx context.Context, chatID int64, username string) 
 
 	resp, err := c.doAuthRequest(ctx, http.MethodPost, "/users", reqBody, chatID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
 
+	var respBody struct {
+		Password string `json:"password"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&respBody)
+	if err != nil {
+		return "", err
+	}
+
 	switch resp.StatusCode {
 	case http.StatusCreated:
-		return nil
+		return respBody.Password, nil
 	case http.StatusConflict:
-		return errs.ErrUserExists
+		return "", errs.ErrUserExists
 	default:
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 }
 
@@ -240,5 +249,31 @@ func (c *client) GetUserByUsername(ctx context.Context, requesterID int64, usern
 		return nil, errs.ErrUserNotFound
 	default:
 		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+}
+
+func (c *client) ChangePassword(ctx context.Context, userID int64, password string) error {
+	path := "/users/me/password"
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	reqBody := struct {
+		Password []byte `json:"password"`
+	}{
+		Password: hashedPassword,
+	}
+	resp, err := c.doAuthRequest(ctx, http.MethodPatch, path, reqBody, userID)
+	if err != nil {
+		return err
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return nil
+	case http.StatusNotFound:
+		return errs.ErrUserNotFound
+	default:
+		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}
 }

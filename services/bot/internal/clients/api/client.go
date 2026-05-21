@@ -27,7 +27,7 @@ func New(cfg *config.Config) domain.ApiClient {
 	c := &http.Client{
 		Timeout: apiTimeout,
 	}
-	authClient := auth.New(cfg.Auth)
+	authClient := auth.New(cfg.Auth, cfg.InternalSecret)
 	return &client{
 		baseURL:    apiUrl,
 		httpClient: c,

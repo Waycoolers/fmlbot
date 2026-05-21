@@ -66,6 +66,8 @@ func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 			h.HandleTitleImportantDate(ctx, msg)
 		case state.AwaitingEditTitleImportantDate:
 			h.HandleEditTitleImportantDateText(ctx, msg)
+		case state.AwaitingPassword:
+			h.HandleChangePassword(ctx, msg)
 		default:
 			h.ReplyUnknownMessage(ctx, msg)
 		}
@@ -83,6 +85,8 @@ func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 			h.ShowImportantDatesMenu(ctx, msg)
 		case string(domain.DeleteAccount):
 			h.DeleteAccount(ctx, msg)
+		case string(domain.ChangePassword):
+			h.ChangePassword(ctx, msg)
 		case string(domain.AddPartner):
 			h.SetPartner(ctx, msg)
 		case string(domain.DeletePartner):
