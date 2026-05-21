@@ -14,7 +14,8 @@ type BotClient interface {
 }
 
 type ApiClient interface {
-	CreateUser(ctx context.Context, chatID int64, username string) error
+	CreateUser(ctx context.Context, chatID int64, username string) (string, error)
+	ChangePassword(ctx context.Context, userID int64, password string) error
 	GetMe(ctx context.Context, chatID int64) (*User, error)
 	GetPartner(ctx context.Context, chatID int64) (*User, error)
 	DeleteMe(ctx context.Context, chatID int64) error

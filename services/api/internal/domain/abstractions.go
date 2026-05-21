@@ -7,7 +7,9 @@ import (
 )
 
 type UsersRepo interface {
-	AddUser(ctx context.Context, userID int64, username string) error
+	AddUser(ctx context.Context, userID int64, username string, password []byte) error
+	SetPassword(ctx context.Context, userID int64, password []byte) error
+	GetUserPasswordHash(ctx context.Context, userID int64) ([]byte, error)
 	GetUserIDByUsername(ctx context.Context, username string) (int64, error)
 	IsUserExists(ctx context.Context, userID int64) (bool, error)
 	IsUserExistsByUsername(ctx context.Context, username string) (bool, error)
@@ -31,6 +33,7 @@ type UserConfigRepo interface {
 type ComplimentsRepo interface {
 	AddCompliment(ctx context.Context, userID int64, text string) (*Compliment, error)
 	GetCompliments(ctx context.Context, userID int64) (compliments []Compliment, err error)
+	GetReceivedCompliments(ctx context.Context, userID int64) (compliments []Compliment, err error)
 	UpdateCompliment(ctx context.Context, userID int64, complimentID int64, text string, isSent bool) error
 	DeleteCompliment(ctx context.Context, userID int64, complimentID int64) error
 	MarkComplimentSent(ctx context.Context, complimentID int64) error
@@ -49,10 +52,16 @@ type ImportantDatesRepo interface {
 	MakeImportantDateShared(ctx context.Context, dateID int64, userID int64, partnerID int64) error
 }
 
+type FCMRepo interface {
+	SetFCMToken(ctx context.Context, userID int64, token string) error
+	GetFCMToken(ctx context.Context, userID int64) (string, error)
+}
+
 type SchedulerRepo interface {
 	DoMidnightTasksWithCompliments(ctx context.Context) error
 }
 
 type Sender interface {
-	SendMessage(ctx context.Context, update any) error
+	SendMessage(ctx context.Context, update MessageRequest) error
+	SendImportantDatesNotification(ctx context.Context, update ImportantDateMessage) error
 }

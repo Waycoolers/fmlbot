@@ -8,7 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Waycoolers/fmlbot/common/logger"
+	"github.com/Waycoolers/fmlbot/pkg/logger"
+	"github.com/Waycoolers/fmlbot/services/auth/internal/clients/api"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/config"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/handlers"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/server"
@@ -42,13 +43,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	h, err := handlers.New(store.Tokens, cfg)
+	c := api.New(cfg.API, cfg.InternalSecret)
+
+	h, err := handlers.New(store.Tokens, cfg, c)
 	if err != nil {
 		slog.Error("Error creating handler", "error", err)
 		os.Exit(1)
 	}
 
-	srv := server.New(cfg.Server, h)
+	srv := server.New(cfg.Server, h, cfg.InternalSecret)
 	srv.Start()
 
 	// Graceful shutdown

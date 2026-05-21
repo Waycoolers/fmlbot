@@ -68,6 +68,10 @@ services:
       LOG_LEVEL: ${LOG_LEVEL}
       ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL}
       REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL}
+      API_HTTP_TIMEOUT: ${API_HTTP_TIMEOUT}
+      API_HOST: ${API_HOST}
+      API_PORT: ${API_PORT}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
     ports:
       - "${AUTH_PORT}:${AUTH_PORT}"
     depends_on:
@@ -95,6 +99,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       LOG_LEVEL: ${LOG_LEVEL}
       BOT_URL: ${BOT_URL}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
+      FCM_CREDENTIALS: ${FCM_CREDENTIALS}
     ports:
       - "${API_PORT}:${API_PORT}"
     depends_on:
@@ -128,6 +134,7 @@ services:
       AUTH_HTTP_TIMEOUT: ${AUTH_HTTP_TIMEOUT}
       LOG_LEVEL: ${LOG_LEVEL}
       JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
     ports:
       - "${BOT_PORT}:${BOT_PORT}"
     depends_on:

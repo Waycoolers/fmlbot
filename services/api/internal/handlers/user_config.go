@@ -6,14 +6,14 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/Waycoolers/fmlbot/common/errs"
-	"github.com/Waycoolers/fmlbot/common/jwtmiddleware"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
+	"github.com/Waycoolers/fmlbot/pkg/middlewares"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
 
 func (h *Handler) GetMyUserConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	id, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -34,7 +34,7 @@ func (h *Handler) GetMyUserConfig(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetPartnerUserConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	id, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -56,7 +56,7 @@ func (h *Handler) GetPartnerUserConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateUserConfig(w http.ResponseWriter, r *http.Request) {
 	var userConfig domain.UserConfigPatch
 	ctx := r.Context()
-	id, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	id, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -83,7 +83,7 @@ func (h *Handler) UpdateUserConfig(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ResetMyUserConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	id, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -104,7 +104,7 @@ func (h *Handler) ResetMyUserConfig(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ResetPartnerUserConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	id, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

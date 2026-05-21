@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Waycoolers/fmlbot/common/logger"
+	"github.com/Waycoolers/fmlbot/pkg/logger"
 	"github.com/Waycoolers/fmlbot/services/api/internal/config"
 	"github.com/Waycoolers/fmlbot/services/api/internal/handlers"
 	"github.com/Waycoolers/fmlbot/services/api/internal/scheduler"
@@ -49,11 +49,16 @@ func main() {
 
 	srv := server.New(cfg.Server, h)
 
-	snd := sender.NewHTTPSender(cfg.BotURL)
-	sched := scheduler.New(h, snd)
-
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	httpSender := sender.NewHTTPSender(cfg.BotURL, cfg.Server.InternalSecret)
+	fcmSender, err := sender.NewFCMSender(ctx, store.Repos.FCM, cfg.FCM.CredentialsFile)
+	if err != nil {
+		slog.Error("Error creating FCM sender", "error", err)
+		os.Exit(1)
+	}
+	sched := scheduler.New(h, httpSender, fcmSender)
 
 	sched.Run(ctx)
 	srv.Start()

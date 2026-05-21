@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "901518464577",
+    "project_id": "fmlbot-4be53",
+    "storage_bucket": "fmlbot-4be53.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:901518464577:android:1921d8e2fec542b39618c0",
+        "android_client_info": {
+          "package_name": "com.example.fml_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfdfp2gbaXaixoANTb-HJ6Apt-1e4V8S8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

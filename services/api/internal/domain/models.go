@@ -80,10 +80,16 @@ type Repos struct {
 	Compliments    ComplimentsRepo
 	ImportantDates ImportantDatesRepo
 	Scheduler      SchedulerRepo
+	FCM            FCMRepo
 }
 
 type ImportantDateMessage struct {
 	ImportantDateID int64   `db:"important_date_id" json:"important_date_id"`
 	UserIDs         []int64 `db:"user_ids" json:"user_ids"`
 	Message         string  `db:"message" json:"message"`
+}
+
+type MessageRequest struct {
+	Text   string `json:"text"`
+	UserID int64  `json:"user_id"`
 }

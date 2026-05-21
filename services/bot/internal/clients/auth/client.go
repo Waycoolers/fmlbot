@@ -16,6 +16,7 @@ import (
 type client struct {
 	baseURL    string
 	httpClient *http.Client
+	secret     []byte
 }
 
 type tokenRequest struct {
@@ -26,7 +27,7 @@ type tokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-func New(cfg *config.AuthConfig) domain.AuthClient {
+func New(cfg *config.AuthConfig, internalSecret []byte) domain.AuthClient {
 	url := fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
 	timeout := time.Duration(cfg.HTTPTimeout) * time.Second
 	c := &http.Client{
@@ -35,6 +36,7 @@ func New(cfg *config.AuthConfig) domain.AuthClient {
 	return &client{
 		baseURL:    url,
 		httpClient: c,
+		secret:     internalSecret,
 	}
 }
 
@@ -45,12 +47,13 @@ func (c *client) GetAccessToken(ctx context.Context, userID int64) (string, erro
 		return "", err
 	}
 
-	url := fmt.Sprintf("%s/auth/token", c.baseURL)
+	url := fmt.Sprintf("%s/internal/auth/token", c.baseURL)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Secret", string(c.secret))
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

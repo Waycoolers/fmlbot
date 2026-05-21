@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/Waycoolers/fmlbot/common/errs"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
 
@@ -32,6 +32,22 @@ func (uc *UseCase) GetAllCompliments(ctx context.Context, userID int64) (*[]doma
 	}
 
 	compliments, err := uc.compliments.GetCompliments(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &compliments, nil
+}
+
+func (uc *UseCase) GetAllReceivedCompliments(ctx context.Context, userID int64) (*[]domain.Compliment, error) {
+	exists, err := uc.users.IsUserExists(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errs.ErrUserNotFound
+	}
+
+	compliments, err := uc.compliments.GetReceivedCompliments(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

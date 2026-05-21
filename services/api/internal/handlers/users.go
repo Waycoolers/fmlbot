@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/Waycoolers/fmlbot/common/errs"
-	"github.com/Waycoolers/fmlbot/common/jwtmiddleware"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
+	"github.com/Waycoolers/fmlbot/pkg/middlewares"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
 
@@ -19,7 +19,7 @@ func (h *Handler) AddUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusBadRequest)
 		return
@@ -29,7 +29,7 @@ func (h *Handler) AddUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.uc.AddUser(ctx, userID, req.Username)
+	password, err := h.uc.AddUser(ctx, userID, req.Username)
 	if err != nil {
 		if errors.Is(err, errs.ErrUserExists) {
 			http.Error(w, err.Error(), http.StatusConflict)
@@ -39,12 +39,17 @@ func (h *Handler) AddUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusCreated)
+	resp := struct {
+		Password string `json:"password"`
+	}{
+		Password: password,
+	}
+	sendJson(w, http.StatusCreated, resp)
 }
 
 func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -64,7 +69,7 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	id, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -83,9 +88,38 @@ func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 	sendJson(w, http.StatusOK, user)
 }
 
+func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, ok := ctx.Value(middlewares.UserIDKey).(int64)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		Password []byte `json:"password"`
+	}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = h.uc.ChangePassword(ctx, id, req.Password)
+	if err != nil {
+		if errors.Is(err, errs.ErrUserNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		slog.Error("Unexpected error", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func (h *Handler) GetPartner(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	id, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -106,7 +140,7 @@ func (h *Handler) GetPartner(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -133,7 +167,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UpdatePartner(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -170,7 +204,7 @@ func (h *Handler) UpdatePartner(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AddPartners(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -199,7 +233,7 @@ func (h *Handler) AddPartners(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) DeletePartners(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	id, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -249,4 +283,37 @@ func (h *Handler) GetUserByUsername(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sendJson(w, http.StatusOK, user)
+}
+
+func (h *Handler) SaveFCMToken(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		SCMToken string `json:"fcm_token"`
+	}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.SCMToken == "" {
+		http.Error(w, "fcm_token is required", http.StatusBadRequest)
+		return
+	}
+
+	slog.Info("FCMToken", "fcm_token", req.SCMToken)
+	err = h.uc.ProcessFCMToken(ctx, userID, req.SCMToken)
+	if err != nil {
+		if errors.Is(err, errs.ErrUserNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		slog.Error("Unexpected error", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	w.WriteHeader(http.StatusOK)
 }

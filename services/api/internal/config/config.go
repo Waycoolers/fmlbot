@@ -9,14 +9,16 @@ import (
 type Config struct {
 	Server   *ServerConfig
 	DB       *DatabaseConfig
+	FCM      *FCMConfig
 	Loglevel string
 	BotURL   string
 }
 
 type ServerConfig struct {
-	Host      string
-	Port      string
-	JwtSecret []byte
+	InternalSecret []byte
+	Host           string
+	Port           string
+	JwtSecret      []byte
 }
 
 type DatabaseConfig struct {
@@ -25,6 +27,10 @@ type DatabaseConfig struct {
 	User     string
 	Password string
 	Name     string
+}
+
+type FCMConfig struct {
+	CredentialsFile string
 }
 
 func Load() (*Config, error) {
@@ -50,15 +56,26 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	fcm, err := loadFCMConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Server:   server,
 		DB:       db,
+		FCM:      fcm,
 		Loglevel: loglevel,
 		BotURL:   os.Getenv("BOT_URL"),
 	}, nil
 }
 
 func loadServerConfig() (*ServerConfig, error) {
+	secret := os.Getenv("INTERNAL_API_SECRET")
+	if secret == "" {
+		slog.Error("not found INTERNAL_API_SECRET")
+		return nil, errors.New("no INTERNAL_API_SECRET")
+	}
 	host := os.Getenv("API_HOST")
 	if host == "" {
 		host = "localhost"
@@ -75,9 +92,10 @@ func loadServerConfig() (*ServerConfig, error) {
 		return nil, errors.New("no JWT_SECRET")
 	}
 	return &ServerConfig{
-		Host:      host,
-		Port:      port,
-		JwtSecret: []byte(jwtSecret),
+		InternalSecret: []byte(secret),
+		Host:           host,
+		Port:           port,
+		JwtSecret:      []byte(jwtSecret),
 	}, nil
 }
 
@@ -115,4 +133,13 @@ func loadDatabaseConfig() (*DatabaseConfig, error) {
 		Password: password,
 		Name:     name,
 	}, nil
+}
+
+func loadFCMConfig() (*FCMConfig, error) {
+	cred := os.Getenv("FCM_CREDENTIALS")
+	if cred == "" {
+		slog.Error("not found FCM_CREDENTIALS")
+		return nil, errors.New("no FCM_CREDENTIALS")
+	}
+	return &FCMConfig{CredentialsFile: cred}, nil
 }

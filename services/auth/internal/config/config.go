@@ -11,8 +11,10 @@ import (
 type Config struct {
 	DB              *DatabaseConfig
 	Server          *ServerConfig
+	API             *APIConfig
 	Loglevel        string
 	JwtSecret       []byte
+	InternalSecret  []byte
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
 }
@@ -28,6 +30,12 @@ type DatabaseConfig struct {
 	User     string
 	Password string
 	Name     string
+}
+
+type APIConfig struct {
+	Host        string
+	Port        int
+	HTTPTimeout time.Duration
 }
 
 func Load() (*Config, error) {
@@ -66,6 +74,12 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	secret := os.Getenv("INTERNAL_API_SECRET")
+	if secret == "" {
+		slog.Error("not found INTERNAL_API_SECRET")
+		return nil, errors.New("no INTERNAL_API_SECRET")
+	}
+
 	server, err := loadServerConfig()
 	if err != nil {
 		return nil, err
@@ -76,11 +90,18 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	api, err := loadAPIConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		DB:              db,
 		Server:          server,
+		API:             api,
 		Loglevel:        loglevel,
 		JwtSecret:       []byte(jwtSecret),
+		InternalSecret:  []byte(secret),
 		AccessTokenTTL:  time.Duration(intAccessTokenTTL) * time.Minute,
 		RefreshTokenTTL: time.Duration(intRefreshTokenTTL) * 24 * time.Hour,
 	}, nil
@@ -97,7 +118,10 @@ func loadServerConfig() (*ServerConfig, error) {
 		port = "8081"
 		slog.Warn("not found AUTH_PORT")
 	}
-	return &ServerConfig{host, port}, nil
+	return &ServerConfig{
+		Host: host,
+		Port: port,
+	}, nil
 }
 
 func loadDatabaseConfig() (*DatabaseConfig, error) {
@@ -133,5 +157,38 @@ func loadDatabaseConfig() (*DatabaseConfig, error) {
 		User:     user,
 		Password: password,
 		Name:     name,
+	}, nil
+}
+
+func loadAPIConfig() (*APIConfig, error) {
+	host := os.Getenv("API_HOST")
+	if host == "" {
+		host = "localhost"
+		slog.Warn("not found API_HOST")
+	}
+	port := os.Getenv("API_PORT")
+	if port == "" {
+		port = "8080"
+		slog.Warn("not found API_PORT")
+	}
+	intPort, err := strconv.Atoi(port)
+	if err != nil {
+		return nil, err
+	}
+
+	httpTimeout := os.Getenv("API_HTTP_TIMEOUT")
+	if httpTimeout == "" {
+		httpTimeout = "60"
+		slog.Warn("not found HTTP_TIMEOUT")
+	}
+	intHTTPTimeout, err := strconv.Atoi(httpTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return &APIConfig{
+		Host:        host,
+		Port:        intPort,
+		HTTPTimeout: time.Duration(intHTTPTimeout) * time.Second,
 	}, nil
 }

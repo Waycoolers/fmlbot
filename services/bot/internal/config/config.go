@@ -9,13 +9,14 @@ import (
 )
 
 type Config struct {
-	Bot       *BotConfig
-	RDB       *RedisConfig
-	Server    *ServerConfig
-	Api       *ApiConfig
-	Auth      *AuthConfig
-	Loglevel  string
-	JwtSecret []byte
+	Bot            *BotConfig
+	RDB            *RedisConfig
+	Server         *ServerConfig
+	Api            *ApiConfig
+	Auth           *AuthConfig
+	Loglevel       string
+	JwtSecret      []byte
+	InternalSecret []byte
 }
 
 type BotConfig struct {
@@ -59,6 +60,12 @@ func Load() (*Config, error) {
 		return nil, errors.New("no JWT_SECRET")
 	}
 
+	secret := os.Getenv("INTERNAL_API_SECRET")
+	if secret == "" {
+		slog.Error("not found INTERNAL_API_SECRET")
+		return nil, errors.New("no INTERNAL_API_SECRET")
+	}
+
 	bot, err := loadBotConfig()
 	if err != nil {
 		return nil, err
@@ -85,13 +92,14 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Bot:       bot,
-		RDB:       rdb,
-		Server:    server,
-		Api:       api,
-		Auth:      auth,
-		Loglevel:  loglevel,
-		JwtSecret: []byte(jwtSecret),
+		Bot:            bot,
+		RDB:            rdb,
+		Server:         server,
+		Api:            api,
+		Auth:           auth,
+		Loglevel:       loglevel,
+		JwtSecret:      []byte(jwtSecret),
+		InternalSecret: []byte(secret),
 	}, nil
 }
 

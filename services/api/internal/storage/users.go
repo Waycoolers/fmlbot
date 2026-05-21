@@ -10,17 +10,17 @@ type usersRepo struct {
 	db *sqlx.DB
 }
 
-func (s *usersRepo) AddUser(ctx context.Context, userID int64, username string) error {
+func (s *usersRepo) AddUser(ctx context.Context, userID int64, username string, password []byte) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
 	res, err := tx.ExecContext(ctx, `
-        INSERT INTO users (user_id, username)
-        VALUES ($1, $2)
+        INSERT INTO users (user_id, username, password_hash)
+        VALUES ($1, $2, $3)
         ON CONFLICT (user_id) DO NOTHING;
-    `, userID, username)
+    `, userID, username, password)
 	if err != nil {
 		er := tx.Rollback()
 		if er != nil {
@@ -58,6 +58,31 @@ func (s *usersRepo) AddUser(ctx context.Context, userID int64, username string) 
 	}
 
 	return tx.Commit()
+}
+
+func (s *usersRepo) SetPassword(ctx context.Context, userID int64, password []byte) error {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE users SET password_hash = $1 WHERE user_id = $2;
+	`, password, userID)
+	if err != nil {
+		return err
+	}
+	aff, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if aff != 1 {
+		return err
+	}
+	return nil
+}
+
+func (s *usersRepo) GetUserPasswordHash(ctx context.Context, userID int64) ([]byte, error) {
+	var hash []byte
+	err := s.db.QueryRowContext(ctx, `
+		SELECT password_hash FROM users WHERE user_id = $1;
+	`, userID).Scan(&hash)
+	return hash, err
 }
 
 func (s *usersRepo) GetUserIDByUsername(ctx context.Context, username string) (int64, error) {

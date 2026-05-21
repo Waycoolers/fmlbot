@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Waycoolers/fmlbot/pkg/middlewares"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/config"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/handlers"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/middleware"
@@ -17,18 +18,21 @@ type Server struct {
 	config *config.ServerConfig
 	server *http.Server
 	h      *handlers.Handler
+	secret []byte
 }
 
-func New(cfg *config.ServerConfig, h *handlers.Handler) *Server {
+func New(cfg *config.ServerConfig, h *handlers.Handler, internalSecret []byte) *Server {
 	return &Server{
 		config: cfg,
 		h:      h,
+		secret: internalSecret,
 	}
 }
 
 func (s *Server) newServer() *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/token", s.h.Token)
+	mux.HandleFunc("POST /internal/auth/token", s.h.InternalToken)
 	mux.HandleFunc("POST /auth/refresh", s.h.Refresh)
 	mux.HandleFunc("POST /auth/revoke", s.h.Revoke)
 	mux.HandleFunc("GET /health", s.h.Health)
@@ -37,7 +41,7 @@ func (s *Server) newServer() *http.Server {
 	addr := fmt.Sprintf("%s:%s", s.config.Host, s.config.Port)
 	return &http.Server{
 		Addr:         addr,
-		Handler:      handler,
+		Handler:      middlewares.InternalAuthMiddlewareWithPrivatePaths(string(s.secret), "POST /internal/auth/token")(handler),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,

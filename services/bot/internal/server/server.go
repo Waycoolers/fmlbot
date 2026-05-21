@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/Waycoolers/fmlbot/pkg/middlewares"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/config"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/handlers"
 )
@@ -17,14 +18,18 @@ type HTTPServer struct {
 	h   *handlers.Handler
 }
 
-func NewHTTPServer(cfg *config.ServerConfig, h *handlers.Handler) *HTTPServer {
+func NewHTTPServer(cfg *config.ServerConfig, h *handlers.Handler, internalSecret []byte) *HTTPServer {
 	addr := fmt.Sprintf(":%d", cfg.Port)
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/updates/message", h.SendMessage)
 	mux.HandleFunc("/updates/important_dates", h.NotifyAllImportantDates)
 
 	return &HTTPServer{
-		s:   &http.Server{Addr: addr, Handler: mux},
+		s: &http.Server{
+			Addr:    addr,
+			Handler: middlewares.InternalAuthMiddlewareWithPublicPaths(string(internalSecret))(mux),
+		},
 		cfg: cfg,
 		h:   h,
 	}
@@ -32,7 +37,7 @@ func NewHTTPServer(cfg *config.ServerConfig, h *handlers.Handler) *HTTPServer {
 
 func (s *HTTPServer) Run() {
 	go func() {
-		slog.Info("Starting HTTP server")
+		slog.Info("Starting HTTP server", "port", s.cfg.Port)
 		err := s.s.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("Server stopped with error", "error", err)
