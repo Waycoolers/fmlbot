@@ -95,3 +95,8 @@ type ImportantDateMessage struct {
 	UserIDs         []int64 `json:"user_ids"`
 	Message         string  `json:"message"`
 }
+
+type MessageRequest struct {
+	Text   string `json:"text"`
+	UserID int64  `json:"user_id"`
+}

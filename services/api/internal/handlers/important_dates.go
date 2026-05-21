@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Waycoolers/fmlbot/common/errs"
-	"github.com/Waycoolers/fmlbot/common/jwtmiddleware"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
+	"github.com/Waycoolers/fmlbot/pkg/middlewares"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
 
 func (h *Handler) AddImportantDate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -42,7 +42,7 @@ func (h *Handler) AddImportantDate(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) RemoveImportantDate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -71,7 +71,7 @@ func (h *Handler) RemoveImportantDate(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UpdateImportantDate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -106,7 +106,7 @@ func (h *Handler) UpdateImportantDate(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetImportantDate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -135,7 +135,7 @@ func (h *Handler) GetImportantDate(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetAllImportantDates(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -156,7 +156,7 @@ func (h *Handler) GetAllImportantDates(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UpdateImportantDateSharing(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

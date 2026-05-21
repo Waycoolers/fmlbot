@@ -8,21 +8,85 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/config"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/domain"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type Handler struct {
-	repo domain.TokensRepo
-	cfg  *config.Config
+	repo   domain.TokensRepo
+	cfg    *config.Config
+	client domain.APIClient
 }
 
-func New(repo domain.TokensRepo, cfg *config.Config) (*Handler, error) {
-	return &Handler{repo: repo, cfg: cfg}, nil
+func New(repo domain.TokensRepo, cfg *config.Config, client domain.APIClient) (*Handler, error) {
+	return &Handler{repo: repo, cfg: cfg, client: client}, nil
 }
 
 func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second*3)
+	defer cancel()
+
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if req.Username == "" || req.Password == "" {
+		http.Error(w, "invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := h.client.VerifyUser(ctx, req.Username, req.Password)
+	if err != nil {
+		if errors.Is(err, errs.ErrUserNotFound) {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, errs.ErrWrongPassword) {
+			http.Error(w, "wrong password", http.StatusUnauthorized)
+			return
+		}
+		if errors.Is(err, errs.ErrBadRequest) {
+			http.Error(w, "bad request", http.StatusBadRequest)
+		}
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	accessToken, err := generateAccessToken(userID, h.cfg.JwtSecret, h.cfg.AccessTokenTTL)
+	if err != nil {
+		slog.Error("failed to generate access token", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	refreshToken, err := h.repo.Create(ctx, userID, h.cfg.RefreshTokenTTL)
+	if err != nil {
+		slog.Error("failed to create refresh token", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	resp := struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+	}{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		return
+	}
+}
+
+func (h *Handler) InternalToken(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Second*3)
 	defer cancel()
 
@@ -38,7 +102,6 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Генерируем access token
 	accessToken, err := generateAccessToken(req.UserID, h.cfg.JwtSecret, h.cfg.AccessTokenTTL)
 	if err != nil {
 		slog.Error("failed to generate access token", "error", err)
@@ -46,7 +109,6 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Создаём refresh token
 	refreshToken, err := h.repo.Create(ctx, req.UserID, h.cfg.RefreshTokenTTL)
 	if err != nil {
 		slog.Error("failed to create refresh token", "error", err)
@@ -96,7 +158,6 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Генерируем новый access token
 	newAccessToken, err := generateAccessToken(userID, h.cfg.JwtSecret, h.cfg.AccessTokenTTL)
 	if err != nil {
 		slog.Error("failed to generate new access token", "error", err)
@@ -158,7 +219,6 @@ func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-// generateAccessToken создаёт JWT access token
 func generateAccessToken(userID int64, secret []byte, ttl time.Duration) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,

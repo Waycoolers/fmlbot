@@ -14,25 +14,40 @@ import (
 type HTTPSender struct {
 	botURL string
 	client *http.Client
+	secret []byte
 }
 
-func NewHTTPSender(botURL string) domain.Sender {
+func NewHTTPSender(botURL string, secret []byte) domain.Sender {
 	return &HTTPSender{
 		botURL: botURL,
 		client: &http.Client{},
+		secret: secret,
 	}
 }
 
-func (s *HTTPSender) SendMessage(ctx context.Context, update any) error {
+func (s *HTTPSender) SendMessage(ctx context.Context, update domain.MessageRequest) error {
+	path := "/updates/message"
+	err := s.send(ctx, path, update)
+	return err
+}
+
+func (s *HTTPSender) SendImportantDatesNotification(ctx context.Context, update domain.ImportantDateMessage) error {
+	path := "/updates/important_dates"
+	err := s.send(ctx, path, update)
+	return err
+}
+
+func (s *HTTPSender) send(ctx context.Context, path string, update any) error {
 	data, err := json.Marshal(update)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.botURL+"/updates/important_dates", bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.botURL+path, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Secret", string(s.secret))
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return err

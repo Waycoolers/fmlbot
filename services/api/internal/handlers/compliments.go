@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Waycoolers/fmlbot/common/errs"
-	"github.com/Waycoolers/fmlbot/common/jwtmiddleware"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
+	"github.com/Waycoolers/fmlbot/pkg/middlewares"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
 
 func (h *Handler) AddCompliment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -45,7 +45,7 @@ func (h *Handler) AddCompliment(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetAllCompliments(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -64,9 +64,30 @@ func (h *Handler) GetAllCompliments(w http.ResponseWriter, r *http.Request) {
 	sendJson(w, http.StatusOK, compliments)
 }
 
+func (h *Handler) GetAllReceivedCompliments(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	compliments, err := h.uc.GetAllReceivedCompliments(ctx, userID)
+	if err != nil {
+		if errors.Is(err, errs.ErrUserNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		slog.Error("Unexpected error", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	sendJson(w, http.StatusOK, compliments)
+}
+
 func (h *Handler) RemoveCompliment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -96,7 +117,7 @@ func (h *Handler) RemoveCompliment(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UpdateCompliment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -136,7 +157,7 @@ func (h *Handler) UpdateCompliment(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ReceiveCompliment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := ctx.Value(jwtmiddleware.UserIDKey).(int64)
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

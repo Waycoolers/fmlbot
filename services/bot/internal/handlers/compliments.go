@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Waycoolers/fmlbot/common/errs"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/state"
 )

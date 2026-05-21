@@ -1,0 +1,3 @@
+alter table users
+    add password_hash varchar(255) not null default '';
+

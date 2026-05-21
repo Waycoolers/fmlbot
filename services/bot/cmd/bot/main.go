@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Waycoolers/fmlbot/common/logger"
+	"github.com/Waycoolers/fmlbot/pkg/logger"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/app"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/clients/api"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/clients/telegram"
@@ -63,7 +63,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	s := server.NewHTTPServer(cfg.Server, handler)
+	s := server.NewHTTPServer(cfg.Server, handler, cfg.InternalSecret)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	s.Run()
