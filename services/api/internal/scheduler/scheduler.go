@@ -11,12 +11,13 @@ import (
 )
 
 type Scheduler struct {
-	h *handlers.Handler
-	c *cron.Cron
-	s domain.Sender
+	h          *handlers.Handler
+	c          *cron.Cron
+	httpSender domain.Sender
+	fcmSender  domain.Sender
 }
 
-func New(h *handlers.Handler, s domain.Sender) *Scheduler {
+func New(h *handlers.Handler, httpSender, fcmSender domain.Sender) *Scheduler {
 	loc, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {
 		slog.Error("Failed to load timezone, using UTC", "error", err)
@@ -24,7 +25,7 @@ func New(h *handlers.Handler, s domain.Sender) *Scheduler {
 	}
 
 	c := cron.New(cron.WithSeconds(), cron.WithLocation(loc))
-	return &Scheduler{h: h, c: c, s: s}
+	return &Scheduler{h: h, c: c, httpSender: httpSender, fcmSender: fcmSender}
 }
 
 func (s *Scheduler) Run(ctx context.Context) {
@@ -39,7 +40,7 @@ func (s *Scheduler) Run(ctx context.Context) {
 
 	_, err = s.c.AddFunc("0 0 12 * * *", func() {
 		slog.Info("Checking important dates (12:00 MSK)")
-		s.h.NotifyImportantDatesCron(ctx, s.s)
+		s.h.NotifyImportantDatesCron(ctx, s.httpSender, s.fcmSender)
 	})
 	if err != nil {
 		slog.Error("Error adding cron task for important date notifications", "error", err)

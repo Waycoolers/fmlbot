@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/Waycoolers/fmlbot/common/jwtmiddleware"
+	"github.com/Waycoolers/fmlbot/pkg/middlewares"
 	"github.com/Waycoolers/fmlbot/services/api/internal/config"
 	"github.com/Waycoolers/fmlbot/services/api/internal/handlers"
 )
@@ -29,6 +29,7 @@ func (s *Server) newServer() *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /users", s.h.AddUser)
 	mux.HandleFunc("GET /users/me", s.h.GetMe)
+	mux.HandleFunc("PATCH /users/me/password", s.h.ChangePassword)
 	mux.HandleFunc("GET /users/partner", s.h.GetPartner)
 	mux.HandleFunc("DELETE /users/me", s.h.DeleteUser)
 	mux.HandleFunc("PUT /users/me", s.h.UpdateUser)
@@ -36,6 +37,7 @@ func (s *Server) newServer() *http.Server {
 	mux.HandleFunc("POST /users/pair", s.h.AddPartners)
 	mux.HandleFunc("PATCH /users/unpair", s.h.DeletePartners)
 	mux.HandleFunc("GET /users/by-username/{username}", s.h.GetUserByUsername)
+	mux.HandleFunc("POST /users/fcm-token", s.h.SaveFCMToken)
 
 	mux.HandleFunc("GET /user_config/me", s.h.GetMyUserConfig)
 	mux.HandleFunc("GET /user_config/partner", s.h.GetPartnerUserConfig)
@@ -57,7 +59,10 @@ func (s *Server) newServer() *http.Server {
 	mux.HandleFunc("PATCH /important_dates/{id}/sharing", s.h.UpdateImportantDateSharing)
 	mux.HandleFunc("DELETE /important_dates/{id}", s.h.RemoveImportantDate)
 
-	handler := jwtmiddleware.Middleware(s.config.JwtSecret, "GET /users/by-username")(mux)
+	mux.HandleFunc("POST /auth/verify", s.h.VerifyUser) // Приватный
+
+	handler := middlewares.Middleware(s.config.JwtSecret, "GET /users/by-username", "POST /auth/verify")(mux)
+	handler = middlewares.InternalAuthMiddlewareWithPrivatePaths(string(s.config.InternalSecret), "POST /auth/verify")(handler)
 	addr := fmt.Sprintf("%s:%s", s.config.Host, s.config.Port)
 	return &http.Server{
 		Addr:    addr,

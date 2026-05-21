@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import '../services/api_client.dart';
+import '../services/auth_client.dart';
 import '../services/token_storage.dart';
 
 class AuthViewModel extends ChangeNotifier {
-  final ApiClient _apiClient = ApiClient();
+  final AuthClient _authClient = AuthClient();
   final TokenStorage _tokenStorage = TokenStorage();
 
   bool _isLoading = false;
@@ -13,66 +13,81 @@ class AuthViewModel extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
-  Future<bool> loginWithTelegram(String username) async {
+  // Метод входа по логину и паролю
+  Future<bool> login(String username, String password) async {
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners(); // Даем сигнал UI показать крутилку загрузки
+    notifyListeners();
 
     try {
-      // Очищаем никнейм от '@', если пользователь случайно его ввел
-      final cleanUsername = username.replaceAll('@', '').trim();
+      // Очищаем юзернейм от '@' и лишних пробелов
+      final cleanUsername = username.trim().replaceAll('@', '');
+      final cleanPassword = password.trim();
 
-      if (cleanUsername.isEmpty) {
-        _errorMessage = "Пожалуйста, введите никнейм";
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
+      // Отправляем запрос на твой микросервис авторизации
+      final response = await _authClient.dio.post('/auth/token', data: {
+        'username': cleanUsername,
+        'password': cleanPassword,
+      });
 
-      // 1. Получаем ID пользователя из твоего API Service
-      // ВНИМАНИЕ: Убедись, что путь '/users/by-username/' совпадает с твоим API!
-      final userResponse = await _apiClient.dio.get('/users/by-username/$cleanUsername');
+      // Достаем токены
+      final accessToken = response.data['access_token'];
+      final refreshToken = response.data['refresh_token'];
 
-      // Предполагаем, что бэкенд возвращает JSON, где есть поле "id" (или "user_id")
-      final userId = userResponse.data['user_id'];
-
-      // 2. Стучимся в Auth Service за токенами (используем чистый Dio, без перехватчика)
-      final authResponse = await Dio().post(
-        '${_apiClient.authBaseUrl}/auth/token',
-        data: {'user_id': userId},
+      // Сохраняем в защищенное хранилище
+      await _tokenStorage.saveTokens(
+        access: accessToken,
+        refresh: refreshToken,
       );
-
-      // 3. Сохраняем токены
-      final accessToken = authResponse.data['access_token'];
-      final refreshToken = authResponse.data['refresh_token'];
-      await _tokenStorage.saveTokens(access: accessToken, refresh: refreshToken);
 
       _isLoading = false;
       notifyListeners();
-      return true; // Успешный вход!
+      return true;
 
     } on DioException catch (e) {
       _isLoading = false;
-      if (e.response?.statusCode == 404) {
-        _errorMessage = "Пользователь не найден. Запустите бота!";
+
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        switch (statusCode) {
+          case 404:
+            _errorMessage = 'Пользователь не найден. Ты уже зарегистрировался в боте?';
+            break;
+          case 401:
+            _errorMessage = 'Неверный пароль';
+            break;
+          case 400:
+            _errorMessage = 'Ошибка запроса: неверный формат данных';
+            break;
+          case 500:
+            _errorMessage = 'Ошибка на сервере. Попробуй позже';
+            break;
+          default:
+            _errorMessage = 'Ошибка ($statusCode): ${e.response!.statusMessage}';
+        }
       } else {
-        // Теперь мы увидим реальную причину (например, Connection refused)
-        _errorMessage = "Ошибка соединения: ${e.response?.statusCode}. Детали: ${e.message}";
+        _errorMessage = 'Ошибка сети. Проверь подключение';
       }
+
       notifyListeners();
       return false;
+
     } catch (e) {
       _isLoading = false;
-      _errorMessage = "Непредвиденная ошибка: $e";
+      _errorMessage = 'Произошла непредвиденная ошибка';
       notifyListeners();
       return false;
     }
   }
 
-  // Выход из аккаунта
   Future<void> logout() async {
-    // В зависимости от того, как ты назвал метод в TokenStorage:
-    // Если метода deleteTokens нет, создай его там (внутри просто storage.deleteAll())
     await _tokenStorage.clearTokens();
+  }
+
+  // Проверка наличия токена для автоматического входа
+  Future<bool> checkAutoLogin() async {
+    final accessToken = await _tokenStorage.getAccessToken();
+    // Если токен есть — возвращаем true, если пусто — false
+    return accessToken != null;
   }
 }

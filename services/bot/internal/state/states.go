@@ -13,4 +13,5 @@ const (
 	AwaitingNotifyBeforeImportantDate State = "awaiting_notify_before_important_date"
 	AwaitingEditTitleImportantDate    State = "awaiting_edit_title_important_date"
 	AwaitingEditDateImportantDate     State = "awaiting_edit_date_important_date"
+	AwaitingPassword                  State = "awaiting_password"
 )

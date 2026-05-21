@@ -16,18 +16,26 @@ func (h *Handler) DoMidnightTasks(ctx context.Context) {
 	slog.Info("Tasks completed")
 }
 
-func (h *Handler) NotifyImportantDatesCron(ctx context.Context, s domain.Sender) {
+func (h *Handler) NotifyImportantDatesCron(ctx context.Context, httpSender, fcmSender domain.Sender) {
 	messages, err := h.uc.GetAllImportantDatesMessages(ctx)
 	if err != nil {
 		slog.Error("Error getting important dates messages", "error", err)
 		return
 	}
 
-	path := "/updates/important_dates"
 	for _, msg := range messages {
-		err = s.SendMessage(ctx, path, msg)
+		ok := true
+		err = httpSender.SendImportantDatesNotification(ctx, msg)
 		if err != nil {
-			slog.Error("Error sending message to important dates", "error", err)
+			slog.Error("Error sending important dates message to bot client", "error", err)
+			ok = false
+		}
+		err = fcmSender.SendImportantDatesNotification(ctx, msg)
+		if err != nil {
+			slog.Error("Error sending important dates message to fcm", "error", err)
+			ok = false
+		}
+		if !ok {
 			continue
 		}
 		err = h.uc.UpdateLastNotificationAt(ctx, msg)

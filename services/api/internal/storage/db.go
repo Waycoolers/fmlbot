@@ -55,6 +55,10 @@ func New(cfg *config.DatabaseConfig) (*Storage, error) {
 		db: db,
 	}
 
+	fcm := fcmRepo{
+		db: db,
+	}
+
 	return &Storage{
 		db: db,
 		Repos: &domain.Repos{
@@ -63,6 +67,7 @@ func New(cfg *config.DatabaseConfig) (*Storage, error) {
 			Scheduler:      &scheduler,
 			UserConfig:     &userConfig,
 			Users:          &users,
+			FCM:            &fcm,
 		},
 	}, nil
 }

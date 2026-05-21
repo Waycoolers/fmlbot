@@ -1,4 +1,4 @@
-module github.com/Waycoolers/fmlbot/common
+module github.com/Waycoolers/fmlbot/pkg
 
 go 1.25.4
 

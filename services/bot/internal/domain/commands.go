@@ -3,11 +3,12 @@ package domain
 type Command string
 
 const (
-	Start         Command = "/start"
-	Main          Command = "🏠 На главную"
-	Account       Command = "⚙️ Мой аккаунт"
-	Register      Command = "✨ Начать"
-	DeleteAccount Command = "🗑️ Удалить аккаунт"
+	Start          Command = "/start"
+	Main           Command = "🏠 На главную"
+	Account        Command = "⚙️ Мой аккаунт"
+	Register       Command = "✨ Начать"
+	DeleteAccount  Command = "🗑️ Удалить аккаунт"
+	ChangePassword Command = "✏️ Сменить пароль"
 
 	Partner       Command = "👤 Мой партнёр"
 	AddPartner    Command = "➕ Добавить партнёра"
@@ -33,6 +34,7 @@ var Commands = []Command{
 	Account,
 	Register,
 	DeleteAccount,
+	ChangePassword,
 	Partner,
 	AddPartner,
 	DeletePartner,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/utils.dart';
 import '../view_models/compliment_view_model.dart';
 import '../models/compliment_model.dart';
 import '../view_models/user_view_model.dart';
@@ -71,29 +72,13 @@ class _ComplimentsScreenState extends State<ComplimentsScreen> {
                 backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                 foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
               ),
-              // КНОПКА ТЕПЕРЬ ВСЕГДА АКТИВНА!
               onPressed: () async {
-                // Пытаемся вытянуть комплимент и ждем результат (String или null)
                 final errorMessage = await vm.receiveNextCompliment();
 
-                // Если пришла ошибка (не null), показываем её текст
                 if (errorMessage != null && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(errorMessage),
-                      backgroundColor: Colors.orange.shade700, // Красивый оранжевый для предупреждений
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
+                  showFmlSnackBar(context, errorMessage, backgroundColor: Colors.orange.shade700);
                 } else if (mounted) {
-                  // Если вернулся null, значит успех!
-                  // Можно даже добавить радостный SnackBar:
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Новый комплимент получен! ❤️'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
+                  showFmlSnackBar(context, 'Новый комплимент получен! ❤️', backgroundColor: Colors.green);
                 }
               },
             ),
@@ -236,9 +221,7 @@ class _ComplimentsScreenState extends State<ComplimentsScreen> {
             },
             onDismissed: (direction) {
               context.read<ComplimentViewModel>().deleteCompliment(comp.id!);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Комплимент удален')),
-              );
+              showFmlSnackBar(context, 'Комплимент удален', backgroundColor: Colors.green);
             },
             child: card,
           );

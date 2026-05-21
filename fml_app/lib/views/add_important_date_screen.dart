@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/utils.dart';
 import '../view_models/important_date_view_model.dart';
 import '../models/important_date_model.dart';
 import '../view_models/user_view_model.dart';
@@ -116,22 +117,12 @@ class _AddImportantDateScreenState extends State<AddImportantDateScreen> {
     final notifyDays = int.tryParse(_notifyController.text.trim());
 
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Введи название даты'),
-            backgroundColor: Colors.red,
-          )
-      );
+      showFmlSnackBar(context, 'Введи название даты', backgroundColor: Colors.red);
       return;
     }
 
     if (notifyDays == null || notifyDays < 0 || notifyDays > 30) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Уведомление должно быть от 0 до 30 дней'),
-            backgroundColor: Colors.orange,
-          )
-      );
+      showFmlSnackBar(context, 'Уведомление должно быть от 0 до 30 дней', backgroundColor: Colors.orange);
       return;
     }
 
@@ -159,12 +150,7 @@ class _AddImportantDateScreenState extends State<AddImportantDateScreen> {
 
     if (success && mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_isEditing ? 'Изменения сохранены!' : 'Дата добавлена!'),
-            backgroundColor: Colors.green,
-          )
-      );
+      showFmlSnackBar(context, 'Изменения сохранены!', backgroundColor: Colors.green);
     }
   }
 

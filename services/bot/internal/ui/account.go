@@ -9,7 +9,12 @@ func (ui *MenuUI) AccountMenu(chatID int64, text string) error {
 		Rows: []domain.KeyboardRow{
 			{
 				Buttons: []domain.KeyboardButton{
+					{domain.ChangePassword},
 					{domain.DeleteAccount},
+				},
+			},
+			{
+				Buttons: []domain.KeyboardButton{
 					{domain.Main},
 				},
 			},

@@ -12,14 +12,20 @@ import (
 	"os"
 	"time"
 
-	"github.com/Waycoolers/fmlbot/common/logger"
+	"github.com/Waycoolers/fmlbot/pkg/logger"
 	"github.com/Waycoolers/fmlbot/services/api/internal/config"
-	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
+
+type userWithPasswordResponse struct {
+	ID           int64  `db:"user_id" json:"user_id"`
+	Username     string `db:"username" json:"username"`
+	PartnerID    int64  `db:"partner_id" json:"partner_id"`
+	PasswordHash []byte `db:"password_hash" json:"password_hash"`
+}
 
 func GenerateRandomPassword(length int) (string, error) {
 	if length <= 0 {
@@ -86,7 +92,7 @@ func main() {
 }
 
 func GivePasswords(ctx context.Context, cfg *config.Config, db *sqlx.DB) {
-	var users []domain.UserResponse
+	var users []userWithPasswordResponse
 	err := db.SelectContext(ctx, &users, `
 		SELECT * FROM users WHERE password_hash = '';
 	`)
@@ -102,6 +108,10 @@ func GivePasswords(ctx context.Context, cfg *config.Config, db *sqlx.DB) {
 			continue
 		}
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			slog.Error("Error hashing password", "error", err)
+			continue
+		}
 
 		_, err = db.ExecContext(ctx, `
 			UPDATE users SET password_hash = $1 WHERE user_id = $2;
@@ -111,7 +121,7 @@ func GivePasswords(ctx context.Context, cfg *config.Config, db *sqlx.DB) {
 			continue
 		}
 
-		text := fmt.Sprintf("Привет! Я усилил безопасность. Твой новый пароль: %s\n\n P.S. Он тебе может пригодится для входа в мобильное приложение. Ты всегда можешь поменять пароль в настройках аккаунта.", password)
+		text := fmt.Sprintf("Привет! Я усилил безопасность. Твой новый пароль: %s\n\nP.S. Он тебе может пригодится для входа в мобильное приложение. Ты всегда можешь поменять пароль в настройках аккаунта.", password)
 
 		message := struct {
 			Text   string `json:"text"`
@@ -128,6 +138,7 @@ func GivePasswords(ctx context.Context, cfg *config.Config, db *sqlx.DB) {
 		req, err := http.NewRequest(http.MethodPost, cfg.BotURL+"/updates/message", bytes.NewReader(encoded))
 		if err != nil {
 			slog.Error("Error creating request", "error", err)
+			continue
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Internal-Secret", string(cfg.Server.InternalSecret))
@@ -141,6 +152,6 @@ func GivePasswords(ctx context.Context, cfg *config.Config, db *sqlx.DB) {
 		}
 		_ = resp.Body.Close()
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(3 * time.Second)
 	}
 }

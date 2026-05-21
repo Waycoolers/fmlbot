@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/utils.dart';
 import '../view_models/important_date_view_model.dart';
 import '../models/important_date_model.dart';
 import 'add_important_date_screen.dart';
@@ -66,7 +67,7 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         children: const [
           SizedBox(height: 100),
-          Center(child: Text('Важных дат пока нет.')),
+          Center(child: Text('Важных дат пока нет 😔')),
         ],
       );
     }
@@ -132,9 +133,7 @@ class _DateCard extends StatelessWidget {
       // ----------------------------------------
       onDismissed: (direction) {
         context.read<ImportantDateViewModel>().deleteDate(date.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Дата "${date.title}" удалена')),
-        );
+        showFmlSnackBar(context, 'Дата "${date.title}" удалена', backgroundColor: Colors.green);
       },
       child: InkWell(
         onTap: () {
@@ -159,10 +158,16 @@ class _DateCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      date.title,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    // --- Обернули Text в Expanded, чтобы он правильно обрезался! ---
+                    Expanded(
+                      child: Text(
+                        date.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
                     ),
+                    const SizedBox(width: 8), // Отступ между названием и датой
                     Text(
                       dateString,
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/utils.dart';
 import '../view_models/important_date_view_model.dart';
 import '../view_models/settings_view_model.dart';
-import '../view_models/user_view_model.dart'; // Добавили импорт
+import '../view_models/theme_view_model.dart';
+import '../view_models/user_view_model.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -43,96 +45,172 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<SettingsViewModel>();
-    final userVM = context.watch<UserViewModel>(); // Подключаем юзера, чтобы знать про партнера
+    final userVM = context.watch<UserViewModel>();
+    final themeVM = context.watch<ThemeViewModel>();
+
+    // Определяем, включена ли темная тема прямо сейчас
+    bool isDarkMode = themeVM.themeMode == ThemeMode.dark;
+    if (themeVM.themeMode == ThemeMode.system) {
+      isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Настройки'),
+        centerTitle: true,
       ),
-      body: vm.isLoading && vm.myConfig == null
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Лимиты комплиментов',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      // Убрали Center(CircularProgressIndicator) из корня,
+      // чтобы экран всегда загружался, даже если нет сети
+      body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        children: [
+
+          // --- СЕКЦИЯ 1: ОФОРМЛЕНИЕ (Всегда доступно) ---
+          _buildSectionHeader(context, 'Экран'),
+          SwitchListTile(
+            secondary: Icon(isDarkMode ? Icons.dark_mode : Icons.light_mode),
+            title: const Text('Тёмная тема'),
+            value: isDarkMode,
+            onChanged: (bool value) {
+              context.read<ThemeViewModel>().setTheme(
+                value ? ThemeMode.dark : ThemeMode.light,
+              );
+            },
+          ),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.0),
+            child: Divider(indent: 16, endIndent: 16),
+          ),
+
+          // --- РАЗВИЛКА: ПРОВЕРКА ИНТЕРНЕТА ---
+
+          if (vm.isLoading && vm.myConfig == null) ...[
+            // 1. Состояние: Идет загрузка настроек
+            const SizedBox(height: 32),
+            const Center(child: CircularProgressIndicator()),
+
+          ] else if (vm.myConfig != null) ...[
+            // 2. Состояние: Есть интернет, настройки загружены
+
+            // --- СЕКЦИЯ 2: ЛИМИТЫ ---
+            _buildSectionHeader(context, 'Комплименты'),
+            SwitchListTile(
+              secondary: const Icon(Icons.all_inclusive),
+              title: const Text('Без ограничений'),
+              subtitle: const Text('Партнер сможет писать сколько угодно'),
+              value: _isUnlimited,
+              onChanged: (val) {
+                setState(() {
+                  _isUnlimited = val;
+                  if (val) _limitController.clear();
+                });
+              },
             ),
-            const SizedBox(height: 8),
 
-            Card(
-              margin: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: SwitchListTile(
-                title: const Text('Без ограничений'),
-                subtitle: const Text('Партнер сможет присылать сколько угодно комплиментов'),
-                secondary: const Icon(Icons.all_inclusive, color: Colors.amber),
-                value: _isUnlimited,
-                onChanged: (val) {
-                  setState(() {
-                    _isUnlimited = val;
-                    if (val) _limitController.clear();
-                  });
-                },
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            AnimatedOpacity(
+            AnimatedSize(
               duration: const Duration(milliseconds: 300),
-              opacity: _isUnlimited ? 0.5 : 1.0,
-              child: IgnorePointer(
-                ignoring: _isUnlimited,
+              curve: Curves.easeInOut,
+              child: _isUnlimited
+                  ? const SizedBox.shrink()
+                  : Padding(
+                padding: const EdgeInsets.fromLTRB(72, 8, 16, 16),
                 child: TextField(
                   controller: _limitController,
-                  readOnly: _isUnlimited,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: 'Максимум в день',
-                    hintText: _isUnlimited ? '∞' : 'Например: 10',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.favorite_border),
+                    filled: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
                 ),
               ),
             ),
 
-            const SizedBox(height: 32),
-
-            ElevatedButton(
-              onPressed: _isSaving ? null : () => _saveSettings(vm),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: FilledButton(
+                onPressed: _isSaving ? null : () => _saveSettings(vm),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isSaving
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Сохранить лимиты', style: TextStyle(fontSize: 16)),
               ),
-              child: _isSaving
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Сохранить', style: TextStyle(fontSize: 18)),
             ),
 
-            // --- ОПАСНАЯ ЗОНА (показываем только если есть партнер) ---
+            // --- СЕКЦИЯ 3: ОПАСНАЯ ЗОНА ---
             if (userVM.partner != null) ...[
-              const SizedBox(height: 48), // Большой отступ, чтобы отделить от обычных настроек
-              const Text(
-                'Опасная зона',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16.0),
+                child: Divider(indent: 16, endIndent: 16),
               ),
-              const SizedBox(height: 8),
-              ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                tileColor: Colors.red.withOpacity(0.1),
-                leading: const Icon(Icons.link_off, color: Colors.red),
-                title: const Text(
-                    'Разорвать связь с партнером',
-                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)
+              _buildSectionHeader(context, 'Опасная зона', color: Colors.red),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Card(
+                  elevation: 0,
+                  margin: EdgeInsets.zero,
+                  color: Colors.red.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: ListTile(
+                    leading: const Icon(Icons.link_off, color: Colors.red),
+                    title: const Text(
+                      'Разорвать связь с партнером',
+                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                    ),
+                    onTap: () => _showUnpairDialog(context),
+                  ),
                 ),
-                onTap: () => _showUnpairDialog(context),
               ),
             ]
-          ],
+
+          ] else ...[
+            // 3. Состояние: НЕТ ИНТЕРНЕТА
+            const SizedBox(height: 32),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                child: Column(
+                  children: [
+                    Icon(Icons.cloud_off, size: 48, color: Colors.grey.shade400),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Нет подключения к сети',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Настройка лимитов и управление парой станут доступны, когда появится интернет.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ]
+        ],
+      ),
+    );
+  }
+
+  // Вспомогательный метод для отрисовки красивых заголовков секций как в Pixel
+  Widget _buildSectionHeader(BuildContext context, String title, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: color ?? Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
         ),
       ),
     );
@@ -146,9 +224,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else {
       final input = int.tryParse(_limitController.text.trim());
       if (input == null || input < 1 || input > 100) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Введи число от 1 до 100'), backgroundColor: Colors.red),
-        );
+        showFmlSnackBar(context, 'Введи число от 1 до 100', backgroundColor: Colors.red);
         return;
       }
       finalValue = input;
@@ -159,14 +235,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _isSaving = false);
 
     if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Настройки успешно обновлены! ✨'), backgroundColor: Colors.green),
-      );
+      showFmlSnackBar(context, 'Настройки сохранены ✨', backgroundColor: Colors.green);
       FocusScope.of(context).unfocus();
     }
   }
 
-  // Диалог подтверждения разрыва связи
   void _showUnpairDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -182,38 +255,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(ctx); // Закрываем диалог
+              Navigator.pop(ctx);
 
-              // 1. Ищем и удаляем все общие даты
               final dateVM = context.read<ImportantDateViewModel>();
-              await dateVM.fetchDates(); // На всякий случай обновляем список
+              await dateVM.fetchDates();
 
-              // Фильтруем только общие
               final sharedDates = dateVM.dates.where((d) => d.isShared).toList();
 
-              // Удаляем их по одной через API
               for (var date in sharedDates) {
                 await dateVM.deleteDate(date.id);
               }
 
-              // 2. Разрываем связь с партнером
               final success = await context.read<UserViewModel>().unpair();
 
               if (success && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Связь разорвана 💔'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
+                showFmlSnackBar(context, 'Связь разорвана 💔', backgroundColor: Colors.orange);
                 Navigator.pop(context);
               } else if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Не удалось разорвать связь'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                showFmlSnackBar(context, 'Не удалось разорвать связь', backgroundColor: Colors.red);
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
