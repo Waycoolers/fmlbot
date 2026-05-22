@@ -1,19 +1,19 @@
 package state
 
 type Machine struct {
-	step State
+	userSteps map[int64]State
 }
 
 func New() *Machine {
 	return &Machine{
-		step: Empty,
+		userSteps: make(map[int64]State),
 	}
 }
 
-func (m *Machine) GetStep() State {
-	return m.step
+func (m *Machine) GetStep(userID int64) State {
+	return m.userSteps[userID]
 }
 
-func (m *Machine) SetStep(step State) {
-	m.step = step
+func (m *Machine) SetStep(userID int64, state State) {
+	m.userSteps[userID] = state
 }
