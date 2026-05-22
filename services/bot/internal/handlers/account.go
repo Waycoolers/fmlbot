@@ -152,7 +152,7 @@ func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *domain.CallbackQu
 func (h *Handler) ChangePassword(_ context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
 
-	h.sm.SetStep(state.AwaitingPassword)
+	h.sm.SetStep(chatID, state.AwaitingPassword)
 
 	text := "Отправь новый пароль"
 	h.Reply(chatID, text)
@@ -187,12 +187,12 @@ func (h *Handler) HandleChangePassword(ctx context.Context, msg *domain.Message)
 
 	err = h.api.ChangePassword(ctx, chatID, password)
 	if err != nil {
-		h.sm.SetStep(state.Empty)
+		h.sm.SetStep(chatID, state.Empty)
 		h.HandleErr(chatID, "Error occurred while trying to change password", err)
 		return
 	}
 	text = "Пароль успешно изменен!"
-	h.sm.SetStep(state.Empty)
+	h.sm.SetStep(chatID, state.Empty)
 	h.Reply(chatID, text)
 }
 

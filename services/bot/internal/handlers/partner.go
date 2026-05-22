@@ -50,7 +50,7 @@ func (h *Handler) SetPartner(ctx context.Context, msg *domain.Message) {
 	}
 
 	if user.PartnerID == 0 {
-		h.sm.SetStep(state.AwaitingPartner)
+		h.sm.SetStep(chatID, state.AwaitingPartner)
 		h.Reply(chatID, "💌 Отправь username партнёра")
 	} else {
 		partner, err := h.api.GetPartner(ctx, chatID)
@@ -108,11 +108,11 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *domain.Messag
 	if user.PartnerID != 0 {
 		if user.PartnerID == partner.UserID {
 			h.Reply(chatID, "💛 @"+partner.Username+" и так ваш партнёр. Приятного времяпрепровождения!")
-			h.sm.SetStep(state.Empty)
+			h.sm.SetStep(chatID, state.Empty)
 			return
 		} else {
 			h.Reply(chatID, "😔 У этого пользователя уже есть партнёр")
-			h.sm.SetStep(state.Empty)
+			h.sm.SetStep(chatID, state.Empty)
 			return
 		}
 	}
@@ -126,7 +126,7 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *domain.Messag
 		h.Reply(partner.UserID, "💔 Твой партнёр добавил другого партнёра")
 	}
 
-	h.sm.SetStep(state.Empty)
+	h.sm.SetStep(chatID, state.Empty)
 
 	err = h.api.PairUsers(ctx, chatID, partner.UserID)
 	if errors.Is(err, errs.ErrPartnerNotFound) {
