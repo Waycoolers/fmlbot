@@ -139,7 +139,7 @@ func (h *Handler) ShowImportantDatesMenu(ctx context.Context, msg *domain.Messag
 func (h *Handler) AddImportantDate(_ context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
 
-	h.sm.SetStep(state.AwaitingTitleImportantDate)
+	h.sm.SetStep(chatID, state.AwaitingTitleImportantDate)
 
 	h.Reply(chatID,
 		"✍️ Как назовём эту дату?\n\n"+
@@ -162,7 +162,7 @@ func (h *Handler) HandleTitleImportantDate(ctx context.Context, msg *domain.Mess
 		return
 	}
 
-	h.sm.SetStep(state.AwaitingDateImportantDate)
+	h.sm.SetStep(chatID, state.AwaitingDateImportantDate)
 
 	err = h.ui.SendYearKeyboard(chatID, time.Now().Year(), false)
 	if err != nil {
@@ -220,7 +220,7 @@ func (h *Handler) HandlePartnerImportantDate(ctx context.Context, cq *domain.Cal
 		h.HandleErr(chatID, "Error deleting message", err)
 	}
 
-	h.sm.SetStep(state.AwaitingNotifyBeforeImportantDate)
+	h.sm.SetStep(chatID, state.AwaitingNotifyBeforeImportantDate)
 
 	err = h.ui.SendNotifyBeforeKeyboard(chatID, false)
 	if err != nil {
@@ -268,7 +268,7 @@ func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *domai
 		return
 	}
 
-	h.sm.SetStep(state.Empty)
+	h.sm.SetStep(chatID, state.Empty)
 
 	err = h.importantDateDrafts.Delete(ctx, chatID)
 	if err != nil {
@@ -590,7 +590,7 @@ func (h *Handler) HandleEditTitleImportantDate(ctx context.Context, cq *domain.C
 		return
 	}
 
-	h.sm.SetStep(state.AwaitingEditTitleImportantDate)
+	h.sm.SetStep(chatID, state.AwaitingEditTitleImportantDate)
 
 	err = h.ui.Client.DeleteMessage(chatID, messageID)
 	if err != nil {
@@ -638,7 +638,7 @@ func (h *Handler) HandleEditTitleImportantDateText(ctx context.Context, msg *dom
 
 	_ = h.importantDateEditDrafts.Delete(ctx, chatID)
 
-	h.sm.SetStep(state.Empty)
+	h.sm.SetStep(chatID, state.Empty)
 
 	h.Reply(chatID, "✅ Отлично! Название обновлено")
 }
@@ -657,7 +657,7 @@ func (h *Handler) HandleEditDateImportantDate(ctx context.Context, cq *domain.Ca
 		return
 	}
 
-	h.sm.SetStep(state.AwaitingEditDateImportantDate)
+	h.sm.SetStep(chatID, state.AwaitingEditDateImportantDate)
 
 	err = h.ui.Client.DeleteMessage(chatID, messageID)
 	if err != nil {
@@ -1119,7 +1119,7 @@ func (h *Handler) HandleDayImportantDateUniversal(ctx context.Context, cq *domai
 				return
 			}
 
-			h.sm.SetStep(state.Empty)
+			h.sm.SetStep(chatID, state.Empty)
 
 			err = h.ui.Client.DeleteMessage(chatID, messageID)
 			if err != nil {
@@ -1156,14 +1156,14 @@ func (h *Handler) HandleDayImportantDateUniversal(ctx context.Context, cq *domai
 
 			if partnerID == 0 {
 				h.Reply(chatID, "✨ Так как у тебя пока нет партнёра, памятная дата будет твоей личной")
-				h.sm.SetStep(state.AwaitingNotifyBeforeImportantDate)
+				h.sm.SetStep(chatID, state.AwaitingNotifyBeforeImportantDate)
 				err = h.ui.SendNotifyBeforeKeyboard(chatID, isEdit)
 				if err != nil {
 					h.HandleErr(chatID, "Error sending keyboard to select day", err)
 					return
 				}
 			} else {
-				h.sm.SetStep(state.AwaitingPartnerImportantDate)
+				h.sm.SetStep(chatID, state.AwaitingPartnerImportantDate)
 				err = h.ui.SendPartnerKeyboard(chatID, isEdit)
 				if err != nil {
 					h.HandleErr(chatID, "Error sending keyboard to select day", err)

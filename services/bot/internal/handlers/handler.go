@@ -38,7 +38,7 @@ func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 	// Если введена команда, то сбрасываем state
 	for _, command := range domain.Commands {
 		if text == string(command) {
-			h.sm.SetStep(state.Empty)
+			h.sm.SetStep(chatID, state.Empty)
 		}
 	}
 
@@ -52,7 +52,7 @@ func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 		return
 	}
 
-	step := h.sm.GetStep()
+	step := h.sm.GetStep(chatID)
 
 	if !(step == state.Empty) {
 		switch step {

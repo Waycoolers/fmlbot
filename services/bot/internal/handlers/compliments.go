@@ -60,7 +60,7 @@ func (h *Handler) ShowComplimentsMenu(ctx context.Context, msg *domain.Message) 
 
 func (h *Handler) AddCompliment(_ context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
-	h.sm.SetStep(state.AwaitingCompliment)
+	h.sm.SetStep(chatID, state.AwaitingCompliment)
 	h.Reply(chatID, "💌 Напиши комплимент")
 }
 
@@ -69,12 +69,12 @@ func (h *Handler) ProcessCompliment(ctx context.Context, msg *domain.Message) {
 	complimentText := msg.Text
 
 	if complimentText == "" {
-		h.sm.SetStep(state.Empty)
+		h.sm.SetStep(chatID, state.Empty)
 		h.Reply(chatID, "Кажется, тут пусто 🙈 Попробуй ещё раз")
 		return
 	}
 
-	h.sm.SetStep(state.Empty)
+	h.sm.SetStep(chatID, state.Empty)
 
 	_, err := h.api.AddCompliment(ctx, chatID, complimentText)
 	if err != nil {
@@ -275,7 +275,7 @@ func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *domain.Messa
 		"• отправь число\n" +
 		"• или «-», чтобы убрать лимит"
 
-	h.sm.SetStep(state.AwaitingComplimentFrequency)
+	h.sm.SetStep(chatID, state.AwaitingComplimentFrequency)
 
 	err = h.ui.EditComplimentFrequencyMenu(chatID, text)
 	if err != nil {
