@@ -1,6 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:fml_app/services/notification_service.dart';
 import 'package:fml_app/view_models/settings_view_model.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:fml_app/views/auth_wrapper.dart';
@@ -18,16 +17,22 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print("Фоновое уведомление получено: ${message.messageId}");
 }
 
+final GlobalKey<NavigatorState> globalNavigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
+  // Обязательная инициализация движка Flutter
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Инициализируем ядро Firebase (это быстро)
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  await NotificationService().init();
 
+  // Регистрируем фоновый обработчик (он должен быть тут)
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // СРАЗУ запускаем UI! Никаких долгих await перед runApp.
   runApp(
-    // Оборачиваем приложение в MultiProvider
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthViewModel()),
@@ -50,6 +55,7 @@ class FmlApp extends StatelessWidget {
     final themeVM = context.watch<ThemeViewModel>();
     return MaterialApp(
       title: 'FML App',
+      navigatorKey: globalNavigatorKey,
       themeMode: themeVM.themeMode,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

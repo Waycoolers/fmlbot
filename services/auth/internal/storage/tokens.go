@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Waycoolers/fmlbot/services/auth/internal/domain"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -48,18 +48,18 @@ func (s *tokensRepo) Create(ctx context.Context, userID int64, ttl time.Duration
 		return "", err
 	}
 
-	_, err = tx.ExecContext(ctx, `
-        UPDATE refresh_tokens 
-        SET revoked = true 
-        WHERE user_id = $1 AND revoked = false
-    `, userID)
-	if err != nil {
-		er := tx.Rollback()
-		if er != nil {
-			return "", er
-		}
-		return "", err
-	}
+	//_, err = tx.ExecContext(ctx, `
+	//    UPDATE refresh_tokens
+	//    SET revoked = true
+	//    WHERE user_id = $1 AND revoked = false
+	//`, userID)
+	//if err != nil {
+	//	er := tx.Rollback()
+	//	if er != nil {
+	//		return "", er
+	//	}
+	//	return "", err
+	//}
 
 	_, err = tx.ExecContext(ctx, `
         INSERT INTO refresh_tokens (token_id, token_hash, user_id, expires_at)
@@ -85,21 +85,27 @@ func (s *tokensRepo) Validate(ctx context.Context, fullToken string) (int64, err
 	if parts == nil {
 		return 0, errors.New("invalid token format")
 	}
-	tokenID, secret := parts[0], parts[1]
+	tokenID, secretBase64 := parts[0], parts[1] // secretBase64 — это то, что мы вытащили из строки
+
+	// 1. Декодируем Base64 обратно в байты!
+	secretBytes, err := base64.URLEncoding.DecodeString(secretBase64)
+	if err != nil {
+		return 0, errors.New("invalid token secret encoding")
+	}
 
 	var userID int64
 	var tokenHash string
 	var expiresAt time.Time
 	var revoked bool
 
-	err := s.db.QueryRowContext(ctx, `
+	err = s.db.QueryRowContext(ctx, `
         SELECT user_id, token_hash, expires_at, revoked
         FROM refresh_tokens
         WHERE token_id = $1
     `, tokenID).Scan(&userID, &tokenHash, &expiresAt, &revoked)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, domain.ErrTokenNotFound
+			return 0, errs.ErrTokenNotFound
 		}
 		return 0, err
 	}
@@ -111,8 +117,8 @@ func (s *tokensRepo) Validate(ctx context.Context, fullToken string) (int64, err
 		return 0, errors.New("token expired")
 	}
 
-	// Сравниваем хеш с секретом
-	err = bcrypt.CompareHashAndPassword([]byte(tokenHash), []byte(secret))
+	// 2. Сравниваем хеш с сырыми байтами (которые мы получили после декодирования)
+	err = bcrypt.CompareHashAndPassword([]byte(tokenHash), secretBytes)
 	if err != nil {
 		return 0, errors.New("invalid token")
 	}

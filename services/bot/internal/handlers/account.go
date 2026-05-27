@@ -166,19 +166,19 @@ func (h *Handler) HandleChangePassword(ctx context.Context, msg *domain.Message)
 	err := validatePassword(password)
 	if err != nil {
 		switch {
-		case errors.Is(err, ErrPasswordTooShort):
+		case errors.Is(err, errs.ErrPasswordTooShort):
 			text = "Пароль должен содержать минимум 8 символов"
-		case errors.Is(err, ErrPasswordTooLong):
+		case errors.Is(err, errs.ErrPasswordTooLong):
 			text = "Пароль не может быть длиннее 32 символов"
-		case errors.Is(err, ErrPasswordInvalidCharacter):
+		case errors.Is(err, errs.ErrPasswordInvalidCharacter):
 			text = "Пароль может состоять из латинских букв, цифр и знаков препинания"
-		case errors.Is(err, ErrPasswordWithoutLetter):
+		case errors.Is(err, errs.ErrPasswordWithoutLetter):
 			text = "В пароле обязательно должна быть хотя бы одна буква"
-		case errors.Is(err, ErrPasswordWithoutUpper):
+		case errors.Is(err, errs.ErrPasswordWithoutUpper):
 			text = "В пароле обязательно должен быть хотя бы один символ с верхним регистром"
-		case errors.Is(err, ErrPasswordWithoutLower):
+		case errors.Is(err, errs.ErrPasswordWithoutLower):
 			text = "В пароле обязательно должен быть хотя бы один символ с нижним регистром"
-		case errors.Is(err, ErrPasswordWithoutDigit):
+		case errors.Is(err, errs.ErrPasswordWithoutDigit):
 			text = "В пароле обязательно должна быть хотя бы одна цифра"
 		}
 		h.Reply(chatID, text)
@@ -196,29 +196,19 @@ func (h *Handler) HandleChangePassword(ctx context.Context, msg *domain.Message)
 	h.Reply(chatID, text)
 }
 
-var (
-	ErrPasswordTooShort         = errors.New("password too short")
-	ErrPasswordTooLong          = errors.New("password too long")
-	ErrPasswordInvalidCharacter = errors.New("password invalid")
-	ErrPasswordWithoutLetter    = errors.New("password without letter")
-	ErrPasswordWithoutUpper     = errors.New("password without uppercase")
-	ErrPasswordWithoutLower     = errors.New("password without lowercase")
-	ErrPasswordWithoutDigit     = errors.New("password without digit")
-)
-
 func validatePassword(password string) error {
 	if len([]rune(password)) < 8 {
-		return ErrPasswordTooShort
+		return errs.ErrPasswordTooShort
 	}
 	if len([]rune(password)) > 32 {
-		return ErrPasswordTooLong
+		return errs.ErrPasswordTooLong
 	}
 
 	var hasLetter, hasUpper, hasLower, hasNumber bool
 
 	for _, char := range password {
 		if char < '!' || char > '~' {
-			return ErrPasswordInvalidCharacter
+			return errs.ErrPasswordInvalidCharacter
 		}
 
 		switch {
@@ -234,16 +224,16 @@ func validatePassword(password string) error {
 	}
 
 	if !hasLetter {
-		return ErrPasswordWithoutLetter
+		return errs.ErrPasswordWithoutLetter
 	}
 	if !hasUpper {
-		return ErrPasswordWithoutUpper
+		return errs.ErrPasswordWithoutUpper
 	}
 	if !hasLower {
-		return ErrPasswordWithoutLower
+		return errs.ErrPasswordWithoutLower
 	}
 	if !hasNumber {
-		return ErrPasswordWithoutDigit
+		return errs.ErrPasswordWithoutDigit
 	}
 	return nil
 }

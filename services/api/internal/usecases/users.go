@@ -33,7 +33,26 @@ func generateRandomPassword(length int) (string, error) {
 	return string(password), nil
 }
 
-func (uc *UseCase) AddUser(ctx context.Context, userID int64, username string) (string, error) {
+func (uc *UseCase) RegisterUser(ctx context.Context, userID int64, username string, password string) error {
+	_, err := uc.users.GetUserIDByUsername(ctx, username)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+	}
+	if err == nil {
+		return errs.ErrUsernameIsAlreadyTaken
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	return uc.users.AddUser(ctx, userID, username, hashedPassword)
+}
+
+func (uc *UseCase) AddUserWithRandomPassword(ctx context.Context, userID int64, username string) (string, error) {
 	exists, err := uc.users.IsUserExists(ctx, userID)
 	if err != nil {
 		return "", err

@@ -11,6 +11,40 @@ import (
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
 
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var req struct {
+		UserID   int64  `json:"user_id"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Username == "" {
+		http.Error(w, "Username is required", http.StatusBadRequest)
+		return
+	}
+	if req.Password == "" {
+		http.Error(w, "Password is required", http.StatusBadRequest)
+		return
+	}
+
+	err = h.uc.RegisterUser(ctx, req.UserID, req.Username, req.Password)
+	if err != nil {
+		if errors.Is(err, errs.ErrUsernameIsAlreadyTaken) {
+			body := map[string]string{"error": err.Error()}
+			sendJson(w, http.StatusConflict, body)
+		}
+		slog.Error("Unexpected error", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+}
+
 func (h *Handler) AddUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req domain.UserRequest
@@ -29,7 +63,7 @@ func (h *Handler) AddUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	password, err := h.uc.AddUser(ctx, userID, req.Username)
+	password, err := h.uc.AddUserWithRandomPassword(ctx, userID, req.Username)
 	if err != nil {
 		if errors.Is(err, errs.ErrUserExists) {
 			http.Error(w, err.Error(), http.StatusConflict)

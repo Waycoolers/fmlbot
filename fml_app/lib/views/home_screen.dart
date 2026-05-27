@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/notification_service.dart';
 import '../services/utils.dart';
 import '../view_models/auth_view_model.dart';
 import '../view_models/user_view_model.dart';
@@ -24,6 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<UserViewModel>().fetchProfiles();
       // <-- Теперь при открытии главного экрана грузим еще и даты
       context.read<ImportantDateViewModel>().fetchDates();
+
+      NotificationService().init();
     });
   }
 

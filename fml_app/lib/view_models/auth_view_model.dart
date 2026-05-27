@@ -20,21 +20,17 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Очищаем юзернейм от '@' и лишних пробелов
       final cleanUsername = username.trim().replaceAll('@', '');
       final cleanPassword = password.trim();
 
-      // Отправляем запрос на твой микросервис авторизации
       final response = await _authClient.dio.post('/auth/token', data: {
         'username': cleanUsername,
         'password': cleanPassword,
       });
 
-      // Достаем токены
       final accessToken = response.data['access_token'];
       final refreshToken = response.data['refresh_token'];
 
-      // Сохраняем в защищенное хранилище
       await _tokenStorage.saveTokens(
         access: accessToken,
         refresh: refreshToken,
@@ -51,7 +47,7 @@ class AuthViewModel extends ChangeNotifier {
         final statusCode = e.response!.statusCode;
         switch (statusCode) {
           case 404:
-            _errorMessage = 'Пользователь не найден. Ты уже зарегистрировался в боте?';
+            _errorMessage = 'Пользователь не найден. Вы уже зарегистрировались?';
             break;
           case 401:
             _errorMessage = 'Неверный пароль';
@@ -80,14 +76,74 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+  // НОВЫЙ МЕТОД: Настоящая регистрация
+  Future<bool> register(String username, String password) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final cleanUsername = username.trim().replaceAll('@', '');
+      final cleanPassword = password.trim();
+
+      final response = await _authClient.dio.post('/auth/register', data: {
+        'username': cleanUsername,
+        'password': cleanPassword,
+      });
+
+      if (response.statusCode == 201) {
+        // Успешно создали юзера! Сразу логиним его под капотом
+        return await login(cleanUsername, cleanPassword);
+      } else {
+        _errorMessage = 'Не удалось зарегистрироваться';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } on DioException catch (e) {
+      _isLoading = false;
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        if (statusCode == 409) {
+          _errorMessage = 'Этот логин уже занят';
+        } else if (statusCode == 400) {
+          // Пытаемся вытащить сообщение об ошибке от твоего Go-бэкенда (например, про пароль)
+          final data = e.response!.data;
+          if (data is Map<String, dynamic> && data['error'] != null) {
+            _errorMessage = data['error'].toString();
+          } else {
+            _errorMessage = 'Логин или пароль не соответствуют требованиям';
+          }
+        } else {
+          _errorMessage = 'Ошибка сервера при регистрации';
+        }
+      } else {
+        _errorMessage = 'Ошибка сети. Проверь подключение';
+      }
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Произошла непредвиденная ошибка';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Метод очистки ошибки (чтобы сбрасывать красную надпись при переключении Вход/Регистрация)
+  void clearError() {
+    if (_errorMessage != null) {
+      _errorMessage = null;
+      notifyListeners();
+    }
+  }
+
   Future<void> logout() async {
     await _tokenStorage.clearTokens();
   }
 
-  // Проверка наличия токена для автоматического входа
   Future<bool> checkAutoLogin() async {
     final accessToken = await _tokenStorage.getAccessToken();
-    // Если токен есть — возвращаем true, если пусто — false
     return accessToken != null;
   }
 }

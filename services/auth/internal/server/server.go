@@ -31,6 +31,7 @@ func New(cfg *config.ServerConfig, h *handlers.Handler, internalSecret []byte) *
 
 func (s *Server) newServer() *http.Server {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /register", s.h.Register)
 	mux.HandleFunc("POST /auth/token", s.h.Token)
 	mux.HandleFunc("POST /internal/auth/token", s.h.InternalToken)
 	mux.HandleFunc("POST /auth/refresh", s.h.Refresh)
