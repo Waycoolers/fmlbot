@@ -10,7 +10,6 @@ import (
 
 	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func (c *client) CreateUser(ctx context.Context, chatID int64, username string) (string, error) {
@@ -254,11 +253,10 @@ func (c *client) GetUserByUsername(ctx context.Context, requesterID int64, usern
 
 func (c *client) ChangePassword(ctx context.Context, userID int64, password string) error {
 	path := "/users/me/password"
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	reqBody := struct {
-		Password []byte `json:"password"`
+		Password string `json:"password"`
 	}{
-		Password: hashedPassword,
+		Password: password,
 	}
 	resp, err := c.doAuthRequest(ctx, http.MethodPatch, path, reqBody, userID)
 	if err != nil {

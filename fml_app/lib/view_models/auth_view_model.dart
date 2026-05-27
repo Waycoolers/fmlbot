@@ -86,14 +86,25 @@ class AuthViewModel extends ChangeNotifier {
       final cleanUsername = username.trim().replaceAll('@', '');
       final cleanPassword = password.trim();
 
-      final response = await _authClient.dio.post('/auth/register', data: {
+      final response = await _authClient.dio.post('/register', data: {
         'username': cleanUsername,
         'password': cleanPassword,
       });
 
-      if (response.statusCode == 201) {
-        // Успешно создали юзера! Сразу логиним его под капотом
-        return await login(cleanUsername, cleanPassword);
+      // Go-бэкенд возвращает 200 OK и сразу отдает готовую пару токенов!
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final accessToken = response.data['access_token'];
+        final refreshToken = response.data['refresh_token'];
+
+        // Сразу сохраняем токены, не вызывая метод login повторно
+        await _tokenStorage.saveTokens(
+          access: accessToken,
+          refresh: refreshToken,
+        );
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
       } else {
         _errorMessage = 'Не удалось зарегистрироваться';
         _isLoading = false;
@@ -107,7 +118,6 @@ class AuthViewModel extends ChangeNotifier {
         if (statusCode == 409) {
           _errorMessage = 'Этот логин уже занят';
         } else if (statusCode == 400) {
-          // Пытаемся вытащить сообщение об ошибке от твоего Go-бэкенда (например, про пароль)
           final data = e.response!.data;
           if (data is Map<String, dynamic> && data['error'] != null) {
             _errorMessage = data['error'].toString();

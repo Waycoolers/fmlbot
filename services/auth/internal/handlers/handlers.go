@@ -103,6 +103,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			errors.Is(err, errs.ErrPasswordInvalidCharacter) {
 			body := map[string]string{"error": err.Error()}
 			sendJson(w, http.StatusBadRequest, body)
+			return
 		}
 		slog.Error("Unexpected error", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -114,6 +115,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, errs.ErrUsernameIsAlreadyTaken) {
 			body := map[string]string{"error": err.Error()}
 			sendJson(w, http.StatusConflict, body)
+			return
 		}
 		slog.Error("Unexpected error", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -122,6 +124,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	if !available {
 		body := map[string]string{"error": "username is already taken"}
 		sendJson(w, http.StatusConflict, body)
+		return
 	}
 
 	userID := time.Now().UnixMicro()
@@ -130,6 +133,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("Unexpected error", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	accessToken, err := generateAccessToken(userID, h.cfg.JwtSecret, h.cfg.AccessTokenTTL)
@@ -153,6 +157,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {

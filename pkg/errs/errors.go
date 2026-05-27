@@ -22,6 +22,9 @@ var (
 	ErrPasswordWithoutDigit     = errors.New("password without digit")
 	ErrUsernameIsAlreadyTaken   = errors.New("username is already taken")
 	ErrTokenNotFound            = errors.New("token not found")
+	ErrCannotPartnerYourself    = errors.New("cannot partner yourself")
+	ErrAlreadyHasPartner        = errors.New("already has partner")
+	ErrPartnerAlreadyHasPartner = errors.New("partner already has partner")
 )
 
 type ErrBucketEmpty struct {
