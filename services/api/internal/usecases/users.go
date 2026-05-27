@@ -61,6 +61,14 @@ func (uc *UseCase) AddUserWithRandomPassword(ctx context.Context, userID int64, 
 		return "", errs.ErrUserExists
 	}
 
+	taken, err := uc.users.IsUserExistsByUsername(ctx, username)
+	if err != nil {
+		return "", err
+	}
+	if taken {
+		return "", errs.ErrUsernameIsAlreadyTaken
+	}
+
 	password, err := generateRandomPassword(10)
 	if err != nil {
 		return "", err
@@ -87,6 +95,11 @@ func (uc *UseCase) RemoveUser(ctx context.Context, userID int64) error {
 		return err
 	}
 	if partnerID != 0 {
+		err = uc.users.ClearAllPartnersHistory(ctx, userID, partnerID)
+		if err != nil {
+			return err
+		}
+
 		err = uc.users.RemovePartners(ctx, userID, partnerID)
 		if err != nil {
 			return err
@@ -146,6 +159,20 @@ func (uc *UseCase) AddPartners(ctx context.Context, userID int64, partnerID int6
 		return errs.ErrUserNotFound
 	}
 
+	if userID == partnerID {
+		return errs.ErrCannotPartnerYourself
+	}
+
+	userPartner, _ := uc.users.GetPartnerID(ctx, userID)
+	if userPartner != 0 {
+		return errs.ErrAlreadyHasPartner
+	}
+
+	partnerPartner, _ := uc.users.GetPartnerID(ctx, partnerID)
+	if partnerPartner != 0 {
+		return errs.ErrPartnerAlreadyHasPartner
+	}
+
 	return uc.users.SetPartners(ctx, userID, partnerID)
 }
 
@@ -181,7 +208,7 @@ func (uc *UseCase) GetMe(ctx context.Context, userID int64) (*domain.UserRespons
 	}, nil
 }
 
-func (uc *UseCase) ChangePassword(ctx context.Context, userID int64, password []byte) error {
+func (uc *UseCase) ChangePassword(ctx context.Context, userID int64, password string) error {
 	exists, err := uc.users.IsUserExists(ctx, userID)
 	if err != nil {
 		return err
@@ -190,7 +217,8 @@ func (uc *UseCase) ChangePassword(ctx context.Context, userID int64, password []
 		return errs.ErrUserNotFound
 	}
 
-	err = uc.users.SetPassword(ctx, userID, password)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	err = uc.users.SetPassword(ctx, userID, hashedPassword)
 	if err != nil {
 		return err
 	}
@@ -209,9 +237,12 @@ func (uc *UseCase) GetPartner(ctx context.Context, userID int64) (*domain.UserRe
 	partnerID, err := uc.users.GetPartnerID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errs.ErrUserNotFound
+			return nil, errs.ErrPartnerNotFound
 		}
 		return nil, err
+	}
+	if partnerID == 0 {
+		return nil, errs.ErrPartnerNotFound
 	}
 
 	username, err := uc.users.GetUsername(ctx, partnerID)
@@ -246,7 +277,27 @@ func (uc *UseCase) RemovePartners(ctx context.Context, userID int64) error {
 		return errs.ErrPartnerNotFound
 	}
 
-	return uc.users.RemovePartners(ctx, userID, partnerID)
+	err = uc.users.ClearAllPartnersHistory(ctx, userID, partnerID)
+	if err != nil {
+		return err
+	}
+
+	err = uc.users.RemovePartners(ctx, userID, partnerID)
+	if err != nil {
+		return err
+	}
+
+	err = uc.userConfig.SetDefault(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	err = uc.userConfig.SetDefault(ctx, partnerID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (uc *UseCase) GetUserByUsername(ctx context.Context, username string) (*domain.UserResponse, error) {

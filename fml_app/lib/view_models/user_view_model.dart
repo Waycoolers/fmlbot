@@ -48,39 +48,57 @@ class UserViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Добавление партнера по никнейму
-  Future<bool> addPartner(String username) async {
+  Future<String?> addPartner(String username) async {
     isLoading = true;
     notifyListeners();
 
     try {
-      final cleanUsername = username.replaceAll('@', '').trim();
+      // 1. Ищем пользователя по юзернейму
+      final userResponse = await _apiClient.dio.get('/users/by-username/$username');
 
-      // 1. Сначала узнаем ID партнера по его никнейму
-      final userResponse = await _apiClient.dio.get('/users/by-username/$cleanUsername');
-      final partnerId = userResponse.data['user_id'];
+      final data = userResponse.data;
+      // ВАЖНО: Достаем ID по обоим возможным ключам
+      final partnerId = data['id'] ?? data['user_id'];
 
-      // 2. Отправляем запрос на создание пары
-      // ВНИМАНИЕ: Я предполагаю, что твой эндпоинт POST /users/pair ожидает json с partner_id.
-      // Если у тебя структура другая, поправь ключи в data.
+      if (partnerId == null || partnerId == 0) {
+        return 'Ошибка: Сервер не вернул ID пользователя';
+      }
+
+      // ЖЕСТКАЯ защита на фронтенде от самого себя
+      if (currentUser != null && partnerId == currentUser!.userId) {
+        return 'Нельзя добавить самого себя! 😅';
+      }
+
+      // 2. Отправляем ID на эндпоинт создания пары
       await _apiClient.dio.post('/users/pair', data: {
-        'partner_id': partnerId
+        'partner_id': partnerId,
       });
 
-      // 3. Успешно! Заново скачиваем профили, чтобы обновить Главный экран
       await fetchProfiles();
-      return true;
+      return null;
 
     } on DioException catch (e) {
-      print('Ошибка при добавлении партнера: ${e.response?.statusCode}');
-      isLoading = false;
-      notifyListeners();
-      return false;
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        if (statusCode == 404) return 'Пользователь с таким ником не найден';
+
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data['error'] != null) {
+          final errStr = data['error'].toString();
+          switch (errStr) {
+            case 'cannot partner yourself': return 'Нельзя добавить самого себя! 😅';
+            case 'already has partner': return 'У тебя уже есть пара!';
+            case 'partner already has partner': return 'У этого пользователя уже есть партнер 💔';
+            default: return 'Ошибка: $errStr';
+          }
+        }
+      }
+      return 'Ошибка сети. Проверь подключение';
     } catch (e) {
-      print('Непредвиденная ошибка: $e');
+      return 'Произошла непредвиденная ошибка';
+    } finally {
       isLoading = false;
       notifyListeners();
-      return false;
     }
   }
 
@@ -107,6 +125,37 @@ class UserViewModel extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<bool> changePassword(String newPassword) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      // Отправляем как строку, Go json.Decoder превратит её в []byte
+      await _apiClient.dio.patch('/users/me/password', data: {'password': newPassword});
+      return true;
+    } catch (e) {
+      print('Ошибка смены пароля: $e');
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteAccount() async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      await _apiClient.dio.delete('/users/me');
+      return true;
+    } catch (e) {
+      print('Ошибка удаления аккаунта: $e');
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
     }
   }
 }

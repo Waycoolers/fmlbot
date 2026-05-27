@@ -392,25 +392,23 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-                // Очищаем ввод от пробелов и удаляем все символы '@'
+                // Очищаем ввод
                 final cleanUsername = controller.text.trim().replaceAll('@', '');
-                final currentUser = context.read<UserViewModel>().currentUser;
 
                 if (cleanUsername.isNotEmpty) {
-                  // --- ПРОВЕРКА НА САМОГО СЕБЯ ---
-                  if (currentUser != null && cleanUsername.toLowerCase() == currentUser.username.toLowerCase()) {
-                    showFmlSnackBar(context, 'Нельзя добавить самого себя! 😅', backgroundColor: Colors.orange);
-                    return; // Прерываем выполнение
-                  }
+                  Navigator.pop(ctx); // Закрываем диалоговое окно
 
-                  Navigator.pop(ctx); // Закрываем окно
-                  // Отправляем на бэкенд уже чистый юзернейм без '@'
-                  final success = await context.read<UserViewModel>().addPartner(cleanUsername);
+                  // Ждем ответ от ViewModel. errorMessage будет null, если пара создана.
+                  final errorMessage = await context.read<UserViewModel>().addPartner(cleanUsername);
 
-                  if (success && mounted) {
-                    showFmlSnackBar(context, 'Ура! Вы теперь в паре 🎉', backgroundColor: Colors.green);
-                  } else if (mounted) {
-                    showFmlSnackBar(context, 'Не удалось найти партнера', backgroundColor: Colors.red);
+                  if (mounted) {
+                    if (errorMessage == null) {
+                      // Успех!
+                      showFmlSnackBar(context, 'Ура! Вы теперь в паре 🎉', backgroundColor: Colors.green);
+                    } else {
+                      // Показываем конкретную ошибку пользователю
+                      showFmlSnackBar(context, errorMessage, backgroundColor: Colors.red);
+                    }
                   }
                 }
               },

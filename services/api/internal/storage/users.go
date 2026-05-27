@@ -2,7 +2,9 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -15,6 +17,9 @@ func (s *usersRepo) AddUser(ctx context.Context, userID int64, username string, 
 	if err != nil {
 		return err
 	}
+	defer func(tx *sqlx.Tx) {
+		_ = tx.Rollback()
+	}(tx)
 
 	res, err := tx.ExecContext(ctx, `
         INSERT INTO users (user_id, username, password_hash)
@@ -22,10 +27,6 @@ func (s *usersRepo) AddUser(ctx context.Context, userID int64, username string, 
         ON CONFLICT (user_id) DO NOTHING;
     `, userID, username, password)
 	if err != nil {
-		er := tx.Rollback()
-		if er != nil {
-			return er
-		}
 		return err
 	}
 
@@ -38,11 +39,7 @@ func (s *usersRepo) AddUser(ctx context.Context, userID int64, username string, 
 		return err
 	}
 	if aff != 1 {
-		er := tx.Rollback()
-		if er != nil {
-			return er
-		}
-		return err
+		return errs.ErrUserExists
 	}
 
 	_, err = tx.ExecContext(ctx, `
@@ -135,16 +132,15 @@ func (s *usersRepo) SetPartners(ctx context.Context, userID, partnerID int64) er
 	if err != nil {
 		return err
 	}
+	defer func(tx *sql.Tx) {
+		_ = tx.Rollback()
+	}(tx)
 
 	// user -> partner
 	_, err = tx.ExecContext(ctx, `
         UPDATE users SET partner_id = $1 WHERE user_id = $2
     `, partnerID, userID)
 	if err != nil {
-		er := tx.Rollback()
-		if er != nil {
-			return er
-		}
 		return err
 	}
 
@@ -153,10 +149,6 @@ func (s *usersRepo) SetPartners(ctx context.Context, userID, partnerID int64) er
         UPDATE users SET partner_id = $1 WHERE user_id = $2
     `, userID, partnerID)
 	if err != nil {
-		er := tx.Rollback()
-		if er != nil {
-			return er
-		}
 		return err
 	}
 
@@ -168,16 +160,15 @@ func (s *usersRepo) RemovePartners(ctx context.Context, userID, partnerID int64)
 	if err != nil {
 		return err
 	}
+	defer func(tx *sql.Tx) {
+		_ = tx.Rollback()
+	}(tx)
 
 	// user -> partner
 	_, err = tx.ExecContext(ctx, `
         UPDATE users SET partner_id = $1 WHERE user_id = $2
     `, 0, userID)
 	if err != nil {
-		er := tx.Rollback()
-		if er != nil {
-			return er
-		}
 		return err
 	}
 
@@ -186,10 +177,36 @@ func (s *usersRepo) RemovePartners(ctx context.Context, userID, partnerID int64)
         UPDATE users SET partner_id = $1 WHERE user_id = $2
     `, 0, partnerID)
 	if err != nil {
-		er := tx.Rollback()
-		if er != nil {
-			return er
-		}
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *usersRepo) ClearAllPartnersHistory(ctx context.Context, userID, partnerID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func(tx *sql.Tx) {
+		_ = tx.Rollback()
+	}(tx)
+
+	// Удаляем общие даты
+	_, err = tx.ExecContext(ctx, `
+		DELETE from important_dates WHERE (user_id = $1 AND partner_id = $2) OR (partner_id = $1 AND user_id = $2);
+	`, userID, partnerID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM compliments AS c
+		USING user_compliment AS uc
+		WHERE c.id = uc.compliment_id
+		  AND (uc.user_id = $1 OR uc.user_id = $2);
+	`, userID, partnerID)
+	if err != nil {
 		return err
 	}
 

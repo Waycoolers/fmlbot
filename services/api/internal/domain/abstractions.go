@@ -18,6 +18,7 @@ type UsersRepo interface {
 	GetPartnerID(ctx context.Context, userID int64) (int64, error)
 	SetPartners(ctx context.Context, userID int64, partnerID int64) error
 	RemovePartners(ctx context.Context, userID int64, partnerID int64) error
+	ClearAllPartnersHistory(ctx context.Context, userID, partnerID int64) error
 	DeleteUser(ctx context.Context, userID int64) error
 	UpdateUser(ctx context.Context, userID int64, username string, partnerID int64) error
 }

@@ -69,6 +69,10 @@ func (h *Handler) AddUser(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
+		if errors.Is(err, errs.ErrUsernameIsAlreadyTaken) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		slog.Error("Unexpected error", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -130,7 +134,7 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Password []byte `json:"password"`
+		Password string `json:"password"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -251,11 +255,34 @@ func (h *Handler) AddPartners(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if req.PartnerID == 0 {
+		http.Error(w, "partner_id is required", http.StatusBadRequest)
+		return
+	}
 
 	err = h.uc.AddPartners(ctx, userID, req.PartnerID)
 	if err != nil {
-		if errors.Is(err, errs.ErrUserNotFound) {
+		switch {
+		case errors.Is(err, errs.ErrUserNotFound):
 			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		case errors.Is(err, errs.ErrCannotPartnerYourself):
+			body := map[string]string{
+				"error": err.Error(),
+			}
+			sendJson(w, http.StatusBadRequest, body)
+			return
+		case errors.Is(err, errs.ErrAlreadyHasPartner):
+			body := map[string]string{
+				"error": err.Error(),
+			}
+			sendJson(w, http.StatusForbidden, body)
+			return
+		case errors.Is(err, errs.ErrPartnerAlreadyHasPartner):
+			body := map[string]string{
+				"error": err.Error(),
+			}
+			sendJson(w, http.StatusForbidden, body)
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
@@ -291,6 +318,7 @@ func (h *Handler) DeletePartners(w http.ResponseWriter, r *http.Request) {
 		}
 		slog.Error("Unexpected error", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	w.WriteHeader(http.StatusOK)
 }

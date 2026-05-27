@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -86,16 +85,22 @@ func (c *client) IsUsernameAvailable(ctx context.Context, username string) (bool
 	}
 	req.Header.Set("X-Internal-Secret", string(c.secret))
 	resp, err := c.httpClient.Do(req)
-	if errors.Is(err, errs.ErrUserNotFound) {
+	if err != nil {
+		return false, err
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	if resp.StatusCode == http.StatusNotFound {
 		return true, nil
 	}
-	if err == nil && resp.StatusCode == http.StatusOK {
-		defer func(Body io.ReadCloser) {
-			_ = Body.Close()
-		}(resp.Body)
-		return false, errs.ErrUsernameIsAlreadyTaken
+
+	if resp.StatusCode == http.StatusOK {
+		return false, nil
 	}
-	return false, err
+
+	return false, fmt.Errorf("unexpected status: %d", resp.StatusCode)
 }
 
 func (c *client) Register(ctx context.Context, userID int64, username string, password string) error {
@@ -122,6 +127,9 @@ func (c *client) Register(ctx context.Context, userID int64, username string, pa
 	if err != nil {
 		return err
 	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}

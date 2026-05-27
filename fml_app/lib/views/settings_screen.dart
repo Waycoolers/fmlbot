@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/utils.dart';
+import '../view_models/auth_view_model.dart';
 import '../view_models/important_date_view_model.dart';
 import '../view_models/settings_view_model.dart';
 import '../view_models/theme_view_model.dart';
 import '../view_models/user_view_model.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -146,30 +148,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
 
             // --- СЕКЦИЯ 3: ОПАСНАЯ ЗОНА ---
-            if (userVM.partner != null) ...[
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16.0),
-                child: Divider(indent: 16, endIndent: 16),
-              ),
-              _buildSectionHeader(context, 'Опасная зона', color: Colors.red),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Card(
-                  elevation: 0,
-                  margin: EdgeInsets.zero,
-                  color: Colors.red.withOpacity(0.1),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    leading: const Icon(Icons.link_off, color: Colors.red),
-                    title: const Text(
-                      'Разорвать связь с партнером',
-                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16.0),
+              child: Divider(indent: 16, endIndent: 16),
+            ),
+            _buildSectionHeader(context, 'Опасная зона', color: Colors.red),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Card(
+                elevation: 0,
+                margin: EdgeInsets.zero,
+                color: Colors.red.withOpacity(0.1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Column(
+                  children: [
+                    // 1. Смена пароля
+                    ListTile(
+                      leading: const Icon(Icons.password, color: Colors.red),
+                      title: const Text('Сменить пароль', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                      onTap: () => _showChangePasswordDialog(context),
                     ),
-                    onTap: () => _showUnpairDialog(context),
-                  ),
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    // 2. Разрыв связи (твой старый функционал)
+                    if (userVM.partner != null) ...{
+                      ListTile(
+                        leading: const Icon(Icons.link_off, color: Colors.red),
+                        title: const Text('Разорвать связь с партнером', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                        onTap: () => _showUnpairDialog(context),
+                      ),
+                    },
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    // 3. Удаление аккаунта
+                    ListTile(
+                      leading: const Icon(Icons.delete_forever, color: Colors.red),
+                      title: const Text('Удалить аккаунт', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                      onTap: () => _showDeleteAccountDialog(context),
+                    ),
+                  ],
                 ),
               ),
-            ]
+            ),
 
           ] else ...[
             // 3. Состояние: НЕТ ИНТЕРНЕТА
@@ -281,6 +299,113 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  void _showChangePasswordDialog(BuildContext context) {
+    final TextEditingController passController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Смена пароля'),
+        content: TextField(
+          controller: passController,
+          obscureText: true,
+          decoration: const InputDecoration(
+            labelText: 'Новый пароль',
+            helperText: 'От 8 до 32 символов, цифры и буквы',
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Отмена')
+          ),
+          FilledButton(
+            onPressed: () async {
+              // ВЫЗОВ ВАЛИДАЦИИ
+              final error = validatePassword(passController.text);
+
+              if (error != null) {
+                // Если есть ошибка, показываем её пользователю
+                showFmlSnackBar(context, error, backgroundColor: Colors.red);
+                return;
+              }
+
+              // Если всё ок, идем на сервер
+              final success = await context.read<UserViewModel>().changePassword(passController.text);
+              if (success && mounted) {
+                showFmlSnackBar(context, 'Пароль успешно обновлен', backgroundColor: Colors.green);
+                Navigator.pop(ctx);
+              } else if (mounted) {
+                showFmlSnackBar(context, 'Ошибка при смене пароля', backgroundColor: Colors.red);
+              }
+            },
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удаление аккаунта', style: TextStyle(color: Colors.red)),
+        content: const Text('Это действие нельзя отменить. Все твои данные будут удалены навсегда.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              final success = await context.read<UserViewModel>().deleteAccount();
+              if (success && mounted) {
+                await context.read<AuthViewModel>().logout();
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                );
+              }
+            },
+            child: const Text('Удалить навсегда'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? validatePassword(String password) {
+    if (password.length < 8) return 'Минимум 8 символов';
+    if (password.length > 32) return 'Максимум 32 символа';
+
+    bool hasUpper = false;
+    bool hasLower = false;
+    bool hasNumber = false;
+    bool hasLetter = false;
+
+    for (int i = 0; i < password.length; i++) {
+      int code = password.codeUnitAt(i);
+
+      // Проверка на допустимые символы (ASCII 33 '!' - 126 '~')
+      if (code < 33 || code > 126) return 'Недопустимый символ';
+
+      if (code >= 65 && code <= 90) { // A-Z
+        hasUpper = true;
+        hasLetter = true;
+      } else if (code >= 97 && code <= 122) { // a-z
+        hasLower = true;
+        hasLetter = true;
+      } else if (code >= 48 && code <= 57) { // 0-9
+        hasNumber = true;
+      }
+    }
+
+    if (!hasLetter) return 'Пароль должен содержать буквы';
+    if (!hasUpper) return 'Нужна заглавная буква';
+    if (!hasLower) return 'Нужна строчная буква';
+    if (!hasNumber) return 'Нужна хотя бы одна цифра';
+
+    return null; // Пароль валиден
   }
 
   @override
