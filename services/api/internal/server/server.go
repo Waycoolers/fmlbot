@@ -60,9 +60,10 @@ func (s *Server) newServer() *http.Server {
 	mux.HandleFunc("DELETE /important_dates/{id}", s.h.RemoveImportantDate)
 
 	mux.HandleFunc("POST /auth/verify", s.h.VerifyUser) // Приватный
+	mux.HandleFunc("POST /auth/register", s.h.Register) // Приватный
 
-	handler := middlewares.Middleware(s.config.JwtSecret, "GET /users/by-username", "POST /auth/verify")(mux)
-	handler = middlewares.InternalAuthMiddlewareWithPrivatePaths(string(s.config.InternalSecret), "POST /auth/verify")(handler)
+	handler := middlewares.Middleware(s.config.JwtSecret, "GET /users/by-username", "POST /auth/verify", "POST /auth/register")(mux)
+	handler = middlewares.InternalAuthMiddlewareWithPrivatePaths(string(s.config.InternalSecret), "POST /auth/verify", "POST /auth/register")(handler)
 	addr := fmt.Sprintf("%s:%s", s.config.Host, s.config.Port)
 	return &http.Server{
 		Addr:    addr,

@@ -13,4 +13,6 @@ type TokensRepo interface {
 
 type APIClient interface {
 	VerifyUser(ctx context.Context, username string, password string) (int64, error)
+	IsUsernameAvailable(ctx context.Context, username string) (bool, error)
+	Register(ctx context.Context, userID int64, username string, password string) error
 }

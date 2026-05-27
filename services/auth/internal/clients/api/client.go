@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -76,4 +77,53 @@ func (c *client) VerifyUser(ctx context.Context, username string, password strin
 		return 0, err
 	}
 	return respBody.UserID, nil
+}
+
+func (c *client) IsUsernameAvailable(ctx context.Context, username string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+fmt.Sprintf("/users/by-username/%s", username), nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("X-Internal-Secret", string(c.secret))
+	resp, err := c.httpClient.Do(req)
+	if errors.Is(err, errs.ErrUserNotFound) {
+		return true, nil
+	}
+	if err == nil && resp.StatusCode == http.StatusOK {
+		defer func(Body io.ReadCloser) {
+			_ = Body.Close()
+		}(resp.Body)
+		return false, errs.ErrUsernameIsAlreadyTaken
+	}
+	return false, err
+}
+
+func (c *client) Register(ctx context.Context, userID int64, username string, password string) error {
+	body := struct {
+		UserID   int64  `json:"user_id"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}{
+		UserID:   userID,
+		Username: username,
+		Password: password,
+	}
+	reqBody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/auth/register", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Secret", string(c.secret))
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+	return nil
 }
