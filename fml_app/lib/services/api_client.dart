@@ -9,8 +9,8 @@ class ApiClient {
   final TokenStorage _tokenStorage = TokenStorage();
 
   // Обязательно подставь актуальный IP твоего компьютера в локальной сети!
-  final String apiBaseUrl = 'http://192.168.0.100:8080';
-  final String authBaseUrl = 'http://192.168.0.100:8081';
+  final String apiBaseUrl = 'http://144.31.170.128:8080';
+  final String authBaseUrl = 'http://144.31.170.128:8081';
 
   ApiClient() {
     // Базовые настройки Dio
