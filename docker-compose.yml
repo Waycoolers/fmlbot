@@ -105,6 +105,7 @@ services:
       - "${API_PORT}:${API_PORT}"
     depends_on:
       - db_api
+      - ai
     logging:
       driver: "json-file"
       options:
@@ -146,6 +147,25 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  ai:
+    build:
+      context: .
+      dockerfile: services/ai/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${AI_PORT}:${AI_PORT}"
+    environment:
+      - YANDEX_API_KEY=${YANDEX_API_KEY}
+      - YANDEX_FOLDER_ID=${YANDEX_FOLDER_ID}
+      - AI_PORT=${AI_PORT}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - redis
 
 volumes:
   db_data:
