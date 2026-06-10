@@ -26,6 +26,9 @@ const (
 	GetImportantDates   Command = "📖 Мои даты"
 	DeleteImportantDate Command = "🗑️ Удалить дату"
 	EditImportantDate   Command = "✏️ Управление"
+
+	Ideas               Command = "🎲 Идеи"
+	GenerateLeisureIdea Command = "🪄 Чем заняться?"
 )
 
 var Commands = []Command{
@@ -49,4 +52,6 @@ var Commands = []Command{
 	GetImportantDates,
 	DeleteImportantDate,
 	EditImportantDate,
+	Ideas,
+	GenerateLeisureIdea,
 }

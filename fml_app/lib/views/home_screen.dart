@@ -9,6 +9,8 @@ import 'compliments_screen.dart';
 import 'important_dates_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
+import '../view_models/leisure_idea_view_model.dart';
+import '../models/leisure_idea_request.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -223,6 +225,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.blueAccent,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ImportantDatesScreen())),
                 ),
+
+                const SizedBox(height: 12),
+
+                _buildMenuTile(
+                  context,
+                  title: 'Идея для досуга',
+                  subtitle: 'Подберём занятие по настроению',
+                  icon: Icons.lightbulb,
+                  color: Colors.amber,
+                  onTap: () => _showLeisureIdeaDialog(context),
+                ),
               ],
             ),
           ),
@@ -415,6 +428,123 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Text('Добавить'),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  void _showLeisureIdeaDialog(BuildContext context) {
+    final locationController = TextEditingController();
+    final extraContextController = TextEditingController();
+
+    String activityLevel = 'medium';
+    String budget = 'medium';
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return AlertDialog(
+              title: const Text('Идея для досуга'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: locationController,
+                      decoration: const InputDecoration(
+                        labelText: 'Локация',
+                        hintText: 'например: дом, парк, город',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: activityLevel,
+                      decoration: const InputDecoration(labelText: 'Уровень активности'),
+                      items: const [
+                        DropdownMenuItem(value: 'low', child: Text('Низкий')),
+                        DropdownMenuItem(value: 'medium', child: Text('Средний')),
+                        DropdownMenuItem(value: 'high', child: Text('Высокий')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) setState(() => activityLevel = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: budget,
+                      decoration: const InputDecoration(labelText: 'Бюджет'),
+                      items: const [
+                        DropdownMenuItem(value: 'free', child: Text('Бесплатно')),
+                        DropdownMenuItem(value: 'low', child: Text('Низкий')),
+                        DropdownMenuItem(value: 'medium', child: Text('Средний')),
+                        DropdownMenuItem(value: 'high', child: Text('Высокий')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) setState(() => budget = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: extraContextController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Доп. контекст',
+                        hintText: 'например: вдвоём, на вечер, без машины',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Отмена'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final location = locationController.text.trim();
+                    final extraContext = extraContextController.text.trim();
+
+                    Navigator.pop(ctx);
+
+                    final vm = context.read<LeisureIdeaViewModel>();
+                    final error = await vm.generateIdea(
+                      LeisureIdeaRequest(
+                        location: location,
+                        activityLevel: activityLevel,
+                        budget: budget,
+                        extraContext: extraContext,
+                      ),
+                    );
+
+                    if (!context.mounted) return;
+
+                    if (error != null) {
+                      showFmlSnackBar(context, error, backgroundColor: Colors.red);
+                      return;
+                    }
+
+                    showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Вот идея'),
+                        content: Text(vm.lastIdea ?? 'Идея не пришла'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Ок'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  child: const Text('Получить'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

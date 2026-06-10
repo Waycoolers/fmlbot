@@ -42,6 +42,7 @@ func (ui *MenuUI) MainMenu(chatID int64, text string) error {
 				Buttons: []domain.KeyboardButton{
 					{domain.Compliments},
 					{domain.ImportantDates},
+					{domain.Ideas},
 				},
 			},
 		},

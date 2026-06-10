@@ -93,3 +93,10 @@ type MessageRequest struct {
 	Text   string `json:"text"`
 	UserID int64  `json:"user_id"`
 }
+
+type LeisureIdeaRequest struct {
+	Location      string `json:"location"`
+	ActivityLevel string `json:"activity_level"`
+	Budget        string `json:"budget"`
+	ExtraContext  string `json:"extra_context"`
+}

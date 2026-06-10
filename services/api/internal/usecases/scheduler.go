@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
@@ -80,15 +81,27 @@ func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context) ([]domain.I
 			)
 		}
 
+		hasUser := importantDate.UserID.Valid && importantDate.UserID.Int64 != 0
+		hasPartner := importantDate.PartnerID.Valid && importantDate.PartnerID.Int64 != 0
+
+		if hasUser && hasPartner && isEventDay {
+			ideas, aiErr := uc.ai.GetDateIdea(ctx, importantDate.Title, 0, "Простое оригинальное милое свидание чтобы отметить дату")
+			if aiErr == nil && ideas != "" {
+				text = fmt.Sprintf("%s\n\n💡 <b>Случайная идея по этому поводу:</b>\n%s", text, ideas)
+			} else {
+				slog.Error("Failed to get AI date idea", "error", err)
+			}
+		}
+
 		var tgIDs []int64
 		message := domain.ImportantDateMessage{
 			ImportantDateID: importantDate.ID,
 			Message:         text,
 		}
-		if importantDate.UserID.Valid && importantDate.UserID.Int64 != 0 {
+		if hasUser {
 			tgIDs = append(tgIDs, importantDate.UserID.Int64)
 		}
-		if importantDate.PartnerID.Valid && importantDate.PartnerID.Int64 != 0 {
+		if hasPartner {
 			tgIDs = append(tgIDs, importantDate.PartnerID.Int64)
 		}
 		message.UserIDs = tgIDs

@@ -14,4 +14,7 @@ const (
 	AwaitingEditTitleImportantDate    State = "awaiting_edit_title_important_date"
 	AwaitingEditDateImportantDate     State = "awaiting_edit_date_important_date"
 	AwaitingPassword                  State = "awaiting_password"
+	AwaitingLocationIdea              State = "awaiting_location_idea"
+	AwaitingActivityIdea              State = "awaiting_activity_idea"
+	AwaitingBudgetIdea                State = "awaiting_budget_idea"
 )

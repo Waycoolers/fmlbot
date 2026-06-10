@@ -66,3 +66,8 @@ type Sender interface {
 	SendMessage(ctx context.Context, update MessageRequest) error
 	SendImportantDatesNotification(ctx context.Context, update ImportantDateMessage) error
 }
+
+type AIClient interface {
+	GetDateIdea(ctx context.Context, title string, days int, context string) (text string, err error)
+	GetLeisureIdea(ctx context.Context, location, activity, budget, extra string) (string, error)
+}

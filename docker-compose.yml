@@ -101,6 +101,9 @@ services:
       BOT_URL: ${BOT_URL}
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
       FCM_CREDENTIALS: ${FCM_CREDENTIALS}
+      AI_HOST : ${AI_HOST}
+      AI_PORT: ${AI_PORT}
+      AI_HTTP_TIMEOUT: ${AI_HTTP_TIMEOUT}
     ports:
       - "${API_PORT}:${API_PORT}"
     depends_on:
