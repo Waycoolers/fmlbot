@@ -15,17 +15,20 @@ type Handler struct {
 	ui                      *ui.MenuUI
 	importantDateDrafts     *redis_store.ImportantDateDraftStore
 	importantDateEditDrafts *redis_store.ImportantDateEditDraftStore
+	ideaDrafts              *redis_store.IdeaDraftStore
 	api                     domain.ApiClient
 	sm                      *state.Machine
 }
 
 func New(ui *ui.MenuUI, importantDateDrafts *redis_store.ImportantDateDraftStore,
 	importantDateEditDrafts *redis_store.ImportantDateEditDraftStore,
+	ideaDrafts *redis_store.IdeaDraftStore,
 	api domain.ApiClient, sm *state.Machine) *Handler {
 	return &Handler{
 		ui:                      ui,
 		importantDateDrafts:     importantDateDrafts,
 		importantDateEditDrafts: importantDateEditDrafts,
+		ideaDrafts:              ideaDrafts,
 		api:                     api,
 		sm:                      sm,
 	}
@@ -109,6 +112,10 @@ func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 			h.DeleteImportantDate(ctx, msg)
 		case string(domain.EditImportantDate):
 			h.EditImportantDate(ctx, msg)
+		case string(domain.Ideas):
+			h.ShowIdeasMenu(ctx, msg)
+		case string(domain.GenerateLeisureIdea):
+			h.GenerateLeisureIdea(ctx, msg)
 		default:
 			h.ReplyUnknownMessage(ctx, msg)
 		}
@@ -129,6 +136,8 @@ func (h *Handler) HandleCallback(ctx context.Context, cq *domain.CallbackQuery) 
 		h.handleCompliments(ctx, cq, action, payload)
 	case "important_dates":
 		h.handleImportantDates(ctx, cq, action, payload)
+	case "idea":
+		h.handleIdea(ctx, cq, action, payload)
 	default:
 		h.ReplyUnknownCallback(ctx, cq)
 	}
@@ -222,6 +231,21 @@ func (h *Handler) handleImportantDates(ctx context.Context, cq *domain.CallbackQ
 		default:
 			h.ReplyUnknownCallback(ctx, cq)
 		}
+	default:
+		h.ReplyUnknownCallback(ctx, cq)
+	}
+}
+
+func (h *Handler) handleIdea(ctx context.Context, cq *domain.CallbackQuery, action string, _ string) {
+	switch action {
+	case "loc":
+		h.HandleLocationIdeaCallback(ctx, cq)
+	case "act":
+		h.HandleActivityIdeaCallback(ctx, cq)
+	case "bud":
+		h.HandleBudgetIdeaCallback(ctx, cq)
+	case "cancel":
+		h.HandleCancelIdeaCallback(ctx, cq)
 	default:
 		h.ReplyUnknownCallback(ctx, cq)
 	}

@@ -52,9 +52,10 @@ func main() {
 	menuUI := ui.New(tgClient)
 	importantDateDrafts := redis_store.NewImportantDateDraftStore(rdb, 15*time.Minute)
 	importantDateEditDrafts := redis_store.NewImportantDateEditDraftStore(rdb, 15*time.Minute)
+	ideasDrafts := redis_store.NewIdeaDraftStore(rdb, 15*time.Minute)
 	client := api.New(cfg)
 	machine := state.New()
-	handler := handlers.New(menuUI, importantDateDrafts, importantDateEditDrafts, client, machine)
+	handler := handlers.New(menuUI, importantDateDrafts, importantDateEditDrafts, ideasDrafts, client, machine)
 	router := app.NewRouter(handler)
 
 	b, err := app.New(tgClient, router)

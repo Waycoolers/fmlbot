@@ -4,12 +4,14 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"strconv"
 )
 
 type Config struct {
 	Server   *ServerConfig
 	DB       *DatabaseConfig
 	FCM      *FCMConfig
+	AI       *AIConfig
 	Loglevel string
 	BotURL   string
 }
@@ -31,6 +33,12 @@ type DatabaseConfig struct {
 
 type FCMConfig struct {
 	CredentialsFile string
+}
+
+type AIConfig struct {
+	Host        string
+	Port        int
+	HTTPTimeout int
 }
 
 func Load() (*Config, error) {
@@ -61,10 +69,16 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	ai, err := loadAIConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Server:   server,
 		DB:       db,
 		FCM:      fcm,
+		AI:       ai,
 		Loglevel: loglevel,
 		BotURL:   os.Getenv("BOT_URL"),
 	}, nil
@@ -142,4 +156,35 @@ func loadFCMConfig() (*FCMConfig, error) {
 		return nil, errors.New("no FCM_CREDENTIALS")
 	}
 	return &FCMConfig{CredentialsFile: cred}, nil
+}
+
+func loadAIConfig() (*AIConfig, error) {
+	host := os.Getenv("AI_HOST")
+	if host == "" {
+		host = "localhost"
+		slog.Warn("not found AI_HOST")
+	}
+	port := os.Getenv("AI_PORT")
+	if port == "" {
+		port = "8080"
+		slog.Warn("not found AI_PORT")
+	}
+	httpTimeout := os.Getenv("AI_HTTP_TIMEOUT")
+	if httpTimeout == "" {
+		httpTimeout = "10"
+		slog.Warn("not found AI_HTTP_TIMEOUT")
+	}
+	intPort, err := strconv.Atoi(port)
+	if err != nil {
+		return nil, err
+	}
+	intHTTPTimeout, err := strconv.Atoi(httpTimeout)
+	if err != nil {
+		return nil, err
+	}
+	return &AIConfig{
+		Host:        host,
+		Port:        intPort,
+		HTTPTimeout: intHTTPTimeout,
+	}, nil
 }

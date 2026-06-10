@@ -19,3 +19,10 @@ type ImportantDateEditDraft struct {
 	ImportantDateID int64     `json:"important_date_id"`
 	CreatedAt       time.Time `json:"created_at"`
 }
+
+type IdeaDraft struct {
+	Location  string
+	Activity  string
+	Budget    string
+	CreatedAt time.Time
+}

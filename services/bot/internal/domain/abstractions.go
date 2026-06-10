@@ -43,6 +43,8 @@ type ApiClient interface {
 	UpdateImportantDate(ctx context.Context, chatID int64, dateID int64, req ImportantDateRequest) error
 	UpdateImportantDateSharing(ctx context.Context, chatID int64, dateID int64, makeShared bool) error
 	DeleteImportantDate(ctx context.Context, chatID int64, dateID int64) error
+
+	GetLeisureIdea(ctx context.Context, chatID int64, location, level, budget, context string) (string, error)
 }
 
 type AuthClient interface {

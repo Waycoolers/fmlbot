@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Waycoolers/fmlbot/pkg/logger"
+	"github.com/Waycoolers/fmlbot/services/api/internal/clients/ai"
 	"github.com/Waycoolers/fmlbot/services/api/internal/config"
 	"github.com/Waycoolers/fmlbot/services/api/internal/handlers"
 	"github.com/Waycoolers/fmlbot/services/api/internal/scheduler"
@@ -44,7 +45,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	uc := usecases.New(store.Repos)
+	aiClient := ai.New(cfg.AI)
+	uc := usecases.New(store.Repos, aiClient)
 	h := handlers.New(uc)
 
 	srv := server.New(cfg.Server, h)

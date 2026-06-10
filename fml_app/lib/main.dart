@@ -10,6 +10,7 @@ import 'view_models/auth_view_model.dart';
 import 'view_models/user_view_model.dart';
 import 'view_models/compliment_view_model.dart';
 import 'view_models/theme_view_model.dart';
+import 'view_models/leisure_idea_view_model.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -41,6 +42,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => ImportantDateViewModel()),
         ChangeNotifierProvider(create: (_) => SettingsViewModel()),
         ChangeNotifierProvider(create: (_) => ThemeViewModel()),
+        ChangeNotifierProvider(create: (_) => LeisureIdeaViewModel()),
       ],
       child: const FmlApp(),
     ),
