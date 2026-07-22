@@ -8,18 +8,18 @@ import (
 )
 
 type Bot struct {
-	Client domain.BotClient
+	client domain.BotClient
 	router *Router
 }
 
 func New(c domain.BotClient, r *Router) (*Bot, error) {
-	return &Bot{Client: c, router: r}, nil
+	return &Bot{client: c, router: r}, nil
 }
 
 func (b *Bot) Run(ctx context.Context) {
 	slog.Info("Bot is running")
 
-	updates := b.Client.GetUpdatesChan()
+	updates := b.client.GetUpdatesChan()
 
 	for update := range updates {
 		if update.Message != nil || update.CallbackQuery != nil {
@@ -29,8 +29,8 @@ func (b *Bot) Run(ctx context.Context) {
 }
 
 func (b *Bot) Stop() {
-	if b.Client != nil {
+	if b.client != nil {
 		slog.Info("Bot is stopping")
-		b.Client.StopReceivingUpdates()
+		b.client.StopReceivingUpdates()
 	}
 }
