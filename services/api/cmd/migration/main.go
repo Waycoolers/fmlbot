@@ -86,7 +86,8 @@ func main() {
 
 	ctx := context.Background()
 
-	GivePasswords(ctx, cfg, db)
+	// GivePasswords(ctx, cfg, db)
+	SetTelegramIDs(ctx, db)
 
 	slog.Info("Migrations complete")
 }
@@ -153,5 +154,26 @@ func GivePasswords(ctx context.Context, cfg *config.Config, db *sqlx.DB) {
 		_ = resp.Body.Close()
 
 		time.Sleep(3 * time.Second)
+	}
+}
+
+func SetTelegramIDs(ctx context.Context, db *sqlx.DB) {
+	var users []userWithPasswordResponse
+	err := db.SelectContext(ctx, &users, `
+		SELECT * FROM users WHERE password_hash = '';
+	`)
+	if err != nil {
+		slog.Error("Error selecting users", "error", err)
+		os.Exit(1)
+	}
+
+	for _, user := range users {
+		_, err = db.ExecContext(ctx, `
+			UPDATE users SET telegram_id = $1 WHERE user_id = $1;
+		`, user.ID)
+		if err != nil {
+			slog.Error("Error updating user", "error", err)
+			continue
+		}
 	}
 }
