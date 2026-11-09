@@ -26,7 +26,6 @@ jobs:
               docker compose build \$service
               docker compose up -d --no-deps \$service
               docker image prune -f
-              docker builder prune -af
             done
             docker compose up -d
           "

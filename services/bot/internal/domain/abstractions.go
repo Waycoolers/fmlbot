@@ -3,6 +3,8 @@ package domain
 import (
 	"context"
 	"errors"
+
+	"github.com/Waycoolers/fmlbot/pkg/plans"
 )
 
 // ErrRecipientUnavailable - Telegram окончательно отказал в доставке (бот заблокирован,
@@ -54,6 +56,11 @@ type ApiClient interface {
 	DeleteImportantDate(ctx context.Context, chatID int64, dateID int64) error
 
 	GetLeisureIdea(ctx context.Context, chatID int64, location, level, budget, context string) (string, error)
+	GetPlanOptions(ctx context.Context, chatID int64, request plans.OptionsRequest) (plans.Options, error)
+	CreatePlan(ctx context.Context, chatID int64, proposal plans.Proposal) (plans.View, error)
+	ListPlans(ctx context.Context, chatID int64) ([]plans.Plan, error)
+	GetPlan(ctx context.Context, chatID, planID int64) (plans.View, error)
+	ChangePlan(ctx context.Context, chatID, planID int64, change plans.Change) (plans.View, error)
 }
 
 type AuthClient interface {

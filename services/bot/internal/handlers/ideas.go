@@ -15,8 +15,7 @@ import (
 func (h *Handler) ShowIdeasMenu(_ context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
 	text := "🦄 <b>Генератор впечатлений</b>\n\n" +
-		"Не знаете, как провести время вместе? Быт съедает романтику? " +
-		"Я с радостью помогу придумать классную идею для свидания или уютного вечера. ✨"
+		"Здесь можно подобрать идею на вечер или придумать план и согласовать его вдвоём. ✨"
 
 	err := h.ui.IdeasMenu(chatID, text)
 	if err != nil {
@@ -148,18 +147,7 @@ func (h *Handler) handleIdea(ctx context.Context, cq *domain.CallbackQuery, acti
 
 func (h *Handler) generateIdea(ctx context.Context, cq *domain.CallbackQuery, draft *domain.IdeaDraft, budget string) {
 	chatID := cq.ChatID
-	select {
-	case h.ideaJobs <- struct{}{}:
-	default:
-		h.Reply(chatID, "Сейчас генератор занят. Попробуй ещё раз чуть позже.")
-		return
-	}
-	h.ideaInFlight.Store(chatID, struct{}{})
-	go func() {
-		defer func() {
-			h.ideaInFlight.Delete(chatID)
-			<-h.ideaJobs
-		}()
+	if !h.startIdeaJob(chatID, func() {
 		h.Reply(chatID, "⏳ Придумываю для вас план…")
 		idea, err := h.api.GetLeisureIdea(ctx, chatID, draft.Location, draft.Activity, budget, "")
 		if ctx.Err() != nil {
@@ -180,7 +168,29 @@ func (h *Handler) generateIdea(ctx context.Context, cq *domain.CallbackQuery, dr
 			slog.Error("Error deleting idea draft", "error", err)
 		}
 		h.ui.RemoveButtons(chatID, cq.MessageID)
+	}) {
+		h.Reply(chatID, "Сейчас генератор занят. Попробуй ещё раз чуть позже.")
+	}
+}
+
+func (h *Handler) startIdeaJob(chatID int64, run func()) bool {
+	if _, busy := h.ideaInFlight.LoadOrStore(chatID, struct{}{}); busy {
+		return false
+	}
+	select {
+	case h.ideaJobs <- struct{}{}:
+	default:
+		h.ideaInFlight.Delete(chatID)
+		return false
+	}
+	go func() {
+		defer func() {
+			<-h.ideaJobs
+			h.ideaInFlight.Delete(chatID)
+		}()
+		run()
 	}()
+	return true
 }
 
 var (

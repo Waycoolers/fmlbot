@@ -305,6 +305,15 @@ func unlinkPartners(ctx context.Context, tx *sqlx.Tx, userID, partnerID int64) e
 		return err
 	}
 
+	// Предложения и напоминания принадлежат только текущей паре.
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM couple_plans
+		WHERE (owner_id = $1 AND partner_id = $2) OR (owner_id = $2 AND partner_id = $1)
+	`, userID, partnerID)
+	if err != nil {
+		return err
+	}
+
 	// Удаляем отправленные комплименты. Заготовленные остаются у автора
 	_, err = tx.ExecContext(ctx, `
 		DELETE FROM compliments AS c

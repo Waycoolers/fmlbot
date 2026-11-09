@@ -116,7 +116,17 @@ func TestPostgresPairDeliveryAndTelegramLink(t *testing.T) {
 		t.Fatalf("failed delivery consumed the compliment: %q", text)
 	}
 
+	planID := testPlanLifecycle(t, db, pair)
 	must(users.RemovePartners(ctx, 1, 2, pair))
+	planStore := &plansRepo{db: db}
+	if _, err := planStore.GetPlan(ctx, 2, planID); !errors.Is(err, errs.ErrPlanNotFound) {
+		t.Fatalf("former partner can still read the plan: %v", err)
+	}
+	var remainingPlanNotices int
+	must(db.Get(&remainingPlanNotices, `SELECT COUNT(*) FROM couple_plan_notices WHERE plan_id = $1`, planID))
+	if remainingPlanNotices != 0 {
+		t.Fatal("unlink left plan notifications behind")
+	}
 	nextPair, err := users.CreatePartnerRequest(ctx, 1, 3)
 	must(err)
 	_, err = users.AcceptPartnerRequest(ctx, nextPair, 3)

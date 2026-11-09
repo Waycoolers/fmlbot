@@ -10,15 +10,20 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
+type telegramSender interface {
+	domain.Sender
+	domain.PlanNoticeSender
+}
+
 type Scheduler struct {
 	h          *handlers.Handler
 	c          *cron.Cron
 	loc        *time.Location
-	httpSender domain.Sender
+	httpSender telegramSender
 	fcmSender  domain.Sender
 }
 
-func New(h *handlers.Handler, httpSender, fcmSender domain.Sender) *Scheduler {
+func New(h *handlers.Handler, httpSender telegramSender, fcmSender domain.Sender) *Scheduler {
 	loc, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {
 		slog.Error("Failed to load timezone, using UTC", "error", err)
@@ -50,10 +55,19 @@ func (s *Scheduler) Run(ctx context.Context) {
 		return
 	}
 
+	planJob := cron.SkipIfStillRunning(cron.DefaultLogger)(cron.FuncJob(func() {
+		s.h.NotifyPlansCron(ctx, s.httpSender)
+	}))
+	if _, err = s.c.AddJob("*/15 * * * * *", planJob); err != nil {
+		slog.Error("Error adding cron task for plan notifications", "error", err)
+		return
+	}
+
 	s.h.RunMissedMidnightTasks(ctx, s.loc)
 
 	s.c.Start()
 	go dateJob.Run()
+	go planJob.Run()
 }
 
 func (s *Scheduler) Stop() {

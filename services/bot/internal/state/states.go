@@ -16,4 +16,5 @@ const (
 	AwaitingEditDateImportantDate     State = "awaiting_edit_date_important_date"
 	AwaitingOldPassword               State = "awaiting_old_password"
 	AwaitingPassword                  State = "awaiting_password"
+	AwaitingPlanBrief                 State = "awaiting_plan_brief"
 )

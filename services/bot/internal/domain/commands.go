@@ -29,6 +29,8 @@ const (
 
 	Ideas               Command = "🎲 Идеи"
 	GenerateLeisureIdea Command = "🪄 Чем заняться?"
+	PlanForTwo          Command = "💞 План для двоих"
+	MyPlans             Command = "🗓 Мои планы"
 )
 
 var Commands = []Command{
@@ -54,4 +56,6 @@ var Commands = []Command{
 	EditImportantDate,
 	Ideas,
 	GenerateLeisureIdea,
+	PlanForTwo,
+	MyPlans,
 }

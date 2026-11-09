@@ -103,6 +103,8 @@ func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 			h.HandleOldPassword(ctx, msg)
 		case state.AwaitingPassword:
 			h.HandleChangePassword(ctx, msg)
+		case state.AwaitingPlanBrief:
+			h.processPlanBrief(ctx, msg)
 		default:
 			h.ReplyUnknownMessage(ctx, msg)
 		}
@@ -148,6 +150,10 @@ func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 			h.ShowIdeasMenu(ctx, msg)
 		case string(domain.GenerateLeisureIdea):
 			h.GenerateLeisureIdea(ctx, msg)
+		case string(domain.PlanForTwo):
+			h.startPlan(ctx, msg)
+		case string(domain.MyPlans):
+			h.showMyPlans(ctx, msg)
 		default:
 			h.ReplyUnknownMessage(ctx, msg)
 		}
@@ -175,6 +181,8 @@ func (h *Handler) HandleCallback(ctx context.Context, cq *domain.CallbackQuery) 
 		h.handleImportantDates(ctx, cq, action, payload)
 	case "idea":
 		h.handleIdea(ctx, cq, action, payload)
+	case "plan":
+		h.handlePlan(ctx, cq, action, payload)
 	default:
 		h.ReplyUnknownCallback(ctx, cq)
 	}

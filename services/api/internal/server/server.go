@@ -68,6 +68,11 @@ func (s *Server) newServer() *http.Server {
 	mux.HandleFunc("DELETE /important_dates/{id}", s.h.RemoveImportantDate)
 
 	mux.HandleFunc("POST /ideas/leisure", s.h.GetLeisureIdea)
+	mux.HandleFunc("POST /plans/options", s.h.GetPlanOptions)
+	mux.HandleFunc("POST /plans", s.h.CreatePlan)
+	mux.HandleFunc("GET /plans", s.h.ListPlans)
+	mux.HandleFunc("GET /plans/{id}", s.h.GetPlan)
+	mux.HandleFunc("PATCH /plans/{id}", s.h.ChangePlan)
 
 	mux.HandleFunc("POST /auth/verify", s.h.VerifyUser) // Приватный
 	mux.HandleFunc("POST /auth/register", s.h.Register) // Приватный

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/Waycoolers/fmlbot/pkg/plans"
 )
 
 type UsersRepo interface {
@@ -77,6 +79,24 @@ type Sender interface {
 	SendImportantDatesNotification(ctx context.Context, update ImportantDateMessage) error
 }
 
+type PlanNoticeSender interface {
+	SendPlanNotice(ctx context.Context, notice plans.Notice) error
+}
+
+type PlansRepo interface {
+	CreatePlan(ctx context.Context, userID int64, proposal plans.Proposal) (plans.Plan, error)
+	GetPlan(ctx context.Context, userID, planID int64) (plans.Plan, error)
+	ListPlans(ctx context.Context, userID int64, now time.Time) ([]plans.Plan, error)
+	ChangePlan(ctx context.Context, userID, planID int64, change plans.Change) (plans.Plan, error)
+	DuePlanNotices(ctx context.Context, now time.Time) ([]PlanNoticeJob, error)
+	DeliverPlanNotice(ctx context.Context, job PlanNoticeJob, now time.Time, send func(context.Context, plans.Notice) error) error
+}
+
+type PlanNoticeJob struct {
+	ID     int64 `db:"id"`
+	PlanID int64 `db:"plan_id"`
+}
+
 type AuthClient interface {
 	RevokeAllTokens(ctx context.Context, userID int64) error
 }
@@ -84,4 +104,5 @@ type AuthClient interface {
 type AIClient interface {
 	GetDateIdea(ctx context.Context, title string, days int, context string) (text string, err error)
 	GetLeisureIdea(ctx context.Context, location, activity, budget, extra string) (string, error)
+	GetPlanOptions(ctx context.Context, prompt plans.Prompt) (plans.Options, error)
 }

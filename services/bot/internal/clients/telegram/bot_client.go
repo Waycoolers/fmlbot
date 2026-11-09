@@ -147,8 +147,9 @@ func (c *TelegramClient) SendWithInlineKeyboard(chatID int64, text string, keybo
 	_, err := c.api.Send(msg)
 	if err != nil {
 		log.Printf("Ошибка при отправке сообщения с кнопками: %v", err)
+		return classifySendError(err)
 	}
-	return err
+	return nil
 }
 
 func (c *TelegramClient) EditMessageReplyMarkup(chatID int64, messageID int, keyboard domain.InlineKeyboard) error {

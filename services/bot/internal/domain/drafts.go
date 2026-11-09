@@ -3,6 +3,8 @@ package domain
 import (
 	"database/sql"
 	"time"
+
+	"github.com/Waycoolers/fmlbot/pkg/plans"
 )
 
 type ImportantDateDraft struct {
@@ -32,4 +34,16 @@ type IdeaDraft struct {
 	Location  string
 	Activity  string
 	CreatedAt time.Time
+	Plan      *PlanDraft `json:",omitempty"`
+}
+
+type PlanDraft struct {
+	Pair           plans.Pair
+	Brief          string
+	Cards          []plans.Card
+	Selected       int
+	TargetID       int64
+	TargetRevision int64
+	PickerSession  string
+	PickerTime     time.Time
 }

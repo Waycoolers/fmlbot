@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Waycoolers/fmlbot/pkg/errs"
+	"github.com/Waycoolers/fmlbot/pkg/plans"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
 
@@ -22,13 +23,17 @@ type HTTPSender struct {
 	users  domain.UsersRepo
 }
 
-func NewHTTPSender(botURL string, secret []byte, users domain.UsersRepo) domain.Sender {
+func NewHTTPSender(botURL string, secret []byte, users domain.UsersRepo) *HTTPSender {
 	return &HTTPSender{
 		botURL: botURL,
 		client: &http.Client{Timeout: 30 * time.Second},
 		secret: secret,
 		users:  users,
 	}
+}
+
+func (s *HTTPSender) SendPlanNotice(ctx context.Context, notice plans.Notice) error {
+	return s.send(ctx, "/updates/plans", notice)
 }
 
 func (s *HTTPSender) SendMessage(ctx context.Context, update domain.MessageRequest) error {

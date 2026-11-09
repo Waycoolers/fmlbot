@@ -18,12 +18,15 @@ class AIService:
             default_headers={"x-data-logging-enabled": "false"},
         )
 
-    def call_yandex_gpt(self, system_prompt: str, user_prompt: str) -> str:
+    def call_yandex_gpt(
+        self, system_prompt: str, user_prompt: str, *, json_output: bool = False
+    ) -> str:
+        options = {"text": {"format": {"type": "json_object"}}, "timeout": 15.0} if json_output else {}
         try:
             response = self.client.responses.create(
                 model=f"gpt://{settings.YANDEX_FOLDER_ID}/yandexgpt/latest",
                 store=False,
-                max_output_tokens=700,
+                max_output_tokens=1100 if json_output else 700,
                 input=[
                     {
                         "role": "system",
@@ -33,7 +36,8 @@ class AIService:
                         "role": "user",
                         "content": user_prompt
                     }
-                ]
+                ],
+                **options,
             )
 
         except Exception as error:

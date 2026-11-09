@@ -8,6 +8,12 @@ func (ui *MenuUI) IdeasMenu(chatID int64, text string) error {
 			{
 				Buttons: []domain.KeyboardButton{
 					{Command: domain.GenerateLeisureIdea},
+					{Command: domain.PlanForTwo},
+				},
+			},
+			{
+				Buttons: []domain.KeyboardButton{
+					{Command: domain.MyPlans},
 					{Command: domain.Main},
 				},
 			},

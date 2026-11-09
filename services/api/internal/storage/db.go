@@ -73,6 +73,7 @@ func New(cfg *config.DatabaseConfig) (*Storage, error) {
 			UserConfig:     &userConfig,
 			Users:          &users,
 			FCM:            &fcm,
+			Plans:          &plansRepo{db: db},
 		},
 	}, nil
 }

@@ -26,6 +26,7 @@ func NewHTTPServer(cfg *config.ServerConfig, h *handlers.Handler, internalSecret
 	mux := http.NewServeMux()
 	mux.HandleFunc("/updates/message", h.SendMessage)
 	mux.HandleFunc("/updates/important_dates", h.NotifyAllImportantDates)
+	mux.HandleFunc("POST /updates/plans", h.NotifyPlan)
 
 	return &HTTPServer{
 		s: &http.Server{

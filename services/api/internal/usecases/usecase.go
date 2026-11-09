@@ -11,6 +11,7 @@ type UseCase struct {
 	importantDates domain.ImportantDatesRepo
 	scheduler      domain.SchedulerRepo
 	fcm            domain.FCMRepo
+	plans          domain.PlansRepo
 	ai             domain.AIClient
 	auth           domain.AuthClient
 }
@@ -23,6 +24,7 @@ func New(repos *domain.Repos, ai domain.AIClient, auth domain.AuthClient) *UseCa
 		importantDates: repos.ImportantDates,
 		scheduler:      repos.Scheduler,
 		fcm:            repos.FCM,
+		plans:          repos.Plans,
 		ai:             ai,
 		auth:           auth,
 	}

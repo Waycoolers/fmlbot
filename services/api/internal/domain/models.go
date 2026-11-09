@@ -91,6 +91,7 @@ type Repos struct {
 	ImportantDates ImportantDatesRepo
 	Scheduler      SchedulerRepo
 	FCM            FCMRepo
+	Plans          PlansRepo
 }
 
 type ImportantDateMessage struct {

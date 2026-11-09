@@ -33,3 +33,9 @@ func (h *Handler) NotifyImportantDatesCron(ctx context.Context, now time.Time, h
 		slog.Error("Error processing important date notifications", "error", err)
 	}
 }
+
+func (h *Handler) NotifyPlansCron(ctx context.Context, sender domain.PlanNoticeSender) {
+	if err := h.uc.DeliverPlanNotices(ctx, sender); err != nil {
+		slog.Error("Error processing plan notifications", "error", err)
+	}
+}
