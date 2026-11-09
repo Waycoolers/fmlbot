@@ -45,7 +45,10 @@ func (l *Limiter) Blocked(key string) bool {
 func (l *Limiter) Record(key string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	now := l.now()
+	l.record(key, l.now())
+}
+
+func (l *Limiter) record(key string, now time.Time) {
 	if len(l.entries) >= sweepThreshold {
 		for k, e := range l.entries {
 			if !now.Before(e.resetAt) {
@@ -64,14 +67,12 @@ func (l *Limiter) Record(key string) {
 // Allow атомарно проверяет лимит и учитывает событие.
 func (l *Limiter) Allow(key string) bool {
 	l.mu.Lock()
+	defer l.mu.Unlock()
 	now := l.now()
-	e := l.current(key, now)
-	blocked := e != nil && e.count >= l.limit
-	l.mu.Unlock()
-	if blocked {
+	if e := l.current(key, now); e != nil && e.count >= l.limit {
 		return false
 	}
-	l.Record(key)
+	l.record(key, now)
 	return true
 }
 

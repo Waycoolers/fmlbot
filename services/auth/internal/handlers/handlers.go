@@ -263,7 +263,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := h.repo.Consume(ctx, req.RefreshToken)
+	userID, newRefreshToken, err := h.repo.Rotate(ctx, req.RefreshToken, h.cfg.RefreshTokenTTL)
 	if err != nil {
 		if errors.Is(err, errs.ErrTokenNotFound) || errors.Is(err, errs.ErrTokenInvalid) {
 			slog.Warn("refresh token rejected", "error", err)
@@ -278,13 +278,6 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	newAccessToken, err := generateAccessToken(userID, h.cfg.JwtSecret, h.cfg.AccessTokenTTL)
 	if err != nil {
 		slog.Error("failed to generate new access token", "error", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	newRefreshToken, err := h.repo.Create(ctx, userID, h.cfg.RefreshTokenTTL)
-	if err != nil {
-		slog.Error("failed to create new refresh token", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

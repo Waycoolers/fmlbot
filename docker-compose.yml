@@ -103,12 +103,14 @@ services:
       AUTH_PORT: ${AUTH_PORT}
       AUTH_HTTP_TIMEOUT: ${AUTH_HTTP_TIMEOUT}
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
-      FCM_CREDENTIALS: ${FCM_CREDENTIALS}
+      FCM_CREDENTIALS: ${FCM_CREDENTIALS:-}
       AI_HOST : ${AI_HOST}
       AI_PORT: ${AI_PORT}
       AI_HTTP_TIMEOUT: ${AI_HTTP_TIMEOUT}
     ports:
       - "${API_PORT}:${API_PORT}"
+    volumes:
+      - ${FCM_CREDENTIALS_HOST_DIR:-./secrets}:/root/secrets:ro
     depends_on:
       - db_api
       - ai

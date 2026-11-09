@@ -55,7 +55,7 @@ var months = []string{
 }
 
 // ---------------------- YEAR ----------------------
-func (ui *MenuUI) BuildYearKeyboard(pageStart int, isEdit bool) domain.InlineKeyboard {
+func (ui *MenuUI) BuildYearKeyboard(pageStart int, isEdit bool, session ...string) domain.InlineKeyboard {
 	currentYear := time.Now().In(moscow).Year()
 	if pageStart < YearStart {
 		pageStart = YearStart
@@ -115,14 +115,14 @@ func (ui *MenuUI) BuildYearKeyboard(pageStart int, isEdit bool) domain.InlineKey
 		Rows: rows,
 	}
 
-	return keyboard
+	return dateKeyboardSession(keyboard, session)
 }
 
-func (ui *MenuUI) SendYearKeyboard(chatID int64, pageStart int, isEdit bool) error {
+func (ui *MenuUI) SendYearKeyboard(chatID int64, pageStart int, isEdit bool, session ...string) error {
 	return ui.Client.SendWithInlineKeyboard(
 		chatID,
 		"📅 Выбери год",
-		ui.BuildYearKeyboard(pageStart, isEdit),
+		ui.BuildYearKeyboard(pageStart, isEdit, session...),
 	)
 }
 
@@ -158,11 +158,11 @@ func (ui *MenuUI) BuildMonthKeyboard(year int, isEdit bool) domain.InlineKeyboar
 	return keyboard
 }
 
-func (ui *MenuUI) SendMonthKeyboard(chatID int64, year int, isEdit bool) error {
+func (ui *MenuUI) SendMonthKeyboard(chatID int64, year int, isEdit bool, session ...string) error {
 	return ui.Client.SendWithInlineKeyboard(
 		chatID,
 		"📅 Выбери месяц",
-		ui.BuildMonthKeyboard(year, isEdit),
+		dateKeyboardSession(ui.BuildMonthKeyboard(year, isEdit), session),
 	)
 }
 
@@ -202,11 +202,11 @@ func (ui *MenuUI) BuildDayKeyboard(year, month int, isEdit bool) domain.InlineKe
 	return keyboard
 }
 
-func (ui *MenuUI) SendDayKeyboard(chatID int64, year, month int, isEdit bool) error {
+func (ui *MenuUI) SendDayKeyboard(chatID int64, year, month int, isEdit bool, session ...string) error {
 	return ui.Client.SendWithInlineKeyboard(
 		chatID,
 		"📅 Выбери день",
-		ui.BuildDayKeyboard(year, month, isEdit),
+		dateKeyboardSession(ui.BuildDayKeyboard(year, month, isEdit), session),
 	)
 }
 
@@ -231,11 +231,11 @@ func (ui *MenuUI) BuildPartnerKeyboard(isEdit bool) domain.InlineKeyboard {
 	return keyboard
 }
 
-func (ui *MenuUI) SendPartnerKeyboard(chatID int64, isEdit bool) error {
+func (ui *MenuUI) SendPartnerKeyboard(chatID int64, isEdit bool, session ...string) error {
 	return ui.Client.SendWithInlineKeyboard(
 		chatID,
 		"👥 Эта дата будет:",
-		ui.BuildPartnerKeyboard(isEdit),
+		dateKeyboardSession(ui.BuildPartnerKeyboard(isEdit), session),
 	)
 }
 
@@ -262,10 +262,22 @@ func (ui *MenuUI) BuildNotifyBeforeKeyboard(isEdit bool) domain.InlineKeyboard {
 	return keyboard
 }
 
-func (ui *MenuUI) SendNotifyBeforeKeyboard(chatID int64, isEdit bool) error {
+func (ui *MenuUI) SendNotifyBeforeKeyboard(chatID int64, isEdit bool, session ...string) error {
 	return ui.Client.SendWithInlineKeyboard(
 		chatID,
 		"Выбери, за сколько дней до даты тебе напомнить о ней",
-		ui.BuildNotifyBeforeKeyboard(isEdit),
+		dateKeyboardSession(ui.BuildNotifyBeforeKeyboard(isEdit), session),
 	)
+}
+
+func dateKeyboardSession(keyboard domain.InlineKeyboard, session []string) domain.InlineKeyboard {
+	if len(session) == 0 || session[0] == "" {
+		return keyboard
+	}
+	for i := range keyboard.Rows {
+		for j := range keyboard.Rows[i].Buttons {
+			keyboard.Rows[i].Buttons[j].Data += ":" + session[0]
+		}
+	}
+	return keyboard
 }

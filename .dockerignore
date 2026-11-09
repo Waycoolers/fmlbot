@@ -15,6 +15,7 @@ auth_db_data/
 redis_data/
 
 # Секреты и дампы не должны попадать в контекст сборки
+secrets/
 .env
 *.env
 /backup.sql

@@ -14,13 +14,8 @@ import (
 )
 
 func (c *client) CreateUser(ctx context.Context, chatID int64, username string) (string, error) {
-	reqBody := struct {
-		Username string `json:"username"`
-	}{
-		Username: username,
-	}
-
-	resp, err := c.doAuthRequest(ctx, http.MethodPost, "/users", reqBody, chatID)
+	reqBody := map[string]any{"username": username, "telegram_id": chatID}
+	resp, err := c.doInternalRequest(ctx, http.MethodPost, "/auth/telegram/register", reqBody)
 	if err != nil {
 		return "", err
 	}
@@ -37,8 +32,15 @@ func (c *client) CreateUser(ctx context.Context, chatID int64, username string) 
 		if err != nil {
 			return "", err
 		}
+		c.tokenCache.Delete(chatID)
 		return respBody.Password, nil
 	case http.StatusConflict:
+		var body struct {
+			Error string `json:"error"`
+		}
+		if json.NewDecoder(resp.Body).Decode(&body) == nil && body.Error == errs.ErrUsernameIsAlreadyTaken.Error() {
+			return "", errs.ErrUsernameIsAlreadyTaken
+		}
 		return "", errs.ErrUserExists
 	default:
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -104,6 +106,7 @@ func (c *client) DeleteMe(ctx context.Context, chatID int64) error {
 
 	switch resp.StatusCode {
 	case http.StatusNoContent:
+		c.tokenCache.Delete(chatID)
 		return nil
 	case http.StatusNotFound:
 		return errs.ErrUserNotFound
@@ -193,8 +196,9 @@ func (c *client) DeclinePartnerRequest(ctx context.Context, chatID int64, reques
 	return c.answerPartnerRequest(ctx, chatID, requestID, "decline")
 }
 
-func (c *client) Unpair(ctx context.Context, chatID int64) error {
-	resp, err := c.doAuthRequest(ctx, http.MethodPatch, "/users/unpair", nil, chatID)
+func (c *client) Unpair(ctx context.Context, chatID, pairVersion int64) error {
+	path := fmt.Sprintf("/users/unpair?pair_version=%d", pairVersion)
+	resp, err := c.doAuthRequest(ctx, http.MethodPatch, path, nil, chatID)
 	if err != nil {
 		return err
 	}
@@ -205,6 +209,8 @@ func (c *client) Unpair(ctx context.Context, chatID int64) error {
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return nil
+	case http.StatusConflict:
+		return errs.ErrPairChanged
 	case http.StatusNotFound:
 		var errBody struct {
 			Error string `json:"error"`

@@ -45,20 +45,25 @@ func (uc *UseCase) AddImportantDate(ctx context.Context, userID int64, req domai
 	}
 
 	var partnerIDNull sql.NullInt64
+	var pairVersion int64
 	if req.IsShared {
-		partner, err := uc.users.GetPartnerID(ctx, userID)
+		partner, version, err := uc.users.GetPair(ctx, userID)
 		if err != nil {
 			return nil, err
+		}
+		if req.ExpectedPairVersion != nil && (partner == 0 || *req.ExpectedPairVersion != version) {
+			return nil, errs.ErrPairChanged
 		}
 		if partner == 0 {
 			return nil, errs.ErrPartnerNotFound
 		}
+		pairVersion = version
 		partnerIDNull = sql.NullInt64{Int64: partner, Valid: true}
 	} else {
 		partnerIDNull = sql.NullInt64{Valid: false}
 	}
 
-	date, err := uc.importantDates.AddImportantDate(ctx, userID, partnerIDNull, req.Title, req.Date, req.NotifyBeforeDays)
+	date, err := uc.importantDates.AddImportantDate(ctx, userID, partnerIDNull, pairVersion, req.Title, req.Date, req.NotifyBeforeDays)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +148,7 @@ func (uc *UseCase) GetAllImportantDates(ctx context.Context, userID int64) ([]do
 	return dates, nil
 }
 
-func (uc *UseCase) UpdateImportantDateSharing(ctx context.Context, dateID int64, userID int64, makeShared bool) error {
+func (uc *UseCase) UpdateImportantDateSharing(ctx context.Context, dateID int64, userID int64, makeShared bool, expectedPairVersion *int64) error {
 	exists, err := uc.users.IsUserExists(ctx, userID)
 	if err != nil {
 		return err
@@ -153,15 +158,21 @@ func (uc *UseCase) UpdateImportantDateSharing(ctx context.Context, dateID int64,
 	}
 
 	if makeShared {
-		var partner int64
-		partner, err = uc.users.GetPartnerID(ctx, userID)
+		partner, version, err := uc.users.GetPair(ctx, userID)
 		if err != nil {
 			return err
+		}
+		if expectedPairVersion != nil && (partner == 0 || *expectedPairVersion != version) {
+			return errs.ErrPairChanged
 		}
 		if partner == 0 {
 			return errs.ErrPartnerNotFound
 		}
-		err = uc.importantDates.MakeImportantDateShared(ctx, dateID, userID, partner)
+		err = uc.importantDates.MakeImportantDateShared(ctx, dateID, userID, partner, version)
+		if errors.Is(err, sql.ErrNoRows) {
+			return errs.ErrImportantDateNotFound
+		}
+		return err
 	} else {
 		err = uc.importantDates.MakeImportantDatePrivate(ctx, dateID, userID)
 	}

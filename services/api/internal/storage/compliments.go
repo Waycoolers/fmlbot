@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Waycoolers/fmlbot/pkg/errs"
@@ -144,9 +145,13 @@ func (s *complimentsRepo) MarkComplimentSent(ctx context.Context, complimentID i
 	return err
 }
 
-func (s *complimentsRepo) AcquireCompliment(ctx context.Context, partnerID int64) (string, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
+func (s *complimentsRepo) AcquireCompliment(ctx context.Context, userID, partnerID, version int64, deliver func(context.Context, string) error) (string, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+	if err = lockExpectedPair(ctx, tx, userID, partnerID, version); err != nil {
 		return "", err
 	}
 
@@ -254,11 +259,14 @@ func (s *complimentsRepo) AcquireCompliment(ctx context.Context, partnerID int64
 		return "", err
 	}
 
-	err = tx.Commit()
-	if err != nil {
+	if deliver != nil {
+		if err = deliver(ctx, complimentText); err != nil {
+			return "", fmt.Errorf("%w: %w", errs.ErrComplimentDelivery, err)
+		}
+	}
+	if err = tx.Commit(); err != nil {
 		return "", err
 	}
-
 	return complimentText, nil
 }
 

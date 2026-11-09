@@ -9,14 +9,35 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// API responses include delivery records while the scheduler still reads the
+// legacy timestamp to avoid resending notices on the migration day.
+const importantDateWithDeliveryTime = `
+	SELECT d.id, d.user_id, d.partner_id, d.title, d.date, d.is_active,
+	       GREATEST(d.last_notification_at, (
+	           SELECT MAX(delivered_at) FROM important_date_deliveries WHERE date_id = d.id
+	       )) AS last_notification_at,
+	       d.notify_before_days, d.created_at
+	FROM important_dates d
+`
+
 type importantDatesRepo struct {
 	db *sqlx.DB
 }
 
-func (s *importantDatesRepo) AddImportantDate(ctx context.Context, userID int64, partnerID sql.NullInt64, title string,
+func (s *importantDatesRepo) AddImportantDate(ctx context.Context, userID int64, partnerID sql.NullInt64, pairVersion int64, title string,
 	date time.Time, notifyBefore int) (*domain.ImportantDate, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	if partnerID.Valid {
+		if err = lockExpectedPair(ctx, tx, userID, partnerID.Int64, pairVersion); err != nil {
+			return nil, err
+		}
+	}
 	var importantDate domain.ImportantDate
-	err := s.db.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		INSERT INTO important_dates(user_id, partner_id, title, date, notify_before_days)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, user_id, partner_id, title, date, is_active, last_notification_at, notify_before_days, created_at;
@@ -26,15 +47,14 @@ func (s *importantDatesRepo) AddImportantDate(ctx context.Context, userID int64,
 	if err != nil {
 		return nil, err
 	}
-	return &importantDate, nil
+	return &importantDate, tx.Commit()
 }
 
 func (s *importantDatesRepo) GetImportantDates(ctx context.Context, userID int64) (importantDates []domain.ImportantDate, err error) {
 	importantDates = make([]domain.ImportantDate, 0)
-	err = s.db.SelectContext(ctx, &importantDates, `
-		SELECT * FROM important_dates
-		WHERE user_id = $1 OR partner_id = $1
-		ORDER BY created_at;
+	err = s.db.SelectContext(ctx, &importantDates, importantDateWithDeliveryTime+`
+		WHERE d.user_id = $1 OR d.partner_id = $1
+		ORDER BY d.created_at
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -44,9 +64,9 @@ func (s *importantDatesRepo) GetImportantDates(ctx context.Context, userID int64
 
 func (s *importantDatesRepo) GetImportantDateByID(ctx context.Context, id int64, userID int64) (*domain.ImportantDate, error) {
 	var importantDate domain.ImportantDate
-	err := s.db.QueryRowContext(ctx, `SELECT * FROM important_dates WHERE id=$1 AND (user_id = $2 OR partner_id = $2)`, id, userID).Scan(&importantDate.ID, &importantDate.UserID,
-		&importantDate.PartnerID, &importantDate.Title, &importantDate.Date, &importantDate.IsActive,
-		&importantDate.LastNotificationAt, &importantDate.NotifyBeforeDays, &importantDate.CreatedAt)
+	err := s.db.GetContext(ctx, &importantDate, importantDateWithDeliveryTime+`
+		WHERE d.id = $1 AND (d.user_id = $2 OR d.partner_id = $2)
+	`, id, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +75,7 @@ func (s *importantDatesRepo) GetImportantDateByID(ctx context.Context, id int64,
 
 func (s *importantDatesRepo) DeleteImportantDate(ctx context.Context, id int64, userID int64) error {
 	res, err := s.db.ExecContext(ctx, `
-		DELETE FROM important_dates WHERE id=$1 AND (user_id = $2 OR partner_id = $2);
+		DELETE FROM important_dates WHERE id=$1 AND user_id = $2;
 	`, id, userID)
 	if err != nil {
 		return err
@@ -114,21 +134,12 @@ func (s *importantDatesRepo) GetAllActiveImportantDates(ctx context.Context) (im
 	return importantDates, nil
 }
 
-func (s *importantDatesRepo) UpdateLastNotificationAt(ctx context.Context, id int64, timestamp time.Time) error {
-	_, err := s.db.ExecContext(ctx, `
-		UPDATE important_dates SET last_notification_at=$1 WHERE id=$2;
-	`, timestamp, id)
-	return err
-}
-
 func (s *importantDatesRepo) MakeImportantDatePrivate(ctx context.Context, dateID int64, userID int64) error {
 	res, err := s.db.ExecContext(ctx, `
         UPDATE important_dates
-        SET 
-            user_id = CASE WHEN partner_id = $1 THEN $1 ELSE user_id END,
-            partner_id = NULL
-        WHERE id = $2 AND (user_id = $3 OR partner_id = $3)
-    `, userID, dateID, userID)
+        SET user_id = COALESCE(user_id, $2), partner_id = NULL
+        WHERE id = $1 AND (user_id = $2 OR partner_id = $2)
+    `, dateID, userID)
 	if err != nil {
 		return err
 	}
@@ -142,8 +153,16 @@ func (s *importantDatesRepo) MakeImportantDatePrivate(ctx context.Context, dateI
 	return nil
 }
 
-func (s *importantDatesRepo) MakeImportantDateShared(ctx context.Context, dateID int64, userID int64, partnerID int64) error {
-	res, err := s.db.ExecContext(ctx, `
+func (s *importantDatesRepo) MakeImportantDateShared(ctx context.Context, dateID, userID, partnerID, pairVersion int64) error {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err = lockExpectedPair(ctx, tx, userID, partnerID, pairVersion); err != nil {
+		return err
+	}
+	res, err := tx.ExecContext(ctx, `
         UPDATE important_dates
         SET partner_id = $1
         WHERE id = $2 AND user_id = $3 AND (partner_id IS NULL OR partner_id != $1)
@@ -156,7 +175,7 @@ func (s *importantDatesRepo) MakeImportantDateShared(ctx context.Context, dateID
 		return err
 	}
 	if aff == 0 {
-		return sql.ErrNoRows // или errs.ErrCannotMakeShared
+		return sql.ErrNoRows
 	}
-	return nil
+	return tx.Commit()
 }

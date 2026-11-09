@@ -6,6 +6,7 @@ import (
 )
 
 type Compliment struct {
+	AuthorID  int64     `json:"author_id,omitempty"`
 	ID        int64     `db:"id" json:"id"`
 	Text      string    `db:"text" json:"text"`
 	IsSent    bool      `db:"is_sent" json:"is_sent"`
@@ -29,9 +30,10 @@ type UserRequest struct {
 }
 
 type UserResponse struct {
-	ID        int64  `db:"user_id" json:"user_id"`
-	Username  string `db:"username" json:"username"`
-	PartnerID int64  `db:"partner_id" json:"partner_id"`
+	PairVersion int64  `json:"pair_version,omitempty"`
+	ID          int64  `db:"user_id" json:"user_id"`
+	Username    string `db:"username" json:"username"`
+	PartnerID   int64  `db:"partner_id" json:"partner_id"`
 }
 
 type PartnerRequest struct {
@@ -73,12 +75,13 @@ type ImportantDate struct {
 }
 
 type ImportantDateRequest struct {
-	UserID           sql.NullInt64 `db:"user_id" json:"user_id"`
-	IsShared         bool          `db:"is_shared" json:"is_shared"`
-	Title            string        `db:"title" json:"title"`
-	Date             time.Time     `db:"date" json:"date"`
-	IsActive         bool          `db:"is_active" json:"is_active"`
-	NotifyBeforeDays int           `db:"notify_before_days" json:"notify_before_days"`
+	ExpectedPairVersion *int64        `json:"expected_pair_version,omitempty"`
+	UserID              sql.NullInt64 `db:"user_id" json:"user_id"`
+	IsShared            bool          `db:"is_shared" json:"is_shared"`
+	Title               string        `db:"title" json:"title"`
+	Date                time.Time     `db:"date" json:"date"`
+	IsActive            bool          `db:"is_active" json:"is_active"`
+	NotifyBeforeDays    int           `db:"notify_before_days" json:"notify_before_days"`
 }
 
 type Repos struct {
@@ -96,6 +99,14 @@ type ImportantDateMessage struct {
 	Message         string  `db:"message" json:"message"`
 	// PlainMessage - тот же текст без HTML-разметки для каналов, которые её не понимают
 	PlainMessage string `db:"-" json:"-"`
+}
+
+type ImportantDateDelivery struct {
+	ID      int64  `db:"id"`
+	DateID  int64  `db:"date_id"`
+	UserID  int64  `db:"user_id"`
+	Channel string `db:"channel"`
+	Message string `db:"message"`
 }
 
 type MessageRequest struct {

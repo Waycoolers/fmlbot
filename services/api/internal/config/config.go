@@ -71,11 +71,6 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	fcm, err := loadFCMConfig()
-	if err != nil {
-		return nil, err
-	}
-
 	ai, err := loadAIConfig()
 	if err != nil {
 		return nil, err
@@ -89,7 +84,7 @@ func Load() (*Config, error) {
 	return &Config{
 		Server:   server,
 		DB:       db,
-		FCM:      fcm,
+		FCM:      &FCMConfig{CredentialsFile: os.Getenv("FCM_CREDENTIALS")},
 		AI:       ai,
 		Auth:     auth,
 		Loglevel: loglevel,
@@ -162,15 +157,6 @@ func loadDatabaseConfig() (*DatabaseConfig, error) {
 	}, nil
 }
 
-func loadFCMConfig() (*FCMConfig, error) {
-	cred := os.Getenv("FCM_CREDENTIALS")
-	if cred == "" {
-		slog.Error("not found FCM_CREDENTIALS")
-		return nil, errors.New("no FCM_CREDENTIALS")
-	}
-	return &FCMConfig{CredentialsFile: cred}, nil
-}
-
 func loadAuthConfig() (*AuthConfig, error) {
 	host := os.Getenv("AUTH_HOST")
 	if host == "" {
@@ -215,7 +201,7 @@ func loadAIConfig() (*AIConfig, error) {
 	}
 	httpTimeout := os.Getenv("AI_HTTP_TIMEOUT")
 	if httpTimeout == "" {
-		httpTimeout = "10"
+		httpTimeout = "20"
 		slog.Warn("not found AI_HTTP_TIMEOUT")
 	}
 	intPort, err := strconv.Atoi(port)

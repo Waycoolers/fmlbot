@@ -2,9 +2,12 @@ package sender
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 	"google.golang.org/api/option"
 )
@@ -57,8 +60,11 @@ func (s *FCMSender) SendMessage(ctx context.Context, update domain.MessageReques
 func (s *FCMSender) SendImportantDatesNotification(ctx context.Context, update domain.ImportantDateMessage) error {
 	for _, userID := range update.UserIDs {
 		token, err := s.repo.GetFCMToken(ctx, userID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return errs.ErrRecipientUnavailable
+		}
 		if err != nil {
-			continue
+			return err
 		}
 
 		msg := &messaging.Message{
@@ -70,8 +76,11 @@ func (s *FCMSender) SendImportantDatesNotification(ctx context.Context, update d
 		}
 
 		_, err = s.client.Send(ctx, msg)
+		if messaging.IsUnregistered(err) {
+			return errs.ErrRecipientUnavailable
+		}
 		if err != nil {
-			continue
+			return err
 		}
 	}
 

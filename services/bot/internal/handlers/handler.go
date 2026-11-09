@@ -2,6 +2,11 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"log/slog"
 	"strings"
 	"sync"
@@ -16,30 +21,49 @@ type Handler struct {
 	ui                      *ui.MenuUI
 	importantDateDrafts     *redis_store.ImportantDateDraftStore
 	importantDateEditDrafts *redis_store.ImportantDateEditDraftStore
-	ideaDrafts              *redis_store.IdeaDraftStore
+	ideaDrafts              ideaDraftStore
+	ideaJobs                chan struct{}
+	ideaInFlight            sync.Map
 	api                     domain.ApiClient
 	sm                      *state.Machine
 	// Текущий пароль на время диалога смены пароля. Только в памяти, на диск не попадает
-	oldPasswords sync.Map
+	oldPasswords               sync.Map
+	accountDeleteConfirmations sync.Map
 }
 
 func New(ui *ui.MenuUI, importantDateDrafts *redis_store.ImportantDateDraftStore,
 	importantDateEditDrafts *redis_store.ImportantDateEditDraftStore,
-	ideaDrafts *redis_store.IdeaDraftStore,
+	ideaDrafts ideaDraftStore,
 	api domain.ApiClient, sm *state.Machine) *Handler {
 	return &Handler{
 		ui:                      ui,
 		importantDateDrafts:     importantDateDrafts,
 		importantDateEditDrafts: importantDateEditDrafts,
 		ideaDrafts:              ideaDrafts,
+		ideaJobs:                make(chan struct{}, 8),
 		api:                     api,
 		sm:                      sm,
 	}
 }
 
+func wizardSession() string {
+	var token [8]byte
+	_, _ = rand.Read(token[:])
+	return hex.EncodeToString(token[:])
+}
+
 func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
 	text := msg.Text
+
+	if fields := strings.Fields(text); len(fields) > 0 && fields[0] == "/link" {
+		if len(fields) != 2 {
+			h.Reply(chatID, "Отправь /link и одноразовый код из своего аккаунта.")
+			return
+		}
+		h.LinkTelegram(ctx, msg, fields[1])
+		return
+	}
 
 	// Если введена команда, то сбрасываем state
 	for _, command := range domain.Commands {
@@ -63,6 +87,8 @@ func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 
 	if !(step == state.Empty) {
 		switch step {
+		case state.AwaitingRegistrationUsername:
+			h.RegisterWithUsername(ctx, msg)
 		case state.AwaitingPartner:
 			h.ProcessPartnerUsername(ctx, msg)
 		case state.AwaitingCompliment:
@@ -196,6 +222,27 @@ func (h *Handler) handleCompliments(ctx context.Context, cq *domain.CallbackQuer
 func (h *Handler) handleImportantDates(ctx context.Context, cq *domain.CallbackQuery, action string, payload string) {
 	switch action {
 	case "add":
+		payloadEnd := strings.LastIndexByte(payload, ':')
+		if payloadEnd < 0 {
+			h.ReplyUnknownCallback(ctx, cq)
+			return
+		}
+		draft, err := h.importantDateDrafts.Get(ctx, cq.ChatID)
+		if err != nil {
+			h.HandleErr(cq.ChatID, "Error loading date draft", err)
+			return
+		}
+		if draft == nil || draft.Session == "" || draft.Session != payload[payloadEnd+1:] ||
+			!matchesDateDraftStep(h.sm.GetStep(cq.ChatID), draft, payload[:payloadEnd]) {
+			h.ui.RemoveButtons(cq.ChatID, cq.MessageID)
+			h.Reply(cq.ChatID, "Эта кнопка устарела. Создай дату заново.")
+			return
+		}
+		payload = payload[:payloadEnd]
+		callback := *cq
+		callback.Data = "important_dates:add:" + payload
+		callback.WizardSession = draft.Session
+		cq = &callback
 		switch {
 		case strings.HasPrefix(payload, "partner"):
 			h.HandlePartnerImportantDate(ctx, cq)
@@ -234,6 +281,27 @@ func (h *Handler) handleImportantDates(ctx context.Context, cq *domain.CallbackQ
 			h.ReplyUnknownCallback(ctx, cq)
 		}
 	case "edit":
+		payloadEnd := strings.LastIndexByte(payload, ':')
+		if payloadEnd < 0 {
+			h.ReplyUnknownCallback(ctx, cq)
+			return
+		}
+		draft, err := h.importantDateEditDrafts.Get(ctx, cq.ChatID)
+		if err != nil {
+			h.HandleErr(cq.ChatID, "Error loading date edit draft", err)
+			return
+		}
+		if draft == nil || draft.Session == "" || draft.Session != payload[payloadEnd+1:] ||
+			!matchesDateEditStep(draft, payload[:payloadEnd]) {
+			h.ui.RemoveButtons(cq.ChatID, cq.MessageID)
+			h.Reply(cq.ChatID, "Эта кнопка устарела. Открой настройки даты заново.")
+			return
+		}
+		payload = payload[:payloadEnd]
+		callback := *cq
+		callback.Data = "important_dates:edit:" + payload
+		callback.WizardSession = draft.Session
+		cq = &callback
 		switch {
 		case strings.HasPrefix(payload, "year"):
 			h.HandleYearImportantDateUniversal(ctx, cq)
@@ -253,18 +321,34 @@ func (h *Handler) handleImportantDates(ctx context.Context, cq *domain.CallbackQ
 	}
 }
 
-func (h *Handler) handleIdea(ctx context.Context, cq *domain.CallbackQuery, action string, _ string) {
-	switch action {
-	case "loc":
-		h.HandleLocationIdeaCallback(ctx, cq)
-	case "act":
-		h.HandleActivityIdeaCallback(ctx, cq)
-	case "bud":
-		h.HandleBudgetIdeaCallback(ctx, cq)
-	case "cancel":
-		h.HandleCancelIdeaCallback(ctx, cq)
+func matchesDateDraftStep(step state.State, draft *domain.ImportantDateDraft, action string) bool {
+	switch {
+	case strings.HasPrefix(action, "year:"):
+		return step == state.AwaitingDateImportantDate && draft.Year == 0
+	case strings.HasPrefix(action, "month:"):
+		return step == state.AwaitingDateImportantDate && draft.Year != 0 && draft.Month == 0
+	case strings.HasPrefix(action, "day:"):
+		return step == state.AwaitingDateImportantDate && draft.Month != 0 && draft.Day == 0
+	case strings.HasPrefix(action, "partner:"):
+		return step == state.AwaitingPartnerImportantDate
+	case strings.HasPrefix(action, "notify_before:"):
+		return step == state.AwaitingNotifyBeforeImportantDate
 	default:
-		h.ReplyUnknownCallback(ctx, cq)
+		return false
+	}
+}
+
+func matchesDateEditStep(draft *domain.ImportantDateEditDraft, payload string) bool {
+	action, _, _ := strings.Cut(payload, ":")
+	switch action {
+	case "year":
+		return draft.Action == "date" && draft.Year == 0
+	case "month":
+		return draft.Action == "date" && draft.Year != 0 && draft.Month == 0
+	case "day":
+		return draft.Action == "date" && draft.Month != 0
+	default:
+		return action == draft.Action
 	}
 }
 
@@ -291,6 +375,18 @@ func (h *Handler) ShowMainMenu(_ context.Context, msg *domain.Message) {
 		h.HandleErr(chatID, "Error while trying to display the main menu", err)
 		return
 	}
+}
+
+func (h *Handler) ReplyToUser(ctx context.Context, userID int64, text string) {
+	chatID, err := h.api.TelegramChatID(ctx, userID)
+	if errors.Is(err, errs.ErrUserNotFound) {
+		return
+	}
+	if err != nil {
+		slog.Error("Error resolving Telegram recipient", "error", err)
+		return
+	}
+	h.Reply(chatID, text)
 }
 
 func (h *Handler) Reply(chatID int64, text string) {

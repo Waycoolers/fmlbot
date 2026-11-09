@@ -58,8 +58,8 @@ func isEventAndNotifyDay(date time.Time, notifyBeforeDays int, today time.Time) 
 	return isEventDay, isNotifyDay
 }
 
-func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context) ([]domain.ImportantDateMessage, error) {
-	today := dayOf(time.Now())
+func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context, now time.Time) ([]domain.ImportantDateMessage, error) {
+	today := dayOf(now)
 
 	importantDates, err := uc.importantDates.GetAllActiveImportantDates(ctx)
 	if err != nil {
@@ -73,7 +73,7 @@ func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context) ([]domain.I
 		}
 
 		// Дата создана только сегодня: уведомлять о ней не нужно
-		if dayOf(importantDate.CreatedAt).Equal(today) {
+		if dayOf(importantDate.CreatedAt.In(now.Location())).Equal(today) {
 			continue
 		}
 
@@ -82,7 +82,7 @@ func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context) ([]domain.I
 			continue
 		}
 
-		if importantDate.LastNotificationAt.Valid && dayOf(importantDate.LastNotificationAt.Time).Equal(today) {
+		if importantDate.LastNotificationAt.Valid && dayOf(importantDate.LastNotificationAt.Time.In(now.Location())).Equal(today) {
 			continue
 		}
 
@@ -113,13 +113,9 @@ func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context) ([]domain.I
 		hasPartner := importantDate.PartnerID.Valid && importantDate.PartnerID.Int64 != 0
 
 		if hasUser && hasPartner && isEventDay {
-			ideas, aiErr := uc.ai.GetDateIdea(ctx, importantDate.Title, 0, "Простое оригинальное милое свидание чтобы отметить дату")
-			if aiErr == nil && ideas != "" {
-				text = fmt.Sprintf("%s\n\n💡 <b>Случайная идея по этому поводу:</b>\n%s", text, html.EscapeString(ideas))
-				plain = fmt.Sprintf("%s\n\n💡 Случайная идея по этому поводу:\n%s", plain, ideas)
-			} else {
-				slog.Error("Failed to get AI date idea", "error", aiErr)
-			}
+			hint := "\n\n💡 За идеей для праздника загляни в меню «Идеи»."
+			text += hint
+			plain += hint
 		}
 
 		var tgIDs []int64
@@ -140,11 +136,52 @@ func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context) ([]domain.I
 	return messages, nil
 }
 
-func (uc *UseCase) UpdateLastNotificationAt(ctx context.Context, message domain.ImportantDateMessage) error {
-	now := time.Now().UTC()
-	err := uc.importantDates.UpdateLastNotificationAt(ctx, message.ImportantDateID, now)
+func (uc *UseCase) QueueImportantDateDeliveries(ctx context.Context, now time.Time, pushEnabled bool) error {
+	messages, err := uc.GetAllImportantDatesMessages(ctx, now)
 	if err != nil {
 		return err
+	}
+	for _, message := range messages {
+		for _, userID := range message.UserIDs {
+			if err := uc.scheduler.QueueImportantDateDelivery(ctx, message.ImportantDateID, userID, now, "telegram", message.Message); err != nil {
+				return err
+			}
+			if pushEnabled {
+				if err := uc.scheduler.QueueImportantDateDelivery(ctx, message.ImportantDateID, userID, now, "push", message.PlainMessage); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (uc *UseCase) DeliverImportantDates(ctx context.Context, telegram, push domain.Sender) error {
+	pending, err := uc.scheduler.PendingImportantDateDeliveries(ctx, push != nil)
+	if err != nil {
+		return err
+	}
+	for _, delivery := range pending {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		channel := telegram
+		if delivery.Channel == "push" {
+			channel = push
+		}
+		err = uc.scheduler.DeliverImportantDate(ctx, delivery, func(ctx context.Context) error {
+			ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+			defer cancel()
+			return channel.SendImportantDatesNotification(ctx, domain.ImportantDateMessage{
+				ImportantDateID: delivery.DateID,
+				UserIDs:         []int64{delivery.UserID},
+				Message:         delivery.Message,
+				PlainMessage:    delivery.Message,
+			})
+		})
+		if err != nil {
+			slog.Error("Important date delivery failed", "delivery_id", delivery.ID, "channel", delivery.Channel, "error", err)
+		}
 	}
 	return nil
 }

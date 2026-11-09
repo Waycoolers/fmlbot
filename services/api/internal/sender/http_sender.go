@@ -3,12 +3,15 @@ package sender
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
 
@@ -16,26 +19,45 @@ type HTTPSender struct {
 	botURL string
 	client *http.Client
 	secret []byte
+	users  domain.UsersRepo
 }
 
-func NewHTTPSender(botURL string, secret []byte) domain.Sender {
+func NewHTTPSender(botURL string, secret []byte, users domain.UsersRepo) domain.Sender {
 	return &HTTPSender{
 		botURL: botURL,
 		client: &http.Client{Timeout: 30 * time.Second},
 		secret: secret,
+		users:  users,
 	}
 }
 
 func (s *HTTPSender) SendMessage(ctx context.Context, update domain.MessageRequest) error {
-	path := "/updates/message"
-	err := s.send(ctx, path, update)
-	return err
+	chatID, err := s.telegramChat(ctx, update.UserID)
+	if err != nil {
+		return err
+	}
+	update.UserID = chatID
+	return s.send(ctx, "/updates/message", update)
 }
 
 func (s *HTTPSender) SendImportantDatesNotification(ctx context.Context, update domain.ImportantDateMessage) error {
-	path := "/updates/important_dates"
-	err := s.send(ctx, path, update)
-	return err
+	if len(update.UserIDs) != 1 {
+		return fmt.Errorf("expected one Telegram recipient")
+	}
+	chatID, err := s.telegramChat(ctx, update.UserIDs[0])
+	if err != nil {
+		return err
+	}
+	update.UserIDs = []int64{chatID}
+	return s.send(ctx, "/updates/important_dates", update)
+}
+
+func (s *HTTPSender) telegramChat(ctx context.Context, userID int64) (int64, error) {
+	chatID, err := s.users.GetTelegramID(ctx, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, errs.ErrRecipientUnavailable
+	}
+	return chatID, err
 }
 
 func (s *HTTPSender) send(ctx context.Context, path string, update any) error {
@@ -57,6 +79,9 @@ func (s *HTTPSender) send(ctx context.Context, path string, update any) error {
 		_ = Body.Close()
 	}(resp.Body)
 
+	if resp.StatusCode == http.StatusGone {
+		return errs.ErrRecipientUnavailable
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}

@@ -42,7 +42,11 @@ func (c *client) getToken(ctx context.Context, userID int64) (string, error) {
 	if ok {
 		return cached.(string), nil
 	}
-	token, err := c.authClient.GetAccessToken(ctx, userID)
+	authUserID, err := c.resolveTelegramID(ctx, "user", userID, "user_id")
+	if err != nil {
+		return "", err
+	}
+	token, err := c.authClient.GetAccessToken(ctx, authUserID)
 	if err != nil {
 		return "", err
 	}
@@ -86,11 +90,10 @@ func (c *client) doAuthRequest(ctx context.Context, method, path string, body an
 
 		c.tokenCache.Delete(chatID)
 
-		newToken, err := c.authClient.GetAccessToken(ctx, chatID)
+		newToken, err := c.getToken(ctx, chatID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to refresh token: %w", err)
 		}
-		c.tokenCache.Store(chatID, newToken)
 
 		return execute(newToken)
 	}

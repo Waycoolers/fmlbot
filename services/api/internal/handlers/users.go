@@ -51,15 +51,20 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AddUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var req domain.UserRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
+	var req struct {
+		Username   string `json:"username"`
+		TelegramID int64  `json:"telegram_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusBadRequest)
+	userID := req.TelegramID
+	if r.URL.Path == "/users" {
+		userID, _ = ctx.Value(middlewares.UserIDKey).(int64)
+	}
+	if userID <= 0 || userID >= 1_000_000_000_000_000 {
+		http.Error(w, "invalid Telegram ID", http.StatusBadRequest)
 		return
 	}
 	if !isValidUsername(req.Username) {
@@ -70,11 +75,11 @@ func (h *Handler) AddUser(w http.ResponseWriter, r *http.Request) {
 	generatedPassword, err := h.uc.AddUserWithRandomPassword(ctx, userID, req.Username)
 	if err != nil {
 		if errors.Is(err, errs.ErrUserExists) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			sendJson(w, http.StatusConflict, map[string]string{"error": err.Error()})
 			return
 		}
 		if errors.Is(err, errs.ErrUsernameIsAlreadyTaken) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			sendJson(w, http.StatusConflict, map[string]string{"error": err.Error()})
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
@@ -98,6 +103,10 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 	err := h.uc.RemoveUser(ctx, userID)
 	if err != nil {
+		if errors.Is(err, errs.ErrPairChanged) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		if errors.Is(err, errs.ErrUserNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -355,8 +364,21 @@ func (h *Handler) DeletePartners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.uc.RemovePartners(ctx, id)
+	var expectedVersion *int64
+	if raw := r.URL.Query().Get("pair_version"); raw != "" {
+		version, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || version < 0 {
+			http.Error(w, "invalid pair version", http.StatusBadRequest)
+			return
+		}
+		expectedVersion = &version
+	}
+	err := h.uc.RemovePartners(ctx, id, expectedVersion)
 	if err != nil {
+		if errors.Is(err, errs.ErrPairChanged) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		if errors.Is(err, errs.ErrUserNotFound) {
 			body := map[string]string{
 				"error": err.Error(),

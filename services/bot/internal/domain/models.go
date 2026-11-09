@@ -13,12 +13,13 @@ type Message struct {
 }
 
 type CallbackQuery struct {
-	ID        string
-	ChatID    int64
-	MessageID int
-	Data      string
-	UserName  string
-	Message   string
+	WizardSession string
+	ID            string
+	ChatID        int64
+	MessageID     int
+	Data          string
+	UserName      string
+	Message       string
 }
 
 type InlineKeyboard struct {
@@ -52,6 +53,7 @@ type Update struct {
 }
 
 type Compliment struct {
+	AuthorID  int64     `json:"author_id,omitempty"`
 	ID        int64     `json:"id"`
 	Text      string    `json:"text"`
 	IsSent    bool      `json:"is_sent"`
@@ -59,9 +61,10 @@ type Compliment struct {
 }
 
 type User struct {
-	UserID    int64  `json:"user_id"`
-	Username  string `json:"username"`
-	PartnerID int64  `json:"partner_id"`
+	PairVersion int64  `json:"pair_version,omitempty"`
+	UserID      int64  `json:"user_id"`
+	Username    string `json:"username"`
+	PartnerID   int64  `json:"partner_id"`
 }
 
 type ImportantDate struct {
@@ -83,12 +86,13 @@ type UserConfig struct {
 }
 
 type ImportantDateRequest struct {
-	UserID           sql.NullInt64 `json:"user_id"`
-	IsShared         bool          `json:"is_shared"`
-	Title            string        `json:"title"`
-	Date             time.Time     `json:"date"`
-	IsActive         bool          `json:"is_active"`
-	NotifyBeforeDays int           `json:"notify_before_days"`
+	ExpectedPairVersion *int64        `json:"expected_pair_version,omitempty"`
+	UserID              sql.NullInt64 `json:"user_id"`
+	IsShared            bool          `json:"is_shared"`
+	Title               string        `json:"title"`
+	Date                time.Time     `json:"date"`
+	IsActive            bool          `json:"is_active"`
+	NotifyBeforeDays    int           `json:"notify_before_days"`
 }
 
 type ImportantDateMessage struct {

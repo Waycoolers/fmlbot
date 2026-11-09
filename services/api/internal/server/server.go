@@ -29,6 +29,7 @@ func New(cfg *config.ServerConfig, h *handlers.Handler) *Server {
 
 func (s *Server) newServer() *http.Server {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /users/me/telegram-link", s.h.CreateTelegramLink)
 	mux.HandleFunc("POST /users", s.h.AddUser)
 	mux.HandleFunc("GET /users/me", s.h.GetMe)
 	mux.HandleFunc("PATCH /users/me/password", s.h.ChangePassword)
@@ -57,6 +58,7 @@ func (s *Server) newServer() *http.Server {
 	mux.HandleFunc("PUT /compliments/{id}", s.h.UpdateCompliment)
 	mux.HandleFunc("DELETE /compliments/{id}", s.h.RemoveCompliment)
 	mux.HandleFunc("POST /compliments/next", s.h.ReceiveCompliment)
+	mux.HandleFunc("POST /compliments/next/telegram", s.h.ReceiveTelegramCompliment)
 
 	mux.HandleFunc("POST /important_dates", s.h.AddImportantDate)
 	mux.HandleFunc("GET /important_dates/{id}", s.h.GetImportantDate)
@@ -74,8 +76,16 @@ func (s *Server) newServer() *http.Server {
 	handler := middlewares.Middleware(s.config.JwtSecret, "POST /auth/verify", "POST /auth/register")(mux)
 	// Сервис auth проверяет занятость имени до регистрации, поэтому ходит сюда по внутреннему секрету
 	handler = middlewares.InternalSecretBypass(secret, http.MethodGet, "/users/by-username/", mux)(handler)
-	handler = middlewares.InternalAuthMiddlewareWithPrivatePaths(secret, "POST /auth/verify", "POST /auth/register", "POST /users/me/password/reset")(handler)
-	handler = middlewares.LimitBody(1 << 20)(handler)
+	handler = middlewares.InternalAuthMiddlewareWithPrivatePaths(secret, "POST /auth/verify", "POST /auth/register", "POST /users", "POST /users/me/password/reset", "POST /compliments/next/telegram")(handler)
+	telegram := http.NewServeMux()
+	telegram.HandleFunc("POST /auth/telegram/register", s.h.AddUser)
+	telegram.HandleFunc("POST /auth/telegram/link", s.h.LinkTelegram)
+	telegram.HandleFunc("GET /auth/telegram/{kind}/{id}", s.h.ResolveTelegram)
+
+	routes := http.NewServeMux()
+	routes.Handle("/auth/telegram/", middlewares.InternalAuthMiddlewareWithPublicPaths(secret)(telegram))
+	routes.Handle("/", handler)
+	handler = middlewares.LimitBody(1 << 20)(routes)
 	addr := fmt.Sprintf("%s:%s", s.config.Host, s.config.Port)
 	return &http.Server{
 		Addr:              addr,

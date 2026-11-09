@@ -25,7 +25,7 @@ func New(h *handlers.Handler, httpSender, fcmSender domain.Sender) *Scheduler {
 		loc = time.UTC
 	}
 
-	c := cron.New(cron.WithSeconds(), cron.WithLocation(loc))
+	c := cron.New(cron.WithSeconds(), cron.WithLocation(loc), cron.WithChain(cron.SkipIfStillRunning(cron.DefaultLogger)))
 	return &Scheduler{h: h, c: c, loc: loc, httpSender: httpSender, fcmSender: fcmSender}
 }
 
@@ -39,11 +39,12 @@ func (s *Scheduler) Run(ctx context.Context) {
 		return
 	}
 
-	// Основной запуск в 12:00, остальные повторяют только то, что не удалось доставить
-	_, err = s.c.AddFunc("0 0 12-23 * * *", func() {
-		slog.Info("Checking important dates")
-		s.h.NotifyImportantDatesCron(ctx, s.httpSender, s.fcmSender)
-	})
+	checkDates := func() {
+		s.h.NotifyImportantDatesCron(ctx, time.Now().In(s.loc), s.httpSender, s.fcmSender)
+	}
+	// Новые уведомления появляются с 12:00. Очередь повторяется и после полуночи.
+	dateJob := cron.SkipIfStillRunning(cron.DefaultLogger)(cron.FuncJob(checkDates))
+	_, err = s.c.AddJob("0 0 * * * *", dateJob)
 	if err != nil {
 		slog.Error("Error adding cron task for important date notifications", "error", err)
 		return
@@ -52,6 +53,7 @@ func (s *Scheduler) Run(ctx context.Context) {
 	s.h.RunMissedMidnightTasks(ctx, s.loc)
 
 	s.c.Start()
+	go dateJob.Run()
 }
 
 func (s *Scheduler) Stop() {

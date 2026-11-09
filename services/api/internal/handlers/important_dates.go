@@ -29,6 +29,10 @@ func (h *Handler) AddImportantDate(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.uc.AddImportantDate(ctx, userID, req)
 	if err != nil {
+		if errors.Is(err, errs.ErrPairChanged) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		if errors.Is(err, errs.ErrUserNotFound) || errors.Is(err, errs.ErrPartnerNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -183,16 +187,21 @@ func (h *Handler) UpdateImportantDateSharing(w http.ResponseWriter, r *http.Requ
 	}
 
 	var req struct {
-		MakeShared bool `json:"make_shared"`
+		MakeShared          *bool  `json:"make_shared"`
+		ExpectedPairVersion *int64 `json:"expected_pair_version,omitempty"`
 	}
 	err = json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err != nil || req.MakeShared == nil {
+		http.Error(w, "make_shared is required", http.StatusBadRequest)
 		return
 	}
 
-	err = h.uc.UpdateImportantDateSharing(ctx, int64(importantDateID), userID, req.MakeShared)
+	err = h.uc.UpdateImportantDateSharing(ctx, int64(importantDateID), userID, *req.MakeShared, req.ExpectedPairVersion)
 	if err != nil {
+		if errors.Is(err, errs.ErrPairChanged) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		if errors.Is(err, errs.ErrUserNotFound) || errors.Is(err, errs.ErrImportantDateNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return

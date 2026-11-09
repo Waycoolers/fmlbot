@@ -23,30 +23,13 @@ func (h *Handler) RunMissedMidnightTasks(ctx context.Context, loc *time.Location
 	}
 }
 
-func (h *Handler) NotifyImportantDatesCron(ctx context.Context, httpSender, fcmSender domain.Sender) {
-	messages, err := h.uc.GetAllImportantDatesMessages(ctx)
-	if err != nil {
-		slog.Error("Error getting important dates messages", "error", err)
-		return
-	}
-
-	for _, msg := range messages {
-		// Бот недоступен: дата останется неотмеченной и уйдёт при следующем запуске.
-		// Пуши пока не отправляем, иначе при повторе они придут дважды
-		err = httpSender.SendImportantDatesNotification(ctx, msg)
-		if err != nil {
-			slog.Error("Error sending important dates message to bot client", "error", err)
-			continue
-		}
-		err = fcmSender.SendImportantDatesNotification(ctx, msg)
-		if err != nil {
-			slog.Error("Error sending important dates message to fcm", "error", err)
-		}
-		err = h.uc.UpdateLastNotificationAt(ctx, msg)
-		if err != nil {
-			slog.Error("Error updating last notification at", "error", err)
+func (h *Handler) NotifyImportantDatesCron(ctx context.Context, now time.Time, httpSender, fcmSender domain.Sender) {
+	if now.Hour() >= 12 {
+		if err := h.uc.QueueImportantDateDeliveries(ctx, now, fcmSender != nil); err != nil {
+			slog.Error("Error queueing important date notifications", "error", err)
 		}
 	}
-
-	slog.Info("Notifications about important dates have been processed")
+	if err := h.uc.DeliverImportantDates(ctx, httpSender, fcmSender); err != nil {
+		slog.Error("Error processing important date notifications", "error", err)
+	}
 }

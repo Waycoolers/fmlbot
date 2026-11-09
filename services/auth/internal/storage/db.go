@@ -8,6 +8,7 @@ import (
 	"github.com/Waycoolers/fmlbot/services/auth/internal/config"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/domain"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 type Storage struct {

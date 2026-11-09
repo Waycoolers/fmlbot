@@ -22,6 +22,8 @@ type BotClient interface {
 }
 
 type ApiClient interface {
+	TelegramChatID(ctx context.Context, userID int64) (int64, error)
+	LinkTelegram(ctx context.Context, chatID int64, code string) error
 	CreateUser(ctx context.Context, chatID int64, username string) (string, error)
 	ChangePassword(ctx context.Context, userID int64, oldPassword string, password string) error
 	ResetPassword(ctx context.Context, userID int64) (string, error)
@@ -31,7 +33,7 @@ type ApiClient interface {
 	RequestPartner(ctx context.Context, requesterID int64, partnerID int64) (int64, error)
 	AcceptPartnerRequest(ctx context.Context, chatID int64, requestID int64) (int64, error)
 	DeclinePartnerRequest(ctx context.Context, chatID int64, requestID int64) (int64, error)
-	Unpair(ctx context.Context, chatID int64) error
+	Unpair(ctx context.Context, chatID, pairVersion int64) error
 	GetUserByUsername(ctx context.Context, requesterID int64, username string) (*User, error)
 
 	GetMyUserConfig(ctx context.Context, chatID int64) (*UserConfig, error)
@@ -48,7 +50,7 @@ type ApiClient interface {
 	GetImportantDate(ctx context.Context, chatID int64, dateID int64) (*ImportantDate, error)
 	GetAllImportantDates(ctx context.Context, chatID int64) ([]ImportantDate, error)
 	UpdateImportantDate(ctx context.Context, chatID int64, dateID int64, req ImportantDateRequest) error
-	UpdateImportantDateSharing(ctx context.Context, chatID int64, dateID int64, makeShared bool) error
+	UpdateImportantDateSharing(ctx context.Context, chatID int64, dateID int64, makeShared bool, expectedPairVersion *int64) error
 	DeleteImportantDate(ctx context.Context, chatID int64, dateID int64) error
 
 	GetLeisureIdea(ctx context.Context, chatID int64, location, level, budget, context string) (string, error)

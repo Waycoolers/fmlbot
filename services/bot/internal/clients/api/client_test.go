@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Waycoolers/fmlbot/pkg/errs"
@@ -17,7 +18,13 @@ func (authStub) GetAccessToken(context.Context, int64) (string, error) { return 
 
 func clientFor(t *testing.T, h http.HandlerFunc) *client {
 	t.Helper()
-	server := httptest.NewServer(h)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if id, ok := strings.CutPrefix(r.URL.Path, "/auth/telegram/user/"); ok {
+			_, _ = w.Write([]byte(`{"user_id":` + id + `}`))
+			return
+		}
+		h(w, r)
+	}))
 	t.Cleanup(server.Close)
 	return &client{baseURL: server.URL, httpClient: server.Client(), authClient: authStub{}}
 }
@@ -74,5 +81,40 @@ func TestUsernameIsEscapedInPath(t *testing.T) {
 	_, _ = c.GetUserByUsername(context.Background(), 1, "../me?x=1")
 	if path != "/users/by-username/..%2Fme%3Fx=1" {
 		t.Fatalf("got %q", path)
+	}
+}
+
+type recordingAuthStub struct {
+	users []int64
+}
+
+func (s *recordingAuthStub) GetAccessToken(_ context.Context, userID int64) (string, error) {
+	s.users = append(s.users, userID)
+	return "token", nil
+}
+
+func TestTelegramChatAuthenticatesAsLinkedAccount(t *testing.T) {
+	auth := &recordingAuthStub{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth/telegram/user/123":
+			_, _ = w.Write([]byte(`{"user_id":456}`))
+		case "/users/me":
+			_, _ = w.Write([]byte(`{"user_id":456}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	c := &client{baseURL: server.URL, httpClient: server.Client(), authClient: auth}
+	user, err := c.GetMe(context.Background(), 123)
+	if err != nil || user.UserID != 456 {
+		t.Fatalf("linked user: %+v, %v", user, err)
+	}
+	if _, err := c.GetMe(context.Background(), 456); !errors.Is(err, errs.ErrUserNotFound) {
+		t.Fatalf("unlinked chat error = %v", err)
+	}
+	if len(auth.users) != 1 || auth.users[0] != 456 {
+		t.Fatalf("tokens requested for wrong identities: %v", auth.users)
 	}
 }

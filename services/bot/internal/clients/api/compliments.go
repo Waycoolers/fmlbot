@@ -99,7 +99,7 @@ func (c *client) DeleteCompliment(ctx context.Context, chatID int64, complimentI
 }
 
 func (c *client) ReceiveNextCompliment(ctx context.Context, chatID int64) (*domain.Compliment, error) {
-	resp, err := c.doAuthRequest(ctx, http.MethodPost, "/compliments/next", nil, chatID)
+	resp, err := c.doAuthRequest(ctx, http.MethodPost, "/compliments/next/telegram", nil, chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +119,10 @@ func (c *client) ReceiveNextCompliment(ctx context.Context, chatID int64) (*doma
 		return nil, errs.ErrUserNotFound
 	case http.StatusGone:
 		return nil, errs.ErrNoCompliments
+	case http.StatusConflict:
+		return nil, errs.ErrPairChanged
+	case http.StatusServiceUnavailable:
+		return nil, errs.ErrComplimentDelivery
 	case http.StatusTooManyRequests:
 		var errBody struct {
 			Error   string `json:"error"`

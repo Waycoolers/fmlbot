@@ -48,16 +48,16 @@ func (uc *UseCase) RegisterUser(ctx context.Context, userID int64, username stri
 		return err
 	}
 
-	return uc.users.AddUser(ctx, userID, username, hashedPassword)
+	return uc.users.AddUser(ctx, userID, username, hashedPassword, sql.NullInt64{})
 }
 
 func (uc *UseCase) AddUserWithRandomPassword(ctx context.Context, userID int64, username string) (string, error) {
-	exists, err := uc.users.IsUserExists(ctx, userID)
-	if err != nil {
-		return "", err
-	}
-	if exists {
+	_, err := uc.users.GetTelegramUserID(ctx, userID)
+	if err == nil {
 		return "", errs.ErrUserExists
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", err
 	}
 
 	taken, err := uc.users.IsUserExistsByUsername(ctx, username)
@@ -77,7 +77,7 @@ func (uc *UseCase) AddUserWithRandomPassword(ctx context.Context, userID int64, 
 		return "", err
 	}
 
-	return password, uc.users.AddUser(ctx, userID, username, hashedPassword)
+	return password, uc.users.AddUser(ctx, userID, username, hashedPassword, sql.NullInt64{Int64: userID, Valid: true})
 }
 
 func (uc *UseCase) RemoveUser(ctx context.Context, userID int64) error {
@@ -89,12 +89,12 @@ func (uc *UseCase) RemoveUser(ctx context.Context, userID int64) error {
 		return errs.ErrUserNotFound
 	}
 
-	partnerID, err := uc.users.GetPartnerID(ctx, userID)
+	partnerID, version, err := uc.users.GetPair(ctx, userID)
 	if err != nil {
 		return err
 	}
 
-	if err = uc.users.DeleteUser(ctx, userID, partnerID); err != nil {
+	if err = uc.users.DeleteUser(ctx, userID, partnerID, version); err != nil {
 		return err
 	}
 	uc.revokeTokens(ctx, userID)
@@ -168,7 +168,7 @@ func (uc *UseCase) GetMe(ctx context.Context, userID int64) (*domain.UserRespons
 		return nil, errs.ErrUserNotFound
 	}
 
-	partnerID, err := uc.users.GetPartnerID(ctx, userID)
+	partnerID, version, err := uc.users.GetPair(ctx, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errs.ErrUserNotFound
@@ -185,9 +185,10 @@ func (uc *UseCase) GetMe(ctx context.Context, userID int64) (*domain.UserRespons
 	}
 
 	return &domain.UserResponse{
-		ID:        userID,
-		PartnerID: partnerID,
-		Username:  username,
+		ID:          userID,
+		PartnerID:   partnerID,
+		PairVersion: version,
+		Username:    username,
 	}, nil
 }
 
@@ -279,7 +280,7 @@ func (uc *UseCase) GetPartner(ctx context.Context, userID int64) (*domain.UserRe
 	}, nil
 }
 
-func (uc *UseCase) RemovePartners(ctx context.Context, userID int64) error {
+func (uc *UseCase) RemovePartners(ctx context.Context, userID int64, expectedVersion *int64) error {
 	exists, err := uc.users.IsUserExists(ctx, userID)
 	if err != nil {
 		return err
@@ -288,38 +289,36 @@ func (uc *UseCase) RemovePartners(ctx context.Context, userID int64) error {
 		return errs.ErrUserNotFound
 	}
 
-	partnerID, err := uc.users.GetPartnerID(ctx, userID)
+	partnerID, version, err := uc.users.GetPair(ctx, userID)
 	if err != nil {
 		return err
+	}
+	if expectedVersion != nil && *expectedVersion != version {
+		return errs.ErrPairChanged
 	}
 	if partnerID == 0 {
 		return errs.ErrPartnerNotFound
 	}
 
-	return uc.users.RemovePartners(ctx, userID, partnerID)
+	return uc.users.RemovePartners(ctx, userID, partnerID, version)
 }
 
 func (uc *UseCase) GetUserByUsername(ctx context.Context, username string) (*domain.UserResponse, error) {
 	userID, err := uc.users.GetUserIDByUsername(ctx, username)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errs.ErrUserNotFound
+	}
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errs.ErrUserNotFound
-		}
 		return nil, err
 	}
-	me, err := uc.GetMe(ctx, userID)
+	name, err := uc.users.GetUsername(ctx, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errs.ErrUserNotFound
+	}
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errs.ErrUserNotFound
-		}
 		return nil, err
 	}
-	res := &domain.UserResponse{
-		ID:        me.ID,
-		Username:  me.Username,
-		PartnerID: me.PartnerID,
-	}
-	return res, nil
+	return &domain.UserResponse{ID: userID, Username: name}, nil
 }
 
 func (uc *UseCase) ProcessFCMToken(ctx context.Context, userID int64, token string) error {

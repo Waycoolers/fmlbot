@@ -13,14 +13,17 @@ class AIService:
             api_key=settings.YANDEX_API_KEY,
             base_url="https://ai.api.cloud.yandex.net/v1",
             project=settings.YANDEX_FOLDER_ID,
-            timeout=30.0,
-            max_retries=1
+            timeout=8.0,
+            max_retries=0,
+            default_headers={"x-data-logging-enabled": "false"},
         )
 
     def call_yandex_gpt(self, system_prompt: str, user_prompt: str) -> str:
         try:
             response = self.client.responses.create(
                 model=f"gpt://{settings.YANDEX_FOLDER_ID}/yandexgpt/latest",
+                store=False,
+                max_output_tokens=700,
                 input=[
                     {
                         "role": "system",
@@ -33,11 +36,11 @@ class AIService:
                 ]
             )
 
-            return response.output_text
+        except Exception as error:
+            logger.warning("YandexGPT request failed (%s)", type(error).__name__)
+            raise HTTPException(status_code=502, detail="Idea generation failed") from error
 
-        except Exception as e:
-            logger.error("YandexGPT integration error: %s", e)
-            raise HTTPException(
-                status_code=500,
-                detail="YandexGPT integration error"
-            )
+        output = response.output_text.strip()
+        if response.status != "completed" or not output:
+            raise HTTPException(status_code=502, detail="Idea generation did not complete")
+        return output

@@ -4,11 +4,16 @@ import "errors"
 
 var (
 	ErrUserNotFound             = errors.New("user not found")
+	ErrTelegramLinkInvalid      = errors.New("invalid or expired Telegram link")
+	ErrTelegramAlreadyLinked    = errors.New("Telegram account already linked")
 	ErrUserExists               = errors.New("user already exists")
+	ErrComplimentDelivery       = errors.New("compliment delivery failed")
 	ErrComplimentNotFound       = errors.New("compliment not found")
 	ErrNoCompliments            = errors.New("compliments not found")
 	ErrLimitExceeded            = errors.New("daily limit exceeded")
 	ErrImportantDateNotFound    = errors.New("important date not found")
+	ErrRecipientUnavailable     = errors.New("recipient unavailable")
+	ErrPairChanged              = errors.New("pair changed")
 	ErrPartnerNotFound          = errors.New("partner not found")
 	ErrUserConfigNotFound       = errors.New("user config not found")
 	ErrWrongPassword            = errors.New("wrong password")

@@ -93,7 +93,7 @@ func (uc *UseCase) UpdateCompliment(ctx context.Context, userID int64, complimen
 	return nil
 }
 
-func (uc *UseCase) AcquireCompliment(ctx context.Context, userID int64) (*domain.Compliment, error) {
+func (uc *UseCase) AcquireCompliment(ctx context.Context, userID int64, deliver func(context.Context, string) error) (*domain.Compliment, error) {
 	exists, err := uc.users.IsUserExists(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func (uc *UseCase) AcquireCompliment(ctx context.Context, userID int64) (*domain
 		return nil, errs.ErrUserNotFound
 	}
 
-	partnerID, err := uc.users.GetPartnerID(ctx, userID)
+	partnerID, version, err := uc.users.GetPair(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -110,8 +110,9 @@ func (uc *UseCase) AcquireCompliment(ctx context.Context, userID int64) (*domain
 		return nil, errs.ErrUserNotFound
 	}
 
-	text, err := uc.compliments.AcquireCompliment(ctx, partnerID)
+	text, err := uc.compliments.AcquireCompliment(ctx, userID, partnerID, version, deliver)
 	return &domain.Compliment{
-		Text: text,
+		Text:     text,
+		AuthorID: partnerID,
 	}, err
 }

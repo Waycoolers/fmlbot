@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"html"
-	"math/rand"
 	"strconv"
 	"strings"
 
@@ -221,6 +220,14 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *domain.Message) {
 	}
 
 	compliment, err := h.api.ReceiveNextCompliment(ctx, chatID)
+	if errors.Is(err, errs.ErrComplimentDelivery) {
+		h.Reply(chatID, "Telegram не доставил комплимент. Попробуй получить его ещё раз.")
+		return
+	}
+	if errors.Is(err, errs.ErrPairChanged) {
+		h.Reply(chatID, "Пара изменилась. Открой меню комплиментов заново.")
+		return
+	}
 	if err != nil {
 		var e *errs.ErrBucketEmpty
 		switch {
@@ -241,18 +248,11 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *domain.Message) {
 		}
 	}
 
-	complimentText := html.EscapeString(compliment.Text)
-	var complimentMessages = []string{
-		"💖 <b>Для тебя есть тёплые слова:</b>\n\n«" + complimentText + "»",
-		"✨ <b>Небольшое послание от твоего человека:</b>\n\n«" + complimentText + "»",
-		"🌷 <b>Тебе отправили комплимент:</b>\n\n«" + complimentText + "»",
+	if compliment.AuthorID > 0 {
+		h.ReplyToUser(ctx, compliment.AuthorID,
+			"💌 <b>Комплимент доставлен</b>\n\nТы только что порадовал(а) своего партнёра ✨\n\n«"+html.EscapeString(compliment.Text)+"»",
+		)
 	}
-
-	randomIndex := rand.Intn(len(complimentMessages))
-	h.Reply(chatID, complimentMessages[randomIndex])
-	h.Reply(user.PartnerID,
-		"💌 <b>Комплимент доставлен</b>\n\nТы только что порадовал(а) своего партнёра ✨\n\n«"+complimentText+"»",
-	)
 }
 
 func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *domain.Message) {

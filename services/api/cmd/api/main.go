@@ -12,6 +12,7 @@ import (
 	"github.com/Waycoolers/fmlbot/services/api/internal/clients/ai"
 	"github.com/Waycoolers/fmlbot/services/api/internal/clients/auth"
 	"github.com/Waycoolers/fmlbot/services/api/internal/config"
+	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 	"github.com/Waycoolers/fmlbot/services/api/internal/handlers"
 	"github.com/Waycoolers/fmlbot/services/api/internal/scheduler"
 	"github.com/Waycoolers/fmlbot/services/api/internal/sender"
@@ -49,18 +50,20 @@ func main() {
 	aiClient := ai.New(cfg.AI, cfg.Server.InternalSecret)
 	authClient := auth.New(cfg.Auth, cfg.Server.InternalSecret)
 	uc := usecases.New(store.Repos, aiClient, authClient)
-	h := handlers.New(uc)
+	httpSender := sender.NewHTTPSender(cfg.BotURL, cfg.Server.InternalSecret, store.Repos.Users)
+	h := handlers.New(uc, httpSender)
 
 	srv := server.New(cfg.Server, h)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	httpSender := sender.NewHTTPSender(cfg.BotURL, cfg.Server.InternalSecret)
-	fcmSender, err := sender.NewFCMSender(ctx, store.Repos.FCM, cfg.FCM.CredentialsFile)
-	if err != nil {
-		slog.Error("Error creating FCM sender", "error", err)
-		os.Exit(1)
+	var fcmSender domain.Sender
+	if cfg.FCM.CredentialsFile != "" {
+		fcmSender, err = sender.NewFCMSender(ctx, store.Repos.FCM, cfg.FCM.CredentialsFile)
+		if err != nil {
+			slog.Error("FCM disabled because credentials could not be loaded", "error", err)
+		}
 	}
 	sched := scheduler.New(h, httpSender, fcmSender)
 

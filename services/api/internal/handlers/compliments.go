@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"html"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -156,6 +158,14 @@ func (h *Handler) UpdateCompliment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ReceiveCompliment(w http.ResponseWriter, r *http.Request) {
+	h.receiveCompliment(w, r, false)
+}
+
+func (h *Handler) ReceiveTelegramCompliment(w http.ResponseWriter, r *http.Request) {
+	h.receiveCompliment(w, r, true)
+}
+
+func (h *Handler) receiveCompliment(w http.ResponseWriter, r *http.Request, telegram bool) {
 	ctx := r.Context()
 	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
 	if !ok {
@@ -163,7 +173,26 @@ func (h *Handler) ReceiveCompliment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	compliment, err := h.uc.AcquireCompliment(ctx, userID)
+	var deliver func(context.Context, string) error
+	if telegram {
+		deliver = func(ctx context.Context, text string) error {
+			return h.telegram.SendMessage(ctx, domain.MessageRequest{
+				UserID: userID,
+				Text:   "💖 <b>Для тебя есть тёплые слова:</b>\n\n«" + html.EscapeString(text) + "»",
+			})
+		}
+	}
+
+	compliment, err := h.uc.AcquireCompliment(ctx, userID, deliver)
+	if errors.Is(err, errs.ErrComplimentDelivery) {
+		slog.Warn("Telegram compliment delivery failed", "error", err)
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	if errors.Is(err, errs.ErrPairChanged) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	if err != nil {
 		if errors.Is(err, errs.ErrUserNotFound) {
 			body := map[string]string{

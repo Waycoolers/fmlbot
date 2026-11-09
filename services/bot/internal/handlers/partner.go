@@ -54,7 +54,7 @@ func (h *Handler) SetPartner(ctx context.Context, msg *domain.Message) {
 
 	if user.PartnerID == 0 {
 		h.sm.SetStep(chatID, state.AwaitingPartner)
-		h.Reply(chatID, "💌 Отправь username партнёра")
+		h.Reply(chatID, "💌 Отправь имя аккаунта партнёра в FMLBot")
 	} else {
 		partner, err := h.api.GetPartner(ctx, chatID)
 		if err != nil || partner == nil {
@@ -72,7 +72,6 @@ func (h *Handler) SetPartner(ctx context.Context, msg *domain.Message) {
 func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
 	partnerUsername := msg.Text
-	userUsername := msg.UserName
 
 	if strings.HasPrefix(partnerUsername, "@") {
 		partnerUsername = partnerUsername[1:]
@@ -86,11 +85,6 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *domain.Messag
 			return
 		}
 		exists = false
-	}
-
-	if strings.ToLower(partnerUsername) == strings.ToLower(userUsername) {
-		h.Reply(chatID, "😅 Так не получится — себя добавить нельзя")
-		return
 	}
 
 	if !exists {
@@ -108,6 +102,10 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *domain.Messag
 		return
 	}
 
+	if user.UserID == partner.UserID {
+		h.Reply(chatID, "😅 Так не получится — себя добавить нельзя")
+		return
+	}
 	if user.PartnerID != 0 {
 		if user.PartnerID == partner.UserID {
 			h.Reply(chatID, "💛 @"+html.EscapeString(partner.Username)+" и так ваш партнёр. Приятного времяпрепровождения!")
@@ -144,10 +142,12 @@ func (h *Handler) ProcessPartnerUsername(ctx context.Context, msg *domain.Messag
 			},
 		},
 	}
-	text := "💌 @" + html.EscapeString(userUsername) + " хочет стать твоим партнёром. Принять заявку?"
-	err = h.ui.Client.SendWithInlineKeyboard(partner.UserID, text, keyboard)
-	if err != nil {
-		// Заявка сохранена: пользователь мобильного приложения увидит её там
+	text := "💌 @" + html.EscapeString(user.Username) + " хочет стать твоим партнёром. Принять заявку?"
+	partnerChatID, err := h.api.TelegramChatID(ctx, partner.UserID)
+	if err == nil {
+		err = h.ui.Client.SendWithInlineKeyboard(partnerChatID, text, keyboard)
+	}
+	if err != nil && !errors.Is(err, errs.ErrUserNotFound) {
 		slog.Error("Error sending partner request", "error", err)
 	}
 
@@ -164,32 +164,35 @@ func (h *Handler) HandlePartnerRequest(ctx context.Context, cq *domain.CallbackQ
 		return
 	}
 
-	h.ui.RemoveButtons(chatID, cq.MessageID)
-
 	username := html.EscapeString(cq.UserName)
 	if answer == "decline" {
 		fromUserID, err := h.api.DeclinePartnerRequest(ctx, chatID, requestID)
 		if errors.Is(err, errs.ErrPartnerRequestNotFound) {
+			h.ui.RemoveButtons(chatID, cq.MessageID)
 			h.Reply(chatID, "🤍 Эта заявка уже неактуальна")
 			return
 		} else if err != nil {
 			h.HandleErr(chatID, "Error when declining partner request", err)
 			return
 		}
+		h.ui.RemoveButtons(chatID, cq.MessageID)
 		h.Reply(chatID, "🕊️ Заявка отклонена")
-		h.Reply(fromUserID, "💔 @"+username+" отклонил(а) твою заявку")
+		h.ReplyToUser(ctx, fromUserID, "💔 @"+username+" отклонил(а) твою заявку")
 		return
 	}
 
 	fromUserID, err := h.api.AcceptPartnerRequest(ctx, chatID, requestID)
 	switch {
 	case errors.Is(err, errs.ErrPartnerRequestNotFound):
+		h.ui.RemoveButtons(chatID, cq.MessageID)
 		h.Reply(chatID, "🤍 Эта заявка уже неактуальна")
 		return
 	case errors.Is(err, errs.ErrPartnerAlreadyHasPartner):
+		h.ui.RemoveButtons(chatID, cq.MessageID)
 		h.Reply(chatID, "😔 У этого пользователя уже есть партнёр")
 		return
 	case errors.Is(err, errs.ErrAlreadyHasPartner):
+		h.ui.RemoveButtons(chatID, cq.MessageID)
 		h.Reply(chatID, "💛 У тебя уже есть партнёр")
 		return
 	case err != nil:
@@ -197,13 +200,14 @@ func (h *Handler) HandlePartnerRequest(ctx context.Context, cq *domain.CallbackQ
 		return
 	}
 
+	h.ui.RemoveButtons(chatID, cq.MessageID)
 	partner, err := h.api.GetPartner(ctx, chatID)
 	if err != nil || partner == nil {
 		h.HandleErr(chatID, "Error getting partner", err)
 		return
 	}
 	h.Reply(chatID, "💞 У вас с @"+html.EscapeString(partner.Username)+" теперь есть общая история в боте ✨")
-	h.Reply(fromUserID, "✨ Готово! Партнёр @"+username+" добавлен")
+	h.ReplyToUser(ctx, fromUserID, "✨ Готово! Партнёр @"+username+" добавлен")
 }
 
 func (h *Handler) DeletePartner(ctx context.Context, msg *domain.Message) {
@@ -224,7 +228,7 @@ func (h *Handler) DeletePartner(ctx context.Context, msg *domain.Message) {
 		Rows: []domain.InlineKeyboardRow{
 			{
 				Buttons: []domain.InlineKeyboardButton{
-					{Text: "💔 Да, удалить", Data: "partner:delete:confirm"},
+					{Text: "💔 Да, удалить", Data: fmt.Sprintf("partner:delete:confirm:%d:%d", user.PartnerID, user.PairVersion)},
 					{Text: "↩️ Передумал(а)", Data: "partner:delete:cancel"},
 				},
 			},
@@ -251,28 +255,41 @@ func (h *Handler) HandleDeletePartner(ctx context.Context, cb *domain.CallbackQu
 	chatID := cb.ChatID
 	messageID := cb.MessageID
 
-	switch cb.Data {
-	case "partner:delete:confirm":
-		partner, err := h.api.GetPartner(ctx, chatID)
-		if err != nil || partner == nil {
-			h.ui.RemoveButtons(chatID, messageID)
-			h.HandleErr(chatID, "Error getting partner", err)
-			return
-		}
-
-		// API сам сбрасывает настройки обоих партнёров и удаляет общую историю
-		err = h.api.Unpair(ctx, chatID)
-		if err != nil {
-			h.ui.RemoveButtons(chatID, messageID)
-			h.HandleErr(chatID, "Error while trying to delete partners", err)
-			return
-		}
-
-		h.Reply(chatID, "🕊️ Партнёр удалён")
-		h.Reply(partner.UserID, "💔 Твой партнёр больше не связан с тобой")
-
-	case "partner:delete:cancel":
+	if cb.Data == "partner:delete:cancel" {
+		h.ui.RemoveButtons(chatID, messageID)
 		h.Reply(chatID, "💛 Хорошо, ничего не меняем")
+		return
+	}
+
+	payload, valid := strings.CutPrefix(cb.Data, "partner:delete:confirm:")
+	partnerText, versionText, split := strings.Cut(payload, ":")
+	partnerID, partnerErr := strconv.ParseInt(partnerText, 10, 64)
+	version, versionErr := strconv.ParseInt(versionText, 10, 64)
+	if !valid || !split || partnerErr != nil || versionErr != nil || partnerID <= 0 || version < 0 {
+		h.ui.RemoveButtons(chatID, messageID)
+		h.Reply(chatID, "Это подтверждение устарело. Открой меню партнёра заново.")
+		return
+	}
+	user, err := h.api.GetMe(ctx, chatID)
+	if err != nil || user == nil {
+		h.HandleErr(chatID, "Error getting user", err)
+		return
+	}
+	if user.PartnerID != partnerID || user.PairVersion != version {
+		h.ui.RemoveButtons(chatID, messageID)
+		h.Reply(chatID, "Это подтверждение устарело. Открой меню партнёра заново.")
+		return
+	}
+	if err = h.api.Unpair(ctx, chatID, version); err != nil {
+		if errors.Is(err, errs.ErrPairChanged) || errors.Is(err, errs.ErrPartnerNotFound) {
+			h.ui.RemoveButtons(chatID, messageID)
+			h.Reply(chatID, "Это подтверждение устарело. Открой меню партнёра заново.")
+			return
+		}
+		h.HandleErr(chatID, "Error while trying to delete partners", err)
+		return
 	}
 	h.ui.RemoveButtons(chatID, messageID)
+	h.Reply(chatID, "🕊️ Партнёр удалён")
+	h.ReplyToUser(ctx, partnerID, "💔 Твой партнёр больше не связан с тобой")
 }

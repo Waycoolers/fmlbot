@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
 )
 
@@ -19,6 +20,9 @@ func (c *client) AddImportantDate(ctx context.Context, chatID int64, req domain.
 		_ = Body.Close()
 	}(resp.Body)
 
+	if resp.StatusCode == http.StatusConflict {
+		return nil, errs.ErrPairChanged
+	}
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}
@@ -84,11 +88,12 @@ func (c *client) UpdateImportantDate(ctx context.Context, chatID int64, dateID i
 	return nil
 }
 
-func (c *client) UpdateImportantDateSharing(ctx context.Context, chatID int64, dateID int64, makeShared bool) error {
+func (c *client) UpdateImportantDateSharing(ctx context.Context, chatID int64, dateID int64, makeShared bool, expectedPairVersion *int64) error {
 	path := fmt.Sprintf("/important_dates/%d/sharing", dateID)
 	reqBody := struct {
-		MakeShared bool `json:"make_shared"`
-	}{MakeShared: makeShared}
+		MakeShared          bool   `json:"make_shared"`
+		ExpectedPairVersion *int64 `json:"expected_pair_version,omitempty"`
+	}{MakeShared: makeShared, ExpectedPairVersion: expectedPairVersion}
 	resp, err := c.doAuthRequest(ctx, http.MethodPatch, path, reqBody, chatID)
 	if err != nil {
 		return err
@@ -97,6 +102,9 @@ func (c *client) UpdateImportantDateSharing(ctx context.Context, chatID int64, d
 		_ = Body.Close()
 	}(resp.Body)
 
+	if resp.StatusCode == http.StatusConflict {
+		return errs.ErrPairChanged
+	}
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}

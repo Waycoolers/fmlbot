@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
-	"log/slog"
 	"net/http"
 
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
@@ -17,25 +15,9 @@ func (h *Handler) NotifyAllImportantDates(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 503 просит API повторить отправку. Если кто-то уже получил сообщение,
-	// повтор продублировал бы его, поэтому повторяем только когда не дошло никому
-	delivered, temporaryFailure := h.sendNotifications(message)
-	if !delivered && temporaryFailure {
-		w.WriteHeader(http.StatusServiceUnavailable)
+	if len(message.UserIDs) != 1 {
+		http.Error(w, "expected one recipient", http.StatusBadRequest)
+		return
 	}
-}
-
-func (h *Handler) sendNotifications(message domain.ImportantDateMessage) (delivered, temporaryFailure bool) {
-	for _, id := range message.UserIDs {
-		err := h.ui.Client.SendMessage(id, message.Message)
-		if err == nil {
-			delivered = true
-			continue
-		}
-		slog.Error("Error sending notification", "chatID", id, "error", err)
-		if !errors.Is(err, domain.ErrRecipientUnavailable) {
-			temporaryFailure = true
-		}
-	}
-	return delivered, temporaryFailure
+	h.sendUpdate(w, message.UserIDs[0], message.Message)
 }

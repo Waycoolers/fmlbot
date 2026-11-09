@@ -6,16 +6,20 @@ import (
 )
 
 type ImportantDateDraft struct {
-	Title            string
-	Year             int
-	Month            int
-	Day              int
-	PartnerID        sql.NullInt64
-	NotifyBeforeDays int
-	CreatedAt        time.Time
+	Session     string
+	Title       string
+	Year        int
+	Month       int
+	Day         int
+	PartnerID   sql.NullInt64
+	PairVersion *int64
+	CreatedAt   time.Time
 }
 
 type ImportantDateEditDraft struct {
+	Session         string
+	Action          string
+	PairVersion     *int64
 	ImportantDateID int64     `json:"important_date_id"`
 	Year            int       `json:"year"`
 	Month           int       `json:"month"`
@@ -23,8 +27,9 @@ type ImportantDateEditDraft struct {
 }
 
 type IdeaDraft struct {
+	Session   string
+	Step      string
 	Location  string
 	Activity  string
-	Budget    string
 	CreatedAt time.Time
 }

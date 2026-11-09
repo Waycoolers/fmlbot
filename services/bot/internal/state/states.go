@@ -4,6 +4,7 @@ type State string
 
 const (
 	Empty                             State = ""
+	AwaitingRegistrationUsername      State = "awaiting_registration_username"
 	AwaitingPartner                   State = "awaiting_partner"
 	AwaitingCompliment                State = "awaiting_compliment"
 	AwaitingComplimentFrequency       State = "awaiting_compliment_frequency"
@@ -15,7 +16,4 @@ const (
 	AwaitingEditDateImportantDate     State = "awaiting_edit_date_important_date"
 	AwaitingOldPassword               State = "awaiting_old_password"
 	AwaitingPassword                  State = "awaiting_password"
-	AwaitingLocationIdea              State = "awaiting_location_idea"
-	AwaitingActivityIdea              State = "awaiting_activity_idea"
-	AwaitingBudgetIdea                State = "awaiting_budget_idea"
 )
