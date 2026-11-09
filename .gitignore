@@ -30,3 +30,8 @@ profile.cov
 
 /vendor
 /secrets/
+
+# database dumps
+/backup.sql
+/schema.sql
+/fmlbot_db_data.tar.gz

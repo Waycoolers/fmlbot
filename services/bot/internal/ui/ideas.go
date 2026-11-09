@@ -7,8 +7,8 @@ func (ui *MenuUI) IdeasMenu(chatID int64, text string) error {
 		Rows: []domain.KeyboardRow{
 			{
 				Buttons: []domain.KeyboardButton{
-					{domain.GenerateLeisureIdea},
-					{domain.Main},
+					{Command: domain.GenerateLeisureIdea},
+					{Command: domain.Main},
 				},
 			},
 		},

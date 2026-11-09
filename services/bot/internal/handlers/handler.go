@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/redis_store"
@@ -18,6 +19,8 @@ type Handler struct {
 	ideaDrafts              *redis_store.IdeaDraftStore
 	api                     domain.ApiClient
 	sm                      *state.Machine
+	// Текущий пароль на время диалога смены пароля. Только в памяти, на диск не попадает
+	oldPasswords sync.Map
 }
 
 func New(ui *ui.MenuUI, importantDateDrafts *redis_store.ImportantDateDraftStore,
@@ -42,10 +45,11 @@ func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 	for _, command := range domain.Commands {
 		if text == string(command) {
 			h.sm.SetStep(chatID, state.Empty)
+			h.oldPasswords.Delete(chatID)
 		}
 	}
 
-	slog.Info("Client wrote", "chatID", chatID, "text", text)
+	slog.Debug("Client wrote", "chatID", chatID)
 
 	if text == string(domain.Start) {
 		h.ShowStartMenu(ctx, chatID)
@@ -69,6 +73,8 @@ func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 			h.HandleTitleImportantDate(ctx, msg)
 		case state.AwaitingEditTitleImportantDate:
 			h.HandleEditTitleImportantDateText(ctx, msg)
+		case state.AwaitingOldPassword:
+			h.HandleOldPassword(ctx, msg)
 		case state.AwaitingPassword:
 			h.HandleChangePassword(ctx, msg)
 		default:
@@ -125,6 +131,11 @@ func (h *Handler) HandleMessage(ctx context.Context, msg *domain.Message) {
 func (h *Handler) HandleCallback(ctx context.Context, cq *domain.CallbackQuery) {
 	data := cq.Data
 
+	// Без ответа Telegram продолжает показывать загрузку на кнопке
+	if err := h.ui.Client.AnswerCallback(cq.ID); err != nil {
+		slog.Warn("Error answering callback", "error", err)
+	}
+
 	section, action, payload := parseCallbackData(data)
 
 	switch section {
@@ -149,6 +160,10 @@ func (h *Handler) handleAccount(ctx context.Context, cq *domain.CallbackQuery, a
 		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
 			h.HandleDeleteAccount(ctx, cq)
 		}
+	case "password":
+		if payload == "forgot" {
+			h.HandleForgotPassword(ctx, cq)
+		}
 	default:
 		h.ReplyUnknownCallback(ctx, cq)
 	}
@@ -160,6 +175,8 @@ func (h *Handler) handlePartner(ctx context.Context, cq *domain.CallbackQuery, a
 		if strings.HasPrefix(payload, "confirm") || strings.HasPrefix(payload, "cancel") {
 			h.HandleDeletePartner(ctx, cq)
 		}
+	case "request":
+		h.HandlePartnerRequest(ctx, cq, payload)
 	default:
 		h.ReplyUnknownCallback(ctx, cq)
 	}

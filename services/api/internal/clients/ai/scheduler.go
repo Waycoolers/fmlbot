@@ -28,6 +28,7 @@ func (c *Client) GetDateIdea(ctx context.Context, title string, days int, contex
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Secret", c.secret)
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return "", err

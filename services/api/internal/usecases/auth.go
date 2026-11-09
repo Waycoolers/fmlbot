@@ -25,7 +25,8 @@ func (uc *UseCase) VerifyUser(ctx context.Context, username string, password str
 
 	err = bcrypt.CompareHashAndPassword(hash, []byte(password))
 	if err != nil {
-		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+		// Пустой хеш значит, что пароль не задан: войти с ним нельзя
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) || errors.Is(err, bcrypt.ErrHashTooShort) {
 			return 0, errs.ErrWrongPassword
 		}
 		return 0, err

@@ -13,14 +13,15 @@ type UsersRepo interface {
 	GetUserIDByUsername(ctx context.Context, username string) (int64, error)
 	IsUserExists(ctx context.Context, userID int64) (bool, error)
 	IsUserExistsByUsername(ctx context.Context, username string) (bool, error)
-	SetPartner(ctx context.Context, userID int64, partnerID int64) error
 	GetUsername(ctx context.Context, userID int64) (string, error)
 	GetPartnerID(ctx context.Context, userID int64) (int64, error)
-	SetPartners(ctx context.Context, userID int64, partnerID int64) error
+	CreatePartnerRequest(ctx context.Context, userID int64, partnerID int64) (int64, error)
+	AcceptPartnerRequest(ctx context.Context, requestID int64, userID int64) (int64, error)
+	DeclinePartnerRequest(ctx context.Context, requestID int64, userID int64) (int64, error)
+	GetPartnerRequests(ctx context.Context, userID int64) ([]PartnerRequest, error)
 	RemovePartners(ctx context.Context, userID int64, partnerID int64) error
-	ClearAllPartnersHistory(ctx context.Context, userID, partnerID int64) error
-	DeleteUser(ctx context.Context, userID int64) error
-	UpdateUser(ctx context.Context, userID int64, username string, partnerID int64) error
+	DeleteUser(ctx context.Context, userID int64, partnerID int64) error
+	UpdateUsername(ctx context.Context, userID int64, username string) error
 }
 
 type UserConfigRepo interface {
@@ -60,11 +61,17 @@ type FCMRepo interface {
 
 type SchedulerRepo interface {
 	DoMidnightTasksWithCompliments(ctx context.Context) error
+	GetLastRun(ctx context.Context, name string) (time.Time, bool, error)
+	SetLastRun(ctx context.Context, name string, at time.Time) error
 }
 
 type Sender interface {
 	SendMessage(ctx context.Context, update MessageRequest) error
 	SendImportantDatesNotification(ctx context.Context, update ImportantDateMessage) error
+}
+
+type AuthClient interface {
+	RevokeAllTokens(ctx context.Context, userID int64) error
 }
 
 type AIClient interface {

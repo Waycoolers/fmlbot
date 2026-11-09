@@ -1,6 +1,13 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// ErrRecipientUnavailable - Telegram окончательно отказал в доставке (бот заблокирован,
+// чата не существует). Повторять отправку бессмысленно.
+var ErrRecipientUnavailable = errors.New("recipient unavailable")
 
 type BotClient interface {
 	SendMessage(chatID int64, text string) error
@@ -11,25 +18,25 @@ type BotClient interface {
 	StopReceivingUpdates()
 	SendKeyboard(chatID int64, text string, keyboard Keyboard) (Message, error)
 	DeleteMessage(chatID int64, messageID int) error
+	AnswerCallback(callbackID string) error
 }
 
 type ApiClient interface {
 	CreateUser(ctx context.Context, chatID int64, username string) (string, error)
-	ChangePassword(ctx context.Context, userID int64, password string) error
+	ChangePassword(ctx context.Context, userID int64, oldPassword string, password string) error
+	ResetPassword(ctx context.Context, userID int64) (string, error)
 	GetMe(ctx context.Context, chatID int64) (*User, error)
 	GetPartner(ctx context.Context, chatID int64) (*User, error)
 	DeleteMe(ctx context.Context, chatID int64) error
-	UpdateMe(ctx context.Context, chatID int64, username string, partnerID int64) error
-	UpdatePartner(ctx context.Context, requesterID int64, username string, partnerID int64) error
-	PairUsers(ctx context.Context, requesterID int64, partnerID int64) error
+	RequestPartner(ctx context.Context, requesterID int64, partnerID int64) (int64, error)
+	AcceptPartnerRequest(ctx context.Context, chatID int64, requestID int64) (int64, error)
+	DeclinePartnerRequest(ctx context.Context, chatID int64, requestID int64) (int64, error)
 	Unpair(ctx context.Context, chatID int64) error
 	GetUserByUsername(ctx context.Context, requesterID int64, username string) (*User, error)
 
 	GetMyUserConfig(ctx context.Context, chatID int64) (*UserConfig, error)
 	GetPartnerUserConfig(ctx context.Context, chatID int64) (*UserConfig, error)
 	UpdateUserConfig(ctx context.Context, chatID int64, maxCount *int) error
-	ResetMyUserConfig(ctx context.Context, chatID int64) error
-	ResetPartnerUserConfig(ctx context.Context, chatID int64) error
 
 	AddCompliment(ctx context.Context, chatID int64, text string) (*Compliment, error)
 	GetAllCompliments(ctx context.Context, chatID int64) ([]Compliment, error)

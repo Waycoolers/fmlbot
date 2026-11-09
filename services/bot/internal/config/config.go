@@ -15,7 +15,6 @@ type Config struct {
 	Api            *ApiConfig
 	Auth           *AuthConfig
 	Loglevel       string
-	JwtSecret      []byte
 	InternalSecret []byte
 }
 
@@ -52,12 +51,6 @@ func Load() (*Config, error) {
 	if loglevel == "" {
 		loglevel = "info"
 		slog.Warn("not found LOG_LEVEL")
-	}
-
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		slog.Error("not found JWT_SECRET")
-		return nil, errors.New("no JWT_SECRET")
 	}
 
 	secret := os.Getenv("INTERNAL_API_SECRET")
@@ -98,7 +91,6 @@ func Load() (*Config, error) {
 		Api:            api,
 		Auth:           auth,
 		Loglevel:       loglevel,
-		JwtSecret:      []byte(jwtSecret),
 		InternalSecret: []byte(secret),
 	}, nil
 }

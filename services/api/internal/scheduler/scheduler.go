@@ -13,6 +13,7 @@ import (
 type Scheduler struct {
 	h          *handlers.Handler
 	c          *cron.Cron
+	loc        *time.Location
 	httpSender domain.Sender
 	fcmSender  domain.Sender
 }
@@ -25,7 +26,7 @@ func New(h *handlers.Handler, httpSender, fcmSender domain.Sender) *Scheduler {
 	}
 
 	c := cron.New(cron.WithSeconds(), cron.WithLocation(loc))
-	return &Scheduler{h: h, c: c, httpSender: httpSender, fcmSender: fcmSender}
+	return &Scheduler{h: h, c: c, loc: loc, httpSender: httpSender, fcmSender: fcmSender}
 }
 
 func (s *Scheduler) Run(ctx context.Context) {
@@ -38,14 +39,17 @@ func (s *Scheduler) Run(ctx context.Context) {
 		return
 	}
 
-	_, err = s.c.AddFunc("0 0 12 * * *", func() {
-		slog.Info("Checking important dates (12:00 MSK)")
+	// Основной запуск в 12:00, остальные повторяют только то, что не удалось доставить
+	_, err = s.c.AddFunc("0 0 12-23 * * *", func() {
+		slog.Info("Checking important dates")
 		s.h.NotifyImportantDatesCron(ctx, s.httpSender, s.fcmSender)
 	})
 	if err != nil {
 		slog.Error("Error adding cron task for important date notifications", "error", err)
 		return
 	}
+
+	s.h.RunMissedMidnightTasks(ctx, s.loc)
 
 	s.c.Start()
 }

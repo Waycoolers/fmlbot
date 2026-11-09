@@ -19,7 +19,7 @@ func (ui *MenuUI) StartMenu(chatID int64, text string) error {
 		Rows: []domain.KeyboardRow{
 			{
 				Buttons: []domain.KeyboardButton{
-					{domain.Register},
+					{Command: domain.Register},
 				},
 			},
 		},
@@ -34,15 +34,15 @@ func (ui *MenuUI) MainMenu(chatID int64, text string) error {
 		Rows: []domain.KeyboardRow{
 			{
 				Buttons: []domain.KeyboardButton{
-					{domain.Account},
-					{domain.Partner},
+					{Command: domain.Account},
+					{Command: domain.Partner},
 				},
 			},
 			{
 				Buttons: []domain.KeyboardButton{
-					{domain.Compliments},
-					{domain.ImportantDates},
-					{domain.Ideas},
+					{Command: domain.Compliments},
+					{Command: domain.ImportantDates},
+					{Command: domain.Ideas},
 				},
 			},
 		},

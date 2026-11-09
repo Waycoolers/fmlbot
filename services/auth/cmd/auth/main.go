@@ -11,6 +11,7 @@ import (
 	"github.com/Waycoolers/fmlbot/pkg/logger"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/clients/api"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/config"
+	"github.com/Waycoolers/fmlbot/services/auth/internal/domain"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/handlers"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/server"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/storage"
@@ -51,6 +52,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	cleanupCtx, stopCleanup := context.WithCancel(context.Background())
+	defer stopCleanup()
+	go cleanupExpiredTokens(cleanupCtx, store.Tokens)
+
 	srv := server.New(cfg.Server, h, cfg.InternalSecret)
 	srv.Start()
 
@@ -69,4 +74,22 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("Server stopped")
+}
+
+func cleanupExpiredTokens(ctx context.Context, tokens domain.TokensRepo) {
+	ticker := time.NewTicker(6 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			deleted, err := tokens.DeleteExpired(ctx)
+			if err != nil {
+				slog.Error("Error deleting expired refresh tokens", "error", err)
+				continue
+			}
+			slog.Info("Expired refresh tokens deleted", "count", deleted)
+		}
+	}
 }

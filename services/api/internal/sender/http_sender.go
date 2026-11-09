@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
@@ -20,7 +21,7 @@ type HTTPSender struct {
 func NewHTTPSender(botURL string, secret []byte) domain.Sender {
 	return &HTTPSender{
 		botURL: botURL,
-		client: &http.Client{},
+		client: &http.Client{Timeout: 30 * time.Second},
 		secret: secret,
 	}
 }

@@ -6,9 +6,12 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Waycoolers/fmlbot/pkg/errs"
+	"github.com/Waycoolers/fmlbot/pkg/password"
+	"github.com/Waycoolers/fmlbot/pkg/ratelimit"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/config"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/domain"
 	"github.com/golang-jwt/jwt/v5"
@@ -18,10 +21,17 @@ type Handler struct {
 	repo   domain.TokensRepo
 	cfg    *config.Config
 	client domain.APIClient
+	// Неудачные попытки входа по имени пользователя: защита от перебора пароля
+	failedLogins *ratelimit.Limiter
 }
 
 func New(repo domain.TokensRepo, cfg *config.Config, client domain.APIClient) (*Handler, error) {
-	return &Handler{repo: repo, cfg: cfg, client: client}, nil
+	return &Handler{
+		repo:         repo,
+		cfg:          cfg,
+		client:       client,
+		failedLogins: ratelimit.New(10, 15*time.Minute),
+	}, nil
 }
 
 func sendJson(w http.ResponseWriter, status int, data any) {
@@ -31,48 +41,6 @@ func sendJson(w http.ResponseWriter, status int, data any) {
 	if err != nil {
 		slog.Error("Error sending json", "error", err)
 	}
-}
-
-func validatePassword(password string) error {
-	if len([]rune(password)) < 8 {
-		return errs.ErrPasswordTooShort
-	}
-	if len([]rune(password)) > 32 {
-		return errs.ErrPasswordTooLong
-	}
-
-	var hasLetter, hasUpper, hasLower, hasNumber bool
-
-	for _, char := range password {
-		if char < '!' || char > '~' {
-			return errs.ErrPasswordInvalidCharacter
-		}
-
-		switch {
-		case char >= 'A' && char <= 'Z':
-			hasLetter = true
-			hasUpper = true
-		case char >= 'a' && char <= 'z':
-			hasLetter = true
-			hasLower = true
-		case char >= '0' && char <= '9':
-			hasNumber = true
-		}
-	}
-
-	if !hasLetter {
-		return errs.ErrPasswordWithoutLetter
-	}
-	if !hasUpper {
-		return errs.ErrPasswordWithoutUpper
-	}
-	if !hasLower {
-		return errs.ErrPasswordWithoutLower
-	}
-	if !hasNumber {
-		return errs.ErrPasswordWithoutDigit
-	}
-	return nil
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +63,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid password", http.StatusBadRequest)
 		return
 	}
-	err := validatePassword(req.Password)
+	err := password.Validate(req.Password)
 	if err != nil {
 		if errors.Is(err, errs.ErrPasswordTooShort) || errors.Is(err, errs.ErrPasswordTooLong) ||
 			errors.Is(err, errs.ErrPasswordWithoutLower) || errors.Is(err, errs.ErrPasswordWithoutUpper) ||
@@ -106,7 +74,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -118,7 +86,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if !available {
@@ -131,8 +99,13 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 	err = h.client.Register(ctx, userID, req.Username, req.Password)
 	if err != nil {
+		if errors.Is(err, errs.ErrUsernameIsAlreadyTaken) {
+			body := map[string]string{"error": err.Error()}
+			sendJson(w, http.StatusConflict, body)
+			return
+		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -186,6 +159,12 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	loginKey := strings.ToLower(req.Username)
+	if h.failedLogins.Blocked(loginKey) {
+		http.Error(w, "too many attempts", http.StatusTooManyRequests)
+		return
+	}
+
 	userID, err := h.client.VerifyUser(ctx, req.Username, req.Password)
 	if err != nil {
 		if errors.Is(err, errs.ErrUserNotFound) {
@@ -193,15 +172,19 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, errs.ErrWrongPassword) {
+			h.failedLogins.Record(loginKey)
 			http.Error(w, "wrong password", http.StatusUnauthorized)
 			return
 		}
 		if errors.Is(err, errs.ErrBadRequest) {
 			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
+		slog.Error("Unexpected error", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+	h.failedLogins.Reset(loginKey)
 
 	accessToken, err := generateAccessToken(userID, h.cfg.JwtSecret, h.cfg.AccessTokenTTL)
 	if err != nil {
@@ -232,9 +215,6 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) InternalToken(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), time.Second*3)
-	defer cancel()
-
 	var req struct {
 		UserID int64 `json:"user_id"`
 	}
@@ -254,19 +234,11 @@ func (h *Handler) InternalToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	refreshToken, err := h.repo.Create(ctx, req.UserID, h.cfg.RefreshTokenTTL)
-	if err != nil {
-		slog.Error("failed to create refresh token", "error", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
+	// Внутренним клиентам нужен только access-токен: refresh здесь лишь копил бы строки в БД
 	resp := struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
+		AccessToken string `json:"access_token"`
 	}{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		AccessToken: accessToken,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(resp)
@@ -291,11 +263,11 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := h.repo.Validate(ctx, req.RefreshToken)
+	userID, err := h.repo.Consume(ctx, req.RefreshToken)
 	if err != nil {
-		if errors.Is(err, errs.ErrTokenNotFound) {
-			slog.Warn("refresh token not found", "error", err)
-			http.Error(w, errs.ErrTokenNotFound.Error(), http.StatusUnauthorized)
+		if errors.Is(err, errs.ErrTokenNotFound) || errors.Is(err, errs.ErrTokenInvalid) {
+			slog.Warn("refresh token rejected", "error", err)
+			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 		slog.Error("failed to validate refresh token", "error", err)
@@ -349,7 +321,35 @@ func (h *Handler) Revoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.repo.Revoke(ctx, req.RefreshToken); err != nil {
+		if errors.Is(err, errs.ErrTokenInvalid) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		slog.Error("failed to revoke refresh token", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) InternalRevokeAll(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second*3)
+	defer cancel()
+
+	var req struct {
+		UserID int64 `json:"user_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if req.UserID <= 0 {
+		http.Error(w, "invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.repo.RevokeAll(ctx, req.UserID); err != nil {
+		slog.Error("failed to revoke user tokens", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

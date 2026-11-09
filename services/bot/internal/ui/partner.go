@@ -9,9 +9,9 @@ func (ui *MenuUI) PartnerMenu(chatID int64, text string) error {
 		Rows: []domain.KeyboardRow{
 			{
 				Buttons: []domain.KeyboardButton{
-					{domain.AddPartner},
-					{domain.DeletePartner},
-					{domain.Main},
+					{Command: domain.AddPartner},
+					{Command: domain.DeletePartner},
+					{Command: domain.Main},
 				},
 			},
 		},

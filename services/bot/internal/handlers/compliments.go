@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -104,9 +105,9 @@ func (h *Handler) GetCompliments(ctx context.Context, msg *domain.Message) {
 	var sentCompliments string
 	for _, compliment := range compliments {
 		if !compliment.IsSent {
-			activeCompliments += "👉 " + compliment.Text + "\n\n"
+			activeCompliments += "👉 " + html.EscapeString(compliment.Text) + "\n\n"
 		} else {
-			sentCompliments += "👉 " + compliment.Text + "\n\n"
+			sentCompliments += "👉 " + html.EscapeString(compliment.Text) + "\n\n"
 		}
 	}
 
@@ -240,16 +241,17 @@ func (h *Handler) ReceiveCompliment(ctx context.Context, msg *domain.Message) {
 		}
 	}
 
+	complimentText := html.EscapeString(compliment.Text)
 	var complimentMessages = []string{
-		"💖 <b>Для тебя есть тёплые слова:</b>\n\n«" + compliment.Text + "»",
-		"✨ <b>Небольшое послание от твоего человека:</b>\n\n«" + compliment.Text + "»",
-		"🌷 <b>Тебе отправили комплимент:</b>\n\n«" + compliment.Text + "»",
+		"💖 <b>Для тебя есть тёплые слова:</b>\n\n«" + complimentText + "»",
+		"✨ <b>Небольшое послание от твоего человека:</b>\n\n«" + complimentText + "»",
+		"🌷 <b>Тебе отправили комплимент:</b>\n\n«" + complimentText + "»",
 	}
 
 	randomIndex := rand.Intn(len(complimentMessages))
 	h.Reply(chatID, complimentMessages[randomIndex])
 	h.Reply(user.PartnerID,
-		"💌 <b>Комплимент доставлен</b>\n\nТы только что порадовал(а) своего партнёра ✨\n\n«"+compliment.Text+"»",
+		"💌 <b>Комплимент доставлен</b>\n\nТы только что порадовал(а) своего партнёра ✨\n\n«"+complimentText+"»",
 	)
 }
 
@@ -287,7 +289,7 @@ func (h *Handler) EditComplimentFrequency(ctx context.Context, msg *domain.Messa
 func (h *Handler) ProcessComplimentFrequency(ctx context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
 	freq := msg.Text
-	freqInt := 1
+	var freqInt int
 
 	// Валидация
 	if freq == "-" {
@@ -307,5 +309,6 @@ func (h *Handler) ProcessComplimentFrequency(ctx context.Context, msg *domain.Me
 		return
 	}
 
+	h.sm.SetStep(chatID, state.Empty)
 	h.Reply(chatID, "✨ Лимит обновлён")
 }

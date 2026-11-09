@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/http"
 
 	"github.com/Waycoolers/fmlbot/pkg/errs"
+	pwd "github.com/Waycoolers/fmlbot/pkg/password"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/state"
 )
@@ -21,7 +23,12 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Reply(message.UserID, message.Text)
+	if err = h.ui.Client.SendMessage(message.UserID, message.Text); err != nil {
+		slog.Error("Error sending message", "error", err)
+		if !errors.Is(err, domain.ErrRecipientUnavailable) {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+	}
 }
 
 func (h *Handler) ShowAccountMenu(_ context.Context, msg *domain.Message) {
@@ -63,7 +70,7 @@ func (h *Handler) Register(ctx context.Context, msg *domain.Message) {
 			h.HandleUnknownError(chatID, err)
 			return
 		}
-		text := fmt.Sprintf("Ты успешно зарегистрировался в боте!\nТвой пароль: %s\nP.S. Он тебе может пригодится для входа в мобильное приложение. Ты всегда можешь поменять пароль в настройках аккаунта.", password)
+		text := fmt.Sprintf("Ты успешно зарегистрировался в боте!\nТвой пароль: %s\nP.S. Он тебе может пригодится для входа в мобильное приложение. Ты всегда можешь поменять пароль в настройках аккаунта.", html.EscapeString(password))
 		h.Reply(chatID, text)
 	}
 
@@ -111,29 +118,16 @@ func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *domain.CallbackQu
 			return
 		}
 
-		if user.PartnerID != 0 {
-			err = h.api.Unpair(ctx, chatID)
-			if err != nil {
-				h.ui.RemoveButtons(chatID, messageID)
-				h.HandleErr(chatID, "Error while trying to delete partners", err)
-				return
-			}
-
-			err = h.api.ResetPartnerUserConfig(ctx, chatID)
-			if err != nil {
-				h.ui.RemoveButtons(chatID, messageID)
-				h.HandleErr(chatID, "Error resetting config", err)
-				return
-			}
-
-			h.Reply(user.PartnerID, "Твой партнёр удалил свой аккаунт 💔")
-		}
-
+		// API сам разрывает пару и удаляет данные одной транзакцией
 		err = h.api.DeleteMe(ctx, chatID)
 		if err != nil {
 			h.ui.RemoveButtons(chatID, messageID)
 			h.HandleErr(chatID, "Error occurred while trying to delete a user", err)
 			return
+		}
+
+		if user.PartnerID != 0 {
+			h.Reply(user.PartnerID, "Твой партнёр удалил свой аккаунт 💔")
 		}
 
 		h.Reply(chatID, "🕊️ Аккаунт удалён\nЕсли захочешь — я всегда буду рад(а) начать заново")
@@ -152,10 +146,49 @@ func (h *Handler) HandleDeleteAccount(ctx context.Context, cq *domain.CallbackQu
 func (h *Handler) ChangePassword(_ context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
 
-	h.sm.SetStep(chatID, state.AwaitingPassword)
+	h.oldPasswords.Delete(chatID)
+	h.sm.SetStep(chatID, state.AwaitingOldPassword)
 
-	text := "Отправь новый пароль"
-	h.Reply(chatID, text)
+	keyboard := domain.InlineKeyboard{
+		Rows: []domain.InlineKeyboardRow{
+			{
+				Buttons: []domain.InlineKeyboardButton{
+					{Text: "🔑 Не помню пароль", Data: "account:password:forgot"},
+				},
+			},
+		},
+	}
+	err := h.ui.Client.SendWithInlineKeyboard(chatID, "Отправь текущий пароль", keyboard)
+	if err != nil {
+		h.sm.SetStep(chatID, state.Empty)
+		h.HandleErr(chatID, "Error sending password request", err)
+	}
+}
+
+func (h *Handler) HandleOldPassword(_ context.Context, msg *domain.Message) {
+	chatID := msg.ChatID
+
+	h.oldPasswords.Store(chatID, msg.Text)
+	h.sm.SetStep(chatID, state.AwaitingPassword)
+	h.Reply(chatID, "Отправь новый пароль")
+}
+
+func (h *Handler) HandleForgotPassword(ctx context.Context, cq *domain.CallbackQuery) {
+	chatID := cq.ChatID
+
+	h.ui.RemoveButtons(chatID, cq.MessageID)
+	if h.sm.GetStep(chatID) != state.AwaitingOldPassword {
+		h.ReplyUnknownCallback(ctx, cq)
+		return
+	}
+	h.sm.SetStep(chatID, state.Empty)
+
+	password, err := h.api.ResetPassword(ctx, chatID)
+	if err != nil {
+		h.HandleErr(chatID, "Error occurred while trying to reset password", err)
+		return
+	}
+	h.Reply(chatID, fmt.Sprintf("Твой новый пароль: %s\nТы всегда можешь поменять пароль в настройках аккаунта.", html.EscapeString(password)))
 }
 
 func (h *Handler) HandleChangePassword(ctx context.Context, msg *domain.Message) {
@@ -163,7 +196,7 @@ func (h *Handler) HandleChangePassword(ctx context.Context, msg *domain.Message)
 	password := msg.Text
 
 	text := ""
-	err := validatePassword(password)
+	err := pwd.Validate(password)
 	if err != nil {
 		switch {
 		case errors.Is(err, errs.ErrPasswordTooShort):
@@ -185,55 +218,20 @@ func (h *Handler) HandleChangePassword(ctx context.Context, msg *domain.Message)
 		return
 	}
 
-	err = h.api.ChangePassword(ctx, chatID, password)
+	oldPassword, _ := h.oldPasswords.LoadAndDelete(chatID)
+	currentPassword, _ := oldPassword.(string)
+
+	h.sm.SetStep(chatID, state.Empty)
+	err = h.api.ChangePassword(ctx, chatID, currentPassword, password)
 	if err != nil {
-		h.sm.SetStep(chatID, state.Empty)
+		if errors.Is(err, errs.ErrWrongPassword) {
+			h.Reply(chatID, "Текущий пароль указан неверно. Попробуй сменить пароль ещё раз")
+			return
+		}
 		h.HandleErr(chatID, "Error occurred while trying to change password", err)
 		return
 	}
 	text = "Пароль успешно изменен!"
 	h.sm.SetStep(chatID, state.Empty)
 	h.Reply(chatID, text)
-}
-
-func validatePassword(password string) error {
-	if len([]rune(password)) < 8 {
-		return errs.ErrPasswordTooShort
-	}
-	if len([]rune(password)) > 32 {
-		return errs.ErrPasswordTooLong
-	}
-
-	var hasLetter, hasUpper, hasLower, hasNumber bool
-
-	for _, char := range password {
-		if char < '!' || char > '~' {
-			return errs.ErrPasswordInvalidCharacter
-		}
-
-		switch {
-		case char >= 'A' && char <= 'Z':
-			hasLetter = true
-			hasUpper = true
-		case char >= 'a' && char <= 'z':
-			hasLetter = true
-			hasLower = true
-		case char >= '0' && char <= '9':
-			hasNumber = true
-		}
-	}
-
-	if !hasLetter {
-		return errs.ErrPasswordWithoutLetter
-	}
-	if !hasUpper {
-		return errs.ErrPasswordWithoutUpper
-	}
-	if !hasLower {
-		return errs.ErrPasswordWithoutLower
-	}
-	if !hasNumber {
-		return errs.ErrPasswordWithoutDigit
-	}
-	return nil
 }

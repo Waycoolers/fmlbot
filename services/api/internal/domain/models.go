@@ -34,6 +34,13 @@ type UserResponse struct {
 	PartnerID int64  `db:"partner_id" json:"partner_id"`
 }
 
+type PartnerRequest struct {
+	ID           int64     `db:"id" json:"id"`
+	FromUserID   int64     `db:"from_user_id" json:"from_user_id"`
+	FromUsername string    `db:"from_username" json:"from_username"`
+	CreatedAt    time.Time `db:"created_at" json:"created_at"`
+}
+
 type UserConfig struct {
 	DailyMessageTime   time.Time `db:"daily_message_time" json:"daily_message_time"`
 	MaxComplimentCount int       `db:"max_compliment_count" json:"max_compliment_count"`
@@ -87,6 +94,8 @@ type ImportantDateMessage struct {
 	ImportantDateID int64   `db:"important_date_id" json:"important_date_id"`
 	UserIDs         []int64 `db:"user_ids" json:"user_ids"`
 	Message         string  `db:"message" json:"message"`
+	// PlainMessage - тот же текст без HTML-разметки для каналов, которые её не понимают
+	PlainMessage string `db:"-" json:"-"`
 }
 
 type MessageRequest struct {

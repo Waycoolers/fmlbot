@@ -11,9 +11,10 @@ import (
 type Client struct {
 	baseURL string
 	client  *http.Client
+	secret  string
 }
 
-func New(cfg *config.AIConfig) *Client {
+func New(cfg *config.AIConfig, internalSecret []byte) *Client {
 	aiUrl := fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
 	client := &http.Client{
 		Timeout: time.Duration(cfg.HTTPTimeout) * time.Second,
@@ -21,5 +22,6 @@ func New(cfg *config.AIConfig) *Client {
 	return &Client{
 		baseURL: aiUrl,
 		client:  client,
+		secret:  string(internalSecret),
 	}
 }

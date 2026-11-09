@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"html"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -76,14 +77,6 @@ func (h *Handler) HandleLocationIdeaCallback(ctx context.Context, cq *domain.Cal
 	chatID := cq.ChatID
 	messageID := cq.MessageID
 
-	if cq.Data == "idea:cancel" {
-		_ = h.ideaDrafts.Delete(ctx, chatID)
-		h.sm.SetStep(chatID, state.Empty)
-		_ = h.ui.Client.DeleteMessage(chatID, messageID)
-		h.Reply(chatID, "😉 Генерация идеи отменена")
-		return
-	}
-
 	location := strings.TrimPrefix(cq.Data, "idea:loc:")
 
 	draft, err := h.ideaDrafts.Get(ctx, chatID)
@@ -135,14 +128,6 @@ func (h *Handler) HandleActivityIdeaCallback(ctx context.Context, cq *domain.Cal
 	chatID := cq.ChatID
 	messageID := cq.MessageID
 
-	if cq.Data == "idea:cancel" {
-		_ = h.ideaDrafts.Delete(ctx, chatID)
-		h.sm.SetStep(chatID, state.Empty)
-		_ = h.ui.Client.DeleteMessage(chatID, messageID)
-		h.Reply(chatID, "😉 Генерация идеи отменена")
-		return
-	}
-
 	activity := strings.TrimPrefix(cq.Data, "idea:act:")
 
 	draft, err := h.ideaDrafts.Get(ctx, chatID)
@@ -188,14 +173,6 @@ func (h *Handler) HandleActivityIdeaCallback(ctx context.Context, cq *domain.Cal
 func (h *Handler) HandleBudgetIdeaCallback(ctx context.Context, cq *domain.CallbackQuery) {
 	chatID := cq.ChatID
 	messageID := cq.MessageID
-
-	if cq.Data == "idea:cancel" {
-		_ = h.ideaDrafts.Delete(ctx, chatID)
-		h.sm.SetStep(chatID, state.Empty)
-		_ = h.ui.Client.DeleteMessage(chatID, messageID)
-		h.Reply(chatID, "😉 Генерация идеи отменена")
-		return
-	}
 
 	budget := strings.TrimPrefix(cq.Data, "idea:bud:")
 
@@ -250,11 +227,13 @@ func (h *Handler) HandleCancelIdeaCallback(ctx context.Context, cq *domain.Callb
 	h.Reply(chatID, "😉 Генерация идеи отменена")
 }
 
-func formatMarkdownToHTML(input string) string {
-	reBold := regexp.MustCompile(`\*\*(.*?)\*\*`)
-	output := reBold.ReplaceAllString(input, "<b>$1</b>")
+var (
+	reBold   = regexp.MustCompile(`\*\*(.*?)\*\*`)
+	reBullet = regexp.MustCompile(`(?m)^\s*\*\s+`)
+)
 
-	reBullet := regexp.MustCompile(`(?m)^\s*\*\s+`)
+func formatMarkdownToHTML(input string) string {
+	output := reBold.ReplaceAllString(html.EscapeString(input), "<b>$1</b>")
 	output = reBullet.ReplaceAllString(output, "• ")
 
 	return output

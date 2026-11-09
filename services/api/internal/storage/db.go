@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/Waycoolers/fmlbot/services/api/internal/config"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
@@ -28,6 +29,10 @@ func New(cfg *config.DatabaseConfig) (*Storage, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	db.SetMaxOpenConns(20)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
 
 	if err = db.Ping(); err != nil {
 		return nil, err

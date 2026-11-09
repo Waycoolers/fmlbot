@@ -3,25 +3,63 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"html"
 	"log/slog"
 	"time"
 
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
 
+const midnightTask = "midnight"
+
 func (uc *UseCase) DoMidnightTasks(ctx context.Context) error {
-	return uc.scheduler.DoMidnightTasksWithCompliments(ctx)
+	if err := uc.scheduler.DoMidnightTasksWithCompliments(ctx); err != nil {
+		return err
+	}
+	return uc.scheduler.SetLastRun(ctx, midnightTask, time.Now())
+}
+
+// RunMissedMidnightTasks выполняет ночные задачи, если сервис не работал в полночь.
+func (uc *UseCase) RunMissedMidnightTasks(ctx context.Context, loc *time.Location) error {
+	lastRun, found, err := uc.scheduler.GetLastRun(ctx, midnightTask)
+	if err != nil {
+		return err
+	}
+	now := time.Now().In(loc)
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	if found && !lastRun.Before(midnight) {
+		return nil
+	}
+	return uc.DoMidnightTasks(ctx)
+}
+
+func dayOf(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+// occurrenceIn возвращает день годовщины в указанном году. 29 февраля в невисокосный год
+// отмечается 28 февраля.
+func occurrenceIn(date time.Time, year int) time.Time {
+	day := time.Date(year, date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	if day.Month() != date.Month() {
+		return time.Date(year, date.Month(), 28, 0, 0, 0, 0, time.UTC)
+	}
+	return day
+}
+
+// Важные даты повторяются каждый год, а год самой даты только хранит, когда событие случилось.
+func isEventAndNotifyDay(date time.Time, notifyBeforeDays int, today time.Time) (isEventDay, isNotifyDay bool) {
+	next := occurrenceIn(date, today.Year())
+	isEventDay = next.Equal(today)
+	if next.Before(today) {
+		next = occurrenceIn(date, today.Year()+1)
+	}
+	isNotifyDay = next.AddDate(0, 0, -notifyBeforeDays).Equal(today)
+	return isEventDay, isNotifyDay
 }
 
 func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context) ([]domain.ImportantDateMessage, error) {
-	now := time.Now()
-	today := time.Date(
-		now.Year(),
-		now.Month(),
-		now.Day(),
-		0, 0, 0, 0,
-		time.Local,
-	)
+	today := dayOf(time.Now())
 
 	importantDates, err := uc.importantDates.GetAllActiveImportantDates(ctx)
 	if err != nil {
@@ -34,50 +72,40 @@ func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context) ([]domain.I
 			continue
 		}
 
-		eventDate := importantDate.Date.In(time.Local)
-		eventDay := time.Date(
-			eventDate.Year(),
-			eventDate.Month(),
-			eventDate.Day(),
-			0, 0, 0, 0,
-			time.Local,
-		)
+		// Дата создана только сегодня: уведомлять о ней не нужно
+		if dayOf(importantDate.CreatedAt).Equal(today) {
+			continue
+		}
 
-		notifyDay := eventDay.AddDate(0, 0, -importantDate.NotifyBeforeDays)
-
-		isNotifyDay := notifyDay.Equal(today)
-		isEventDay := eventDay.Equal(today)
-
+		isEventDay, isNotifyDay := isEventAndNotifyDay(importantDate.Date, importantDate.NotifyBeforeDays, today)
 		if !isNotifyDay && !isEventDay {
 			continue
 		}
 
-		if importantDate.LastNotificationAt.Valid {
-			last := importantDate.LastNotificationAt.Time.In(time.Local)
-			lastDay := time.Date(
-				last.Year(),
-				last.Month(),
-				last.Day(),
-				0, 0, 0, 0,
-				time.Local,
-			)
-			if lastDay.Equal(today) {
-				continue
-			}
+		if importantDate.LastNotificationAt.Valid && dayOf(importantDate.LastNotificationAt.Time).Equal(today) {
+			continue
 		}
 
-		var text string
+		title := importantDate.Title
+		htmlTitle := html.EscapeString(title)
+		dateText := importantDate.Date.Format("02.01.2006")
+
+		var text, plain string
 		if isEventDay {
-			text = fmt.Sprintf("🎉 Ура! Сегодня важная дата!\n\n<b>%s</b>\n%s",
-				importantDate.Title,
-				eventDate.Format("02.01.2006"),
-			)
+			text = fmt.Sprintf("🎉 Ура! Сегодня важная дата!\n\n<b>%s</b>\n%s", htmlTitle, dateText)
+			plain = fmt.Sprintf("🎉 Ура! Сегодня важная дата!\n\n%s\n%s", title, dateText)
 		} else {
 			text = fmt.Sprintf(
 				"⏰ Напоминание: через %d дн.\n\n<b>%s</b>\n%s",
 				importantDate.NotifyBeforeDays,
-				importantDate.Title,
-				eventDate.Format("02.01.2006"),
+				htmlTitle,
+				dateText,
+			)
+			plain = fmt.Sprintf(
+				"⏰ Напоминание: через %d дн.\n\n%s\n%s",
+				importantDate.NotifyBeforeDays,
+				title,
+				dateText,
 			)
 		}
 
@@ -87,9 +115,10 @@ func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context) ([]domain.I
 		if hasUser && hasPartner && isEventDay {
 			ideas, aiErr := uc.ai.GetDateIdea(ctx, importantDate.Title, 0, "Простое оригинальное милое свидание чтобы отметить дату")
 			if aiErr == nil && ideas != "" {
-				text = fmt.Sprintf("%s\n\n💡 <b>Случайная идея по этому поводу:</b>\n%s", text, ideas)
+				text = fmt.Sprintf("%s\n\n💡 <b>Случайная идея по этому поводу:</b>\n%s", text, html.EscapeString(ideas))
+				plain = fmt.Sprintf("%s\n\n💡 Случайная идея по этому поводу:\n%s", plain, ideas)
 			} else {
-				slog.Error("Failed to get AI date idea", "error", err)
+				slog.Error("Failed to get AI date idea", "error", aiErr)
 			}
 		}
 
@@ -97,6 +126,7 @@ func (uc *UseCase) GetAllImportantDatesMessages(ctx context.Context) ([]domain.I
 		message := domain.ImportantDateMessage{
 			ImportantDateID: importantDate.ID,
 			Message:         text,
+			PlainMessage:    plain,
 		}
 		if hasUser {
 			tgIDs = append(tgIDs, importantDate.UserID.Int64)

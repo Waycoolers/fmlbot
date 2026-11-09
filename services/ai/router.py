@@ -1,8 +1,22 @@
-from fastapi import APIRouter
+import hmac
+
+from fastapi import APIRouter, Depends, Header, HTTPException
+from config import settings
 from models import ComplimentRequest, DateIdeaRequest, LeisureIdeaRequest
 from services import AIService
 
-router = APIRouter(prefix="/api/v1/ai", tags=["AI Agent"])
+
+def verify_internal_secret(x_internal_secret: str = Header(default="")):
+    secret = settings.INTERNAL_API_SECRET
+    if not secret or not hmac.compare_digest(x_internal_secret, secret):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+router = APIRouter(
+    prefix="/api/v1/ai",
+    tags=["AI Agent"],
+    dependencies=[Depends(verify_internal_secret)],
+)
 ai_service = AIService()
 
 

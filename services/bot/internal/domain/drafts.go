@@ -17,6 +17,8 @@ type ImportantDateDraft struct {
 
 type ImportantDateEditDraft struct {
 	ImportantDateID int64     `json:"important_date_id"`
+	Year            int       `json:"year"`
+	Month           int       `json:"month"`
 	CreatedAt       time.Time `json:"created_at"`
 }
 

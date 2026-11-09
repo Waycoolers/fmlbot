@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"html"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/state"
@@ -68,18 +70,37 @@ func (h *Handler) detailImportantDate(importantDate *domain.ImportantDate, maxLe
 	return title
 }
 
+const maxImportantDateTitle = 256
+
+// replyIfTitleInvalid сообщает пользователю о неподходящем названии, не сбрасывая шаг диалога.
+func (h *Handler) replyIfTitleInvalid(chatID int64, title string) bool {
+	if strings.TrimSpace(title) == "" {
+		h.Reply(chatID, "Кажется, тут пусто 🙈 Попробуй ещё раз")
+		return true
+	}
+	if utf8.RuneCountInString(title) > maxImportantDateTitle {
+		h.Reply(chatID, fmt.Sprintf("Слишком длинное название 🙈 Сократи его до %d символов", maxImportantDateTitle))
+		return true
+	}
+	return false
+}
+
+// occurrenceIn возвращает годовщину в указанном году. 29 февраля в невисокосный год - это 28 февраля.
+func occurrenceIn(date time.Time, year int, loc *time.Location) time.Time {
+	day := time.Date(year, date.Month(), date.Day(), 0, 0, 0, 0, loc)
+	if day.Month() != date.Month() {
+		return time.Date(year, date.Month(), 28, 0, 0, 0, 0, loc)
+	}
+	return day
+}
+
 func nextOccurrence(date time.Time, now time.Time) time.Time {
-	next := time.Date(
-		now.Year(),
-		date.Month(),
-		date.Day(),
-		0, 0, 0, 0,
-		now.Location(),
-	)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	next := occurrenceIn(date, now.Year(), now.Location())
 
 	// если в этом году уже прошло — берём следующий год
-	if next.Before(now) {
-		next = next.AddDate(1, 0, 0)
+	if next.Before(today) {
+		next = occurrenceIn(date, now.Year()+1, now.Location())
 	}
 
 	return next
@@ -125,7 +146,7 @@ func (h *Handler) ShowImportantDatesMenu(ctx context.Context, msg *domain.Messag
 			text = "📅 Ближайших дат нет"
 		} else {
 			title := h.detailImportantDate(nearest, 256)
-			text = "📅 Ближайшая важная дата: \n\n" + title
+			text = "📅 Ближайшая важная дата: \n\n" + html.EscapeString(title)
 		}
 	}
 
@@ -153,6 +174,9 @@ func (h *Handler) AddImportantDate(_ context.Context, msg *domain.Message) {
 func (h *Handler) HandleTitleImportantDate(ctx context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
 	title := msg.Text
+	if h.replyIfTitleInvalid(chatID, title) {
+		return
+	}
 	draft := domain.ImportantDateDraft{}
 
 	draft.Title = title
@@ -320,7 +344,7 @@ func (h *Handler) HandleNotifyBeforeImportantDate(ctx context.Context, cq *domai
 
 	h.Reply(chatID, "🎉 Важная дата добавлена!")
 	if user.PartnerID != 0 && draft.PartnerID.Valid && user.PartnerID == draft.PartnerID.Int64 {
-		h.Reply(user.PartnerID, "🎉 Твой партнёр добавил важную дату:\n"+"<b>"+finalDraft.Title+"</b>"+"\n"+stringDate)
+		h.Reply(user.PartnerID, "🎉 Твой партнёр добавил важную дату:\n"+"<b>"+html.EscapeString(finalDraft.Title)+"</b>"+"\n"+stringDate)
 	}
 }
 
@@ -345,9 +369,9 @@ func (h *Handler) GetImportantDates(ctx context.Context, msg *domain.Message) {
 	var reply string
 	for _, importantDate := range sortedImportantDates {
 		if importantDate.IsActive {
-			activeImportantDates += "👉 " + importantDate.Title + "\n\n"
+			activeImportantDates += "👉 " + html.EscapeString(importantDate.Title) + "\n\n"
 		} else {
-			unactiveImportantDates += "👉 " + importantDate.Title + "\n\n"
+			unactiveImportantDates += "👉 " + html.EscapeString(importantDate.Title) + "\n\n"
 		}
 	}
 
@@ -445,7 +469,7 @@ func (h *Handler) HandleDeleteImportantDate(ctx context.Context, cq *domain.Call
 		partnerID := user.PartnerID
 		if (partnerID != 0 && importantDate.PartnerID.Valid && importantDate.PartnerID.Int64 == partnerID) ||
 			(partnerID != 0 && importantDate.UserID.Valid && importantDate.UserID.Int64 == partnerID) {
-			h.Reply(partnerID, "💔 Твой партнёр удалил важную дату:\n"+"<b>"+title+"</b>"+"\n"+date)
+			h.Reply(partnerID, "💔 Твой партнёр удалил важную дату:\n"+"<b>"+html.EscapeString(title)+"</b>"+"\n"+date)
 		}
 	} else if strings.HasPrefix(data, "important_dates:delete:cancel") {
 		h.Reply(chatID, "😉 Удаление отменено")
@@ -550,7 +574,7 @@ func (h *Handler) HandleEditImportantDate(ctx context.Context, cq *domain.Callba
 		}
 
 		title := h.detailImportantDate(importantDate, 256)
-		text := "💌 Что хочешь изменить?\n\n" + title
+		text := "💌 Что хочешь изменить?\n\n" + html.EscapeString(title)
 
 		err = h.ui.Client.SendWithInlineKeyboard(chatID, text, keyboard)
 		if err != nil {
@@ -602,6 +626,10 @@ func (h *Handler) HandleEditTitleImportantDate(ctx context.Context, cq *domain.C
 
 func (h *Handler) HandleEditTitleImportantDateText(ctx context.Context, msg *domain.Message) {
 	chatID := msg.ChatID
+
+	if h.replyIfTitleInvalid(chatID, msg.Text) {
+		return
+	}
 
 	draft, err := h.importantDateEditDrafts.Get(ctx, chatID)
 	if err != nil || draft == nil {
@@ -712,26 +740,28 @@ func (h *Handler) HandleEditPartnerImportantDateSelect(ctx context.Context, cq *
 		return
 	}
 
-	var isShared bool
-	switch cq.Data {
-	case "important_dates:edit:partner:false":
-		isShared = false
-	case "important_dates:edit:partner:true":
-		isShared = true
-	}
+	makeShared := cq.Data == "important_dates:edit:partner:true"
 
-	req := domain.ImportantDateRequest{
-		UserID:           date.UserID,
-		IsShared:         isShared,
-		Title:            date.Title,
-		Date:             date.Date,
-		IsActive:         date.IsActive,
-		NotifyBeforeDays: date.NotifyBeforeDays,
-	}
-	err = h.api.UpdateImportantDate(ctx, chatID, date.ID, req)
-	if err != nil {
-		h.HandleErr(chatID, "Error updating important date", err)
-		return
+	if date.PartnerID.Valid != makeShared {
+		if makeShared {
+			user, err := h.api.GetMe(ctx, chatID)
+			if err != nil || user == nil {
+				h.HandleErr(chatID, "Error getting user", err)
+				return
+			}
+			if user.PartnerID == 0 {
+				h.ui.RemoveButtons(chatID, messageID)
+				_ = h.importantDateEditDrafts.Delete(ctx, chatID)
+				h.Reply(chatID, "У тебя пока нет партнёра 💭\nСначала добавь его, и сможете делить даты вместе")
+				return
+			}
+		}
+
+		err = h.api.UpdateImportantDateSharing(ctx, chatID, date.ID, makeShared)
+		if err != nil {
+			h.HandleErr(chatID, "Error updating important date sharing", err)
+			return
+		}
 	}
 
 	_ = h.importantDateEditDrafts.Delete(ctx, chatID)
@@ -901,32 +931,11 @@ func (h *Handler) HandleYearImportantDateUniversal(ctx context.Context, cq *doma
 				return
 			}
 
-			date, err := h.api.GetImportantDate(ctx, chatID, draft.ImportantDateID)
-			if err != nil || date == nil {
-				h.HandleErr(chatID, "Date not found", err)
-				return
-			}
-
-			newDate := time.Date(year, date.Date.Month(), date.Date.Day(), 0, 0, 0, 0, time.Local)
-
-			var isShared bool
-			if date.PartnerID.Valid {
-				isShared = true
-			} else {
-				isShared = false
-			}
-
-			req := domain.ImportantDateRequest{
-				UserID:           date.UserID,
-				IsShared:         isShared,
-				Title:            date.Title,
-				Date:             newDate,
-				IsActive:         date.IsActive,
-				NotifyBeforeDays: date.NotifyBeforeDays,
-			}
-			err = h.api.UpdateImportantDate(ctx, chatID, date.ID, req)
+			// Дата сохранится целиком после выбора дня
+			draft.Year = year
+			err = h.importantDateEditDrafts.Save(ctx, chatID, draft)
 			if err != nil {
-				h.HandleErr(chatID, "Error updating important date", err)
+				h.HandleErr(chatID, "Error saving year", err)
 				return
 			}
 
@@ -935,7 +944,7 @@ func (h *Handler) HandleYearImportantDateUniversal(ctx context.Context, cq *doma
 				h.HandleErr(chatID, "Error deleting message", err)
 			}
 
-			err = h.ui.SendMonthKeyboard(chatID, isEdit)
+			err = h.ui.SendMonthKeyboard(chatID, year, isEdit)
 			if err != nil {
 				h.HandleErr(chatID, "Error sending keyboard for month selection", err)
 			}
@@ -960,7 +969,7 @@ func (h *Handler) HandleYearImportantDateUniversal(ctx context.Context, cq *doma
 				h.HandleErr(chatID, "Error deleting message", err)
 			}
 
-			err = h.ui.SendMonthKeyboard(chatID, isEdit)
+			err = h.ui.SendMonthKeyboard(chatID, year, isEdit)
 			if err != nil {
 				h.HandleErr(chatID, "Error sending keyboard for month selection", err)
 			}
@@ -994,32 +1003,11 @@ func (h *Handler) HandleMonthImportantDateUniversal(ctx context.Context, cq *dom
 				h.HandleErr(chatID, "Editing session expired", err)
 				return
 			}
-			date, err := h.api.GetImportantDate(ctx, chatID, draft.ImportantDateID)
-			if err != nil || date == nil {
-				h.HandleErr(chatID, "Date not found", err)
-				return
-			}
-
-			newDate := time.Date(date.Date.Year(), time.Month(month), date.Date.Day(), 0, 0, 0, 0, time.Local)
-
-			var isShared bool
-			if date.PartnerID.Valid {
-				isShared = true
-			} else {
-				isShared = false
-			}
-
-			req := domain.ImportantDateRequest{
-				UserID:           date.UserID,
-				IsShared:         isShared,
-				Title:            date.Title,
-				Date:             newDate,
-				IsActive:         date.IsActive,
-				NotifyBeforeDays: date.NotifyBeforeDays,
-			}
-			err = h.api.UpdateImportantDate(ctx, chatID, date.ID, req)
+			// Дата сохранится целиком после выбора дня
+			draft.Month = month
+			err = h.importantDateEditDrafts.Save(ctx, chatID, draft)
 			if err != nil {
-				h.HandleErr(chatID, "Error updating important date", err)
+				h.HandleErr(chatID, "Error saving month", err)
 				return
 			}
 
@@ -1028,7 +1016,7 @@ func (h *Handler) HandleMonthImportantDateUniversal(ctx context.Context, cq *dom
 				h.HandleErr(chatID, "Error deleting message", err)
 			}
 
-			err = h.ui.SendDayKeyboard(chatID, date.Date.Year(), month, isEdit)
+			err = h.ui.SendDayKeyboard(chatID, draft.Year, month, isEdit)
 			if err != nil {
 				h.HandleErr(chatID, "Error sending keyboard to select day", err)
 			}
@@ -1090,7 +1078,7 @@ func (h *Handler) HandleDayImportantDateUniversal(ctx context.Context, cq *domai
 				return
 			}
 
-			newDate := time.Date(date.Date.Year(), date.Date.Month(), day, 0, 0, 0, 0, time.Local)
+			newDate := time.Date(draft.Year, time.Month(draft.Month), day, 0, 0, 0, 0, time.Local)
 
 			var isShared bool
 			if date.PartnerID.Valid {

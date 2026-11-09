@@ -12,9 +12,10 @@ type UseCase struct {
 	scheduler      domain.SchedulerRepo
 	fcm            domain.FCMRepo
 	ai             domain.AIClient
+	auth           domain.AuthClient
 }
 
-func New(repos *domain.Repos, ai domain.AIClient) *UseCase {
+func New(repos *domain.Repos, ai domain.AIClient, auth domain.AuthClient) *UseCase {
 	return &UseCase{
 		users:          repos.Users,
 		userConfig:     repos.UserConfig,
@@ -23,5 +24,6 @@ func New(repos *domain.Repos, ai domain.AIClient) *UseCase {
 		scheduler:      repos.Scheduler,
 		fcm:            repos.FCM,
 		ai:             ai,
+		auth:           auth,
 	}
 }

@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
-	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
 )
 
@@ -68,52 +66,4 @@ func (c *client) UpdateUserConfig(ctx context.Context, chatID int64, maxCount *i
 		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}
 	return nil
-}
-
-func (c *client) ResetMyUserConfig(ctx context.Context, chatID int64) error {
-	resp, err := c.doAuthRequest(ctx, http.MethodPost, "/user_config/reset/me", nil, chatID)
-	if err != nil {
-		return err
-	}
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return nil
-	case http.StatusNotFound:
-		return errs.ErrUserNotFound
-	default:
-		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
-	}
-}
-
-func (c *client) ResetPartnerUserConfig(ctx context.Context, chatID int64) error {
-	resp, err := c.doAuthRequest(ctx, http.MethodPost, "/user_config/reset/partner", nil, chatID)
-	if err != nil {
-		return err
-	}
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return nil
-	case http.StatusNotFound:
-		var errBody struct {
-			Error string `json:"error"`
-		}
-		decodeErr := json.NewDecoder(resp.Body).Decode(&errBody)
-		if decodeErr != nil {
-			return fmt.Errorf("unexpected 404 response: %w", decodeErr)
-		}
-		if strings.Contains(errBody.Error, "partner") {
-			return errs.ErrPartnerNotFound
-		}
-		return errs.ErrUserNotFound
-	default:
-		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
-	}
 }

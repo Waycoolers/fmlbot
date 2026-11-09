@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/pkg/middlewares"
+	"github.com/Waycoolers/fmlbot/pkg/password"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
 
@@ -23,7 +26,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if req.Username == "" {
+	if !isValidUsername(req.Username) {
 		http.Error(w, "Username is required", http.StatusBadRequest)
 		return
 	}
@@ -37,9 +40,10 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, errs.ErrUsernameIsAlreadyTaken) {
 			body := map[string]string{"error": err.Error()}
 			sendJson(w, http.StatusConflict, body)
+			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
@@ -58,12 +62,12 @@ func (h *Handler) AddUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusBadRequest)
 		return
 	}
-	if req.Username == "" {
+	if !isValidUsername(req.Username) {
 		http.Error(w, "Username is required", http.StatusBadRequest)
 		return
 	}
 
-	password, err := h.uc.AddUserWithRandomPassword(ctx, userID, req.Username)
+	generatedPassword, err := h.uc.AddUserWithRandomPassword(ctx, userID, req.Username)
 	if err != nil {
 		if errors.Is(err, errs.ErrUserExists) {
 			http.Error(w, err.Error(), http.StatusConflict)
@@ -74,13 +78,13 @@ func (h *Handler) AddUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	resp := struct {
 		Password string `json:"password"`
 	}{
-		Password: password,
+		Password: generatedPassword,
 	}
 	sendJson(w, http.StatusCreated, resp)
 }
@@ -99,7 +103,7 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -120,7 +124,7 @@ func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sendJson(w, http.StatusOK, user)
@@ -134,7 +138,8 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Password string `json:"password"`
+		OldPassword string `json:"old_password"`
+		Password    string `json:"password"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -142,17 +147,49 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.uc.ChangePassword(ctx, id, req.Password)
+	if err = password.Validate(req.Password); err != nil {
+		sendJson(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	err = h.uc.ChangePassword(ctx, id, req.OldPassword, req.Password)
+	if err != nil {
+		if errors.Is(err, errs.ErrUserNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		// Не 401: токен действителен, а неверен только пароль
+		if errors.Is(err, errs.ErrWrongPassword) {
+			sendJson(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+			return
+		}
+		slog.Error("Unexpected error", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// ResetPassword - внутренний метод для бота, закрыт X-Internal-Secret.
+func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, ok := ctx.Value(middlewares.UserIDKey).(int64)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	generatedPassword, err := h.uc.ResetPassword(ctx, id)
 	if err != nil {
 		if errors.Is(err, errs.ErrUserNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	sendJson(w, http.StatusOK, map[string]string{"password": generatedPassword})
 }
 
 func (h *Handler) GetPartner(w http.ResponseWriter, r *http.Request) {
@@ -165,12 +202,12 @@ func (h *Handler) GetPartner(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.uc.GetPartner(ctx, id)
 	if err != nil {
-		if errors.Is(err, errs.ErrUserNotFound) {
+		if errors.Is(err, errs.ErrUserNotFound) || errors.Is(err, errs.ErrPartnerNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sendJson(w, http.StatusOK, user)
@@ -190,54 +227,47 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.uc.UpdateUser(ctx, userID, req.Username, req.PartnerID)
+	if !isValidUsername(req.Username) {
+		http.Error(w, "Username is required", http.StatusBadRequest)
+		return
+	}
+
+	// partner_id из запроса намеренно игнорируется: партнёр меняется только через /users/pair и /users/unpair
+	err = h.uc.UpdateUser(ctx, userID, req.Username)
 	if err != nil {
 		if errors.Is(err, errs.ErrUserNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+		if errors.Is(err, errs.ErrUsernameIsAlreadyTaken) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) UpdatePartner(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-	var req domain.UserRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+// UpdatePartner закрыт: пользователь не может менять имя и связи другого пользователя.
+func (h *Handler) UpdatePartner(w http.ResponseWriter, _ *http.Request) {
+	sendJson(w, http.StatusForbidden, map[string]string{"error": errs.ErrForbidden.Error()})
+}
 
-	err = h.uc.UpdatePartner(ctx, userID, req.Username, req.PartnerID)
-	if err != nil {
-		if errors.Is(err, errs.ErrUserNotFound) {
-			body := map[string]string{
-				"error": err.Error(),
-			}
-			sendJson(w, http.StatusNotFound, body)
-			return
-		}
-		if errors.Is(err, errs.ErrPartnerNotFound) {
-			body := map[string]string{
-				"error": err.Error(),
-			}
-			sendJson(w, http.StatusNotFound, body)
-			return
-		}
+func writePairError(w http.ResponseWriter, err error) {
+	body := map[string]string{"error": err.Error()}
+	switch {
+	case errors.Is(err, errs.ErrUserNotFound), errors.Is(err, errs.ErrPartnerRequestNotFound):
+		sendJson(w, http.StatusNotFound, body)
+	case errors.Is(err, errs.ErrCannotPartnerYourself):
+		sendJson(w, http.StatusBadRequest, body)
+	case errors.Is(err, errs.ErrAlreadyHasPartner), errors.Is(err, errs.ErrPartnerAlreadyHasPartner):
+		sendJson(w, http.StatusForbidden, body)
+	default:
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		http.Error(w, "internal error", http.StatusInternalServerError)
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) AddPartners(w http.ResponseWriter, r *http.Request) {
@@ -259,37 +289,62 @@ func (h *Handler) AddPartners(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "partner_id is required", http.StatusBadRequest)
 		return
 	}
-
-	err = h.uc.AddPartners(ctx, userID, req.PartnerID)
-	if err != nil {
-		switch {
-		case errors.Is(err, errs.ErrUserNotFound):
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		case errors.Is(err, errs.ErrCannotPartnerYourself):
-			body := map[string]string{
-				"error": err.Error(),
-			}
-			sendJson(w, http.StatusBadRequest, body)
-			return
-		case errors.Is(err, errs.ErrAlreadyHasPartner):
-			body := map[string]string{
-				"error": err.Error(),
-			}
-			sendJson(w, http.StatusForbidden, body)
-			return
-		case errors.Is(err, errs.ErrPartnerAlreadyHasPartner):
-			body := map[string]string{
-				"error": err.Error(),
-			}
-			sendJson(w, http.StatusForbidden, body)
-			return
-		}
-		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if !h.pairLimiter.Allow(strconv.FormatInt(userID, 10)) {
+		http.Error(w, "too many requests", http.StatusTooManyRequests)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+
+	requestID, err := h.uc.RequestPartner(ctx, userID, req.PartnerID)
+	if err != nil {
+		writePairError(w, err)
+		return
+	}
+	sendJson(w, http.StatusAccepted, map[string]int64{"request_id": requestID})
+}
+
+func (h *Handler) GetPartnerRequests(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	requests, err := h.uc.GetPartnerRequests(ctx, userID)
+	if err != nil {
+		writePairError(w, err)
+		return
+	}
+	sendJson(w, http.StatusOK, requests)
+}
+
+func (h *Handler) answerPartnerRequest(w http.ResponseWriter, r *http.Request, answer func(ctx context.Context, requestID, userID int64) (int64, error)) {
+	ctx := r.Context()
+	userID, ok := ctx.Value(middlewares.UserIDKey).(int64)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	requestID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || requestID <= 0 {
+		http.Error(w, "Request id is incorrect", http.StatusBadRequest)
+		return
+	}
+
+	fromUserID, err := answer(ctx, requestID, userID)
+	if err != nil {
+		writePairError(w, err)
+		return
+	}
+	sendJson(w, http.StatusOK, map[string]int64{"from_user_id": fromUserID})
+}
+
+func (h *Handler) AcceptPartnerRequest(w http.ResponseWriter, r *http.Request) {
+	h.answerPartnerRequest(w, r, h.uc.AcceptPartnerRequest)
+}
+
+func (h *Handler) DeclinePartnerRequest(w http.ResponseWriter, r *http.Request) {
+	h.answerPartnerRequest(w, r, h.uc.DeclinePartnerRequest)
 }
 
 func (h *Handler) DeletePartners(w http.ResponseWriter, r *http.Request) {
@@ -317,7 +372,7 @@ func (h *Handler) DeletePartners(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -367,7 +422,6 @@ func (h *Handler) SaveFCMToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("FCMToken", "fcm_token", req.SCMToken)
 	err = h.uc.ProcessFCMToken(ctx, userID, req.SCMToken)
 	if err != nil {
 		if errors.Is(err, errs.ErrUserNotFound) {
@@ -375,7 +429,8 @@ func (h *Handler) SaveFCMToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
 	}
 	w.WriteHeader(http.StatusOK)
 }

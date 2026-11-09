@@ -13,6 +13,7 @@ type Message struct {
 }
 
 type CallbackQuery struct {
+	ID        string
 	ChatID    int64
 	MessageID int
 	Data      string

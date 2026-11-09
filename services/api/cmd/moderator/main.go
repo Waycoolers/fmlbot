@@ -60,16 +60,22 @@ func main() {
 	}
 
 	// 1. Очистка старых данных (если скрипт запускается не первый раз)
-	modID := int64(12345678)
-	partnerID := int64(87654321)
+	// Значения вне диапазона реальных Telegram id, чтобы бот никому не писал
+	modID := int64(9_000_000_000_001)
+	partnerID := int64(9_000_000_000_002)
 
 	tx.ExecContext(ctx, "DELETE FROM user_config WHERE user_id IN ($1, $2)", modID, partnerID)
 	tx.ExecContext(ctx, "DELETE FROM important_dates WHERE user_id IN ($1, $2)", modID, partnerID)
 	tx.ExecContext(ctx, "DELETE FROM user_compliment WHERE user_id IN ($1, $2)", modID, partnerID)
 	tx.ExecContext(ctx, "DELETE FROM users WHERE user_id IN ($1, $2)", modID, partnerID)
 
-	// 2. Генерация реального хэша для пароля "123456"
-	password := "12345678"
+	// 2. Пароль задаётся только через окружение: в публичном коде его быть не должно
+	password := os.Getenv("MODERATOR_PASSWORD")
+	if password == "" {
+		_ = tx.Rollback()
+		slog.Error("not found MODERATOR_PASSWORD")
+		os.Exit(1)
+	}
 	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		tx.Rollback()

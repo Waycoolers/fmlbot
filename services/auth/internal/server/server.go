@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/Waycoolers/fmlbot/pkg/middlewares"
@@ -34,15 +35,16 @@ func (s *Server) newServer() *http.Server {
 	mux.HandleFunc("POST /register", s.h.Register)
 	mux.HandleFunc("POST /auth/token", s.h.Token)
 	mux.HandleFunc("POST /internal/auth/token", s.h.InternalToken)
+	mux.HandleFunc("POST /internal/auth/revoke-all", s.h.InternalRevokeAll)
 	mux.HandleFunc("POST /auth/refresh", s.h.Refresh)
 	mux.HandleFunc("POST /auth/revoke", s.h.Revoke)
 	mux.HandleFunc("GET /health", s.h.Health)
 
-	handler := middleware.Logging(mux)
+	handler := middlewares.LimitBody(1 << 16)(middleware.Logging(mux))
 	addr := fmt.Sprintf("%s:%s", s.config.Host, s.config.Port)
 	return &http.Server{
 		Addr:         addr,
-		Handler:      middlewares.InternalAuthMiddlewareWithPrivatePaths(string(s.secret), "POST /internal/auth/token")(handler),
+		Handler:      middlewares.InternalAuthMiddlewareWithPrivatePaths(string(s.secret), "POST /internal/auth/token", "POST /internal/auth/revoke-all")(handler),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -56,10 +58,11 @@ func (s *Server) Start() {
 		slog.Info("Starting server", "host", s.config.Host, "port", s.config.Port)
 		err := s.server.ListenAndServe()
 		if err != nil {
-			if !errors.Is(err, http.ErrServerClosed) {
-				slog.Error("Update server failed", "error", err)
+			if errors.Is(err, http.ErrServerClosed) {
+				return
 			}
-			slog.Error("Server error", "error", err)
+			slog.Error("Server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 }

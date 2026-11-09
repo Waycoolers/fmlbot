@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/auth/internal/config"
@@ -20,12 +21,12 @@ type client struct {
 }
 
 func New(cfg *config.APIConfig, internalSecret []byte) domain.APIClient {
-	url := fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
+	baseURL := fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
 	httpClient := &http.Client{
 		Timeout: cfg.HTTPTimeout,
 	}
 	return &client{
-		baseURL:    url,
+		baseURL:    baseURL,
 		httpClient: httpClient,
 		secret:     internalSecret,
 	}
@@ -79,7 +80,7 @@ func (c *client) VerifyUser(ctx context.Context, username string, password strin
 }
 
 func (c *client) IsUsernameAvailable(ctx context.Context, username string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+fmt.Sprintf("/users/by-username/%s", username), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/users/by-username/"+url.PathEscape(username), nil)
 	if err != nil {
 		return false, err
 	}
@@ -130,6 +131,9 @@ func (c *client) Register(ctx context.Context, userID int64, username string, pa
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
+	if resp.StatusCode == http.StatusConflict {
+		return errs.ErrUsernameIsAlreadyTaken
+	}
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}

@@ -14,15 +14,15 @@ func (ui *MenuUI) ImportantDatesMenu(chatID int64, text string) error {
 		Rows: []domain.KeyboardRow{
 			{
 				Buttons: []domain.KeyboardButton{
-					{domain.AddImportantDate},
-					{domain.GetImportantDates},
-					{domain.DeleteImportantDate},
+					{Command: domain.AddImportantDate},
+					{Command: domain.GetImportantDates},
+					{Command: domain.DeleteImportantDate},
 				},
 			},
 			{
 				Buttons: []domain.KeyboardButton{
-					{domain.EditImportantDate},
-					{domain.Main},
+					{Command: domain.EditImportantDate},
+					{Command: domain.Main},
 				},
 			},
 		},
@@ -37,6 +37,16 @@ const (
 	YearsPerPage = 12
 )
 
+var moscow = loadMoscow()
+
+func loadMoscow() *time.Location {
+	loc, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		return time.Local
+	}
+	return loc
+}
+
 var months = []string{
 	"Янв", "Фев", "Мар",
 	"Апр", "Май", "Июн",
@@ -46,7 +56,7 @@ var months = []string{
 
 // ---------------------- YEAR ----------------------
 func (ui *MenuUI) BuildYearKeyboard(pageStart int, isEdit bool) domain.InlineKeyboard {
-	currentYear := time.Now().Year()
+	currentYear := time.Now().In(moscow).Year()
 	if pageStart < YearStart {
 		pageStart = YearStart
 	}
@@ -61,20 +71,19 @@ func (ui *MenuUI) BuildYearKeyboard(pageStart int, isEdit bool) domain.InlineKey
 
 	var rows []domain.InlineKeyboardRow
 	var row domain.InlineKeyboardRow
-	year := pageStart
-	for i := 0; i < YearsPerPage && year >= YearStart; i++ {
-		btn := domain.InlineKeyboardButton{
+	for year := pageStart; year >= YearStart && year > pageStart-YearsPerPage; year-- {
+		row.Buttons = append(row.Buttons, domain.InlineKeyboardButton{
 			Text: strconv.Itoa(year),
 			Data: fmt.Sprintf("%syear:select:%d", prefix, year),
-		}
+		})
 
-		if len(row.Buttons) < 3 {
-			row.Buttons = append(row.Buttons, btn)
-			year--
-		} else {
+		if len(row.Buttons) == 3 {
 			rows = append(rows, row)
 			row = domain.InlineKeyboardRow{}
 		}
+	}
+	if len(row.Buttons) > 0 {
+		rows = append(rows, row)
 	}
 
 	for _, row := range rows {
@@ -84,7 +93,7 @@ func (ui *MenuUI) BuildYearKeyboard(pageStart int, isEdit bool) domain.InlineKey
 
 	// Навигация
 	var navRow domain.InlineKeyboardRow
-	if pageStart > YearStart {
+	if pageStart-YearsPerPage >= YearStart {
 		btn := domain.InlineKeyboardButton{
 			Text: "⬅️ Назад",
 			Data: fmt.Sprintf("%syear:page:%d", prefix, pageStart-YearsPerPage),
@@ -118,20 +127,26 @@ func (ui *MenuUI) SendYearKeyboard(chatID int64, pageStart int, isEdit bool) err
 }
 
 // ---------------------- MONTH ----------------------
-func (ui *MenuUI) BuildMonthKeyboard(isEdit bool) domain.InlineKeyboard {
+func (ui *MenuUI) BuildMonthKeyboard(year int, isEdit bool) domain.InlineKeyboard {
+	// Можно выбрать только уже случившееся событие
+	lastMonth := 12
+	if now := time.Now().In(moscow); year == now.Year() {
+		lastMonth = int(now.Month())
+	}
+
 	prefix := "important_dates:add:month:"
 	if isEdit {
 		prefix = "important_dates:edit:month:"
 	}
 
 	var rows []domain.InlineKeyboardRow
-	for i := 0; i < 12; i += 3 {
-		row := domain.InlineKeyboardRow{
-			Buttons: []domain.InlineKeyboardButton{
-				{Text: months[i], Data: fmt.Sprintf("%s%d", prefix, i+1)},
-				{Text: months[i+1], Data: fmt.Sprintf("%s%d", prefix, i+2)},
-				{Text: months[i+2], Data: fmt.Sprintf("%s%d", prefix, i+3)},
-			},
+	for i := 0; i < lastMonth; i += 3 {
+		var row domain.InlineKeyboardRow
+		for month := i; month < i+3 && month < lastMonth; month++ {
+			row.Buttons = append(row.Buttons, domain.InlineKeyboardButton{
+				Text: months[month],
+				Data: fmt.Sprintf("%s%d", prefix, month+1),
+			})
 		}
 		rows = append(rows, row)
 	}
@@ -143,17 +158,21 @@ func (ui *MenuUI) BuildMonthKeyboard(isEdit bool) domain.InlineKeyboard {
 	return keyboard
 }
 
-func (ui *MenuUI) SendMonthKeyboard(chatID int64, isEdit bool) error {
+func (ui *MenuUI) SendMonthKeyboard(chatID int64, year int, isEdit bool) error {
 	return ui.Client.SendWithInlineKeyboard(
 		chatID,
 		"📅 Выбери месяц",
-		ui.BuildMonthKeyboard(isEdit),
+		ui.BuildMonthKeyboard(year, isEdit),
 	)
 }
 
 // ---------------------- DAY ----------------------
 func (ui *MenuUI) BuildDayKeyboard(year, month int, isEdit bool) domain.InlineKeyboard {
-	days := time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, time.Local).Day()
+	days := time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	// Можно выбрать только уже случившееся событие
+	if now := time.Now().In(moscow); year == now.Year() && time.Month(month) == now.Month() {
+		days = now.Day()
+	}
 	prefix := "important_dates:add:day:"
 	if isEdit {
 		prefix = "important_dates:edit:day:"
@@ -162,19 +181,19 @@ func (ui *MenuUI) BuildDayKeyboard(year, month int, isEdit bool) domain.InlineKe
 	var rows []domain.InlineKeyboardRow
 	var row domain.InlineKeyboardRow
 	for d := 1; d <= days; d++ {
-		btn := domain.InlineKeyboardButton{
+		row.Buttons = append(row.Buttons, domain.InlineKeyboardButton{
 			Text: strconv.Itoa(d),
 			Data: fmt.Sprintf("%s%d", prefix, d),
-		}
+		})
 
-		if len(row.Buttons) < 7 {
-			row.Buttons = append(row.Buttons, btn)
-		} else {
+		if len(row.Buttons) == 7 {
 			rows = append(rows, row)
 			row = domain.InlineKeyboardRow{}
 		}
 	}
-	rows = append(rows, row)
+	if len(row.Buttons) > 0 {
+		rows = append(rows, row)
+	}
 
 	keyboard := domain.InlineKeyboard{
 		Rows: rows,

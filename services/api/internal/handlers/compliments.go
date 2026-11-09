@@ -37,7 +37,7 @@ func (h *Handler) AddCompliment(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sendJson(w, http.StatusCreated, resp)
@@ -58,7 +58,7 @@ func (h *Handler) GetAllCompliments(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sendJson(w, http.StatusOK, compliments)
@@ -79,7 +79,7 @@ func (h *Handler) GetAllReceivedCompliments(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sendJson(w, http.StatusOK, compliments)
@@ -104,12 +104,12 @@ func (h *Handler) RemoveCompliment(w http.ResponseWriter, r *http.Request) {
 
 	err = h.uc.RemoveCompliment(ctx, userID, int64(complimentID))
 	if err != nil {
-		if errors.Is(err, errs.ErrUserNotFound) {
+		if errors.Is(err, errs.ErrUserNotFound) || errors.Is(err, errs.ErrComplimentNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -149,7 +149,7 @@ func (h *Handler) UpdateCompliment(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -196,7 +196,7 @@ func (h *Handler) ReceiveCompliment(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sendJson(w, http.StatusOK, compliment)

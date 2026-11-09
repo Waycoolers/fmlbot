@@ -13,3 +13,13 @@ fml_app/
 db_data/
 auth_db_data/
 redis_data/
+
+# Секреты и дампы не должны попадать в контекст сборки
+.env
+*.env
+/backup.sql
+/schema.sql
+/fmlbot_db_data.tar.gz
+services/ai/.venv/
+services/ai/.idea/
+**/__pycache__/

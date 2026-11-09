@@ -13,6 +13,7 @@ const (
 	AwaitingNotifyBeforeImportantDate State = "awaiting_notify_before_important_date"
 	AwaitingEditTitleImportantDate    State = "awaiting_edit_title_important_date"
 	AwaitingEditDateImportantDate     State = "awaiting_edit_date_important_date"
+	AwaitingOldPassword               State = "awaiting_old_password"
 	AwaitingPassword                  State = "awaiting_password"
 	AwaitingLocationIdea              State = "awaiting_location_idea"
 	AwaitingActivityIdea              State = "awaiting_activity_idea"

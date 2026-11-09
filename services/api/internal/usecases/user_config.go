@@ -115,5 +115,7 @@ func (uc *UseCase) ResetPartnerUserConfig(ctx context.Context, userID int64) err
 		return errs.ErrPartnerNotFound
 	}
 
-	return uc.userConfig.SetDefault(ctx, partnerID)
+	// Счётчики партнёра задают лимит на получение комплиментов, поэтому сбрасывать их
+	// сам получатель не может. Разрыв пары сбрасывает настройки обоих партнёров сам.
+	return nil
 }

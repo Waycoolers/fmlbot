@@ -9,20 +9,20 @@ func (ui *MenuUI) ComplimentsMenu(chatID int64, text string) error {
 		Rows: []domain.KeyboardRow{
 			{
 				Buttons: []domain.KeyboardButton{
-					{domain.AddCompliment},
-					{domain.DeleteCompliment},
+					{Command: domain.AddCompliment},
+					{Command: domain.DeleteCompliment},
 				},
 			},
 			{
 				Buttons: []domain.KeyboardButton{
-					{domain.GetCompliments},
-					{domain.ReceiveCompliment},
+					{Command: domain.GetCompliments},
+					{Command: domain.ReceiveCompliment},
 				},
 			},
 			{
 				Buttons: []domain.KeyboardButton{
-					{domain.EditComplimentFrequency},
-					{domain.Main},
+					{Command: domain.EditComplimentFrequency},
+					{Command: domain.Main},
 				},
 			},
 		},

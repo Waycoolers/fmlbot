@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/Waycoolers/fmlbot/pkg/errs"
@@ -38,7 +39,8 @@ func (h *Handler) VerifyUser(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("Unexpected error", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	resp := struct {

@@ -33,8 +33,12 @@ func (h *Handler) AddImportantDate(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+		if errors.Is(err, errs.ErrInvalidImportantDate) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sendJson(w, http.StatusCreated, resp)
@@ -54,6 +58,7 @@ func (h *Handler) RemoveImportantDate(w http.ResponseWriter, r *http.Request) {
 	}
 	if importantDateID <= 0 {
 		http.Error(w, "Important date id is incorrect", http.StatusBadRequest)
+		return
 	}
 
 	err = h.uc.RemoveImportantDate(ctx, userID, int64(importantDateID))
@@ -63,7 +68,7 @@ func (h *Handler) RemoveImportantDate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -83,6 +88,7 @@ func (h *Handler) UpdateImportantDate(w http.ResponseWriter, r *http.Request) {
 	}
 	if importantDateID <= 0 {
 		http.Error(w, "Important date id is incorrect", http.StatusBadRequest)
+		return
 	}
 	var req domain.ImportantDateRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
@@ -97,8 +103,12 @@ func (h *Handler) UpdateImportantDate(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+		if errors.Is(err, errs.ErrInvalidImportantDate) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -118,6 +128,7 @@ func (h *Handler) GetImportantDate(w http.ResponseWriter, r *http.Request) {
 	}
 	if importantDateID <= 0 {
 		http.Error(w, "Important date id is incorrect", http.StatusBadRequest)
+		return
 	}
 
 	resp, err := h.uc.GetImportantDate(ctx, userID, int64(importantDateID))
@@ -127,7 +138,7 @@ func (h *Handler) GetImportantDate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sendJson(w, http.StatusOK, resp)
@@ -148,7 +159,7 @@ func (h *Handler) GetAllImportantDates(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sendJson(w, http.StatusOK, resp)
@@ -168,6 +179,7 @@ func (h *Handler) UpdateImportantDateSharing(w http.ResponseWriter, r *http.Requ
 	}
 	if importantDateID <= 0 {
 		http.Error(w, "Important date id is incorrect", http.StatusBadRequest)
+		return
 	}
 
 	var req struct {
@@ -190,7 +202,7 @@ func (h *Handler) UpdateImportantDateSharing(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		slog.Error("Unexpected error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

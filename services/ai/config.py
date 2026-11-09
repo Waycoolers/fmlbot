@@ -5,6 +5,7 @@ class Settings:
     YANDEX_API_KEY: str = os.getenv("YANDEX_API_KEY", "")
     YANDEX_FOLDER_ID: str = os.getenv("YANDEX_FOLDER_ID", "")
     PORT: int = int(os.getenv("AI_PORT", 8083))
+    INTERNAL_API_SECRET: str = os.getenv("INTERNAL_API_SECRET", "")
 
 
 settings = Settings()

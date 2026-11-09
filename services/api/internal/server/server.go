@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/Waycoolers/fmlbot/pkg/middlewares"
 	"github.com/Waycoolers/fmlbot/services/api/internal/config"
@@ -30,11 +32,15 @@ func (s *Server) newServer() *http.Server {
 	mux.HandleFunc("POST /users", s.h.AddUser)
 	mux.HandleFunc("GET /users/me", s.h.GetMe)
 	mux.HandleFunc("PATCH /users/me/password", s.h.ChangePassword)
+	mux.HandleFunc("POST /users/me/password/reset", s.h.ResetPassword) // Приватный
 	mux.HandleFunc("GET /users/partner", s.h.GetPartner)
 	mux.HandleFunc("DELETE /users/me", s.h.DeleteUser)
 	mux.HandleFunc("PUT /users/me", s.h.UpdateUser)
 	mux.HandleFunc("PUT /users/partner", s.h.UpdatePartner)
 	mux.HandleFunc("POST /users/pair", s.h.AddPartners)
+	mux.HandleFunc("GET /users/pair/requests", s.h.GetPartnerRequests)
+	mux.HandleFunc("POST /users/pair/requests/{id}/accept", s.h.AcceptPartnerRequest)
+	mux.HandleFunc("POST /users/pair/requests/{id}/decline", s.h.DeclinePartnerRequest)
 	mux.HandleFunc("PATCH /users/unpair", s.h.DeletePartners)
 	mux.HandleFunc("GET /users/by-username/{username}", s.h.GetUserByUsername)
 	mux.HandleFunc("POST /users/fcm-token", s.h.SaveFCMToken)
@@ -64,12 +70,20 @@ func (s *Server) newServer() *http.Server {
 	mux.HandleFunc("POST /auth/verify", s.h.VerifyUser) // Приватный
 	mux.HandleFunc("POST /auth/register", s.h.Register) // Приватный
 
-	handler := middlewares.Middleware(s.config.JwtSecret, "GET /users/by-username", "POST /auth/verify", "POST /auth/register")(mux)
-	handler = middlewares.InternalAuthMiddlewareWithPrivatePaths(string(s.config.InternalSecret), "POST /auth/verify", "POST /auth/register")(handler)
+	secret := string(s.config.InternalSecret)
+	handler := middlewares.Middleware(s.config.JwtSecret, "POST /auth/verify", "POST /auth/register")(mux)
+	// Сервис auth проверяет занятость имени до регистрации, поэтому ходит сюда по внутреннему секрету
+	handler = middlewares.InternalSecretBypass(secret, http.MethodGet, "/users/by-username/", mux)(handler)
+	handler = middlewares.InternalAuthMiddlewareWithPrivatePaths(secret, "POST /auth/verify", "POST /auth/register", "POST /users/me/password/reset")(handler)
+	handler = middlewares.LimitBody(1 << 20)(handler)
 	addr := fmt.Sprintf("%s:%s", s.config.Host, s.config.Port)
 	return &http.Server{
-		Addr:    addr,
-		Handler: handler,
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      2 * time.Minute,
+		IdleTimeout:       2 * time.Minute,
 	}
 }
 
@@ -80,10 +94,11 @@ func (s *Server) Start() {
 		slog.Info("Starting server", "host", s.config.Host, "port", s.config.Port)
 		err := s.server.ListenAndServe()
 		if err != nil {
-			if !errors.Is(err, http.ErrServerClosed) {
-				slog.Error("Update server failed", "error", err)
+			if errors.Is(err, http.ErrServerClosed) {
+				return
 			}
-			slog.Error("Server error", "error", err)
+			slog.Error("Server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 }

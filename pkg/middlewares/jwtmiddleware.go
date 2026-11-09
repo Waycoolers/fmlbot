@@ -22,7 +22,7 @@ func Middleware(secret []byte, publicPaths ...string) func(http.Handler) http.Ha
 			for _, path := range publicPaths {
 				method := strings.Split(path, " ")[0]
 				url := strings.TrimPrefix(path, method+" ")
-				if strings.HasPrefix(r.URL.Path, url) && r.Method == method {
+				if r.URL.Path == url && r.Method == method {
 					next.ServeHTTP(w, r)
 					return
 				}
@@ -47,7 +47,7 @@ func Middleware(secret []byte, publicPaths ...string) func(http.Handler) http.Ha
 					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 				}
 				return secret, nil
-			})
+			}, jwt.WithExpirationRequired())
 
 			if err != nil || !token.Valid {
 				http.Error(w, "invalid token", http.StatusUnauthorized)

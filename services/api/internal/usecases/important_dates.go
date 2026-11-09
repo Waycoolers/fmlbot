@@ -4,10 +4,28 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
+	"time"
+	"unicode/utf8"
 
 	"github.com/Waycoolers/fmlbot/pkg/errs"
 	"github.com/Waycoolers/fmlbot/services/api/internal/domain"
 )
+
+const (
+	maxImportantDateTitle = 256
+	maxNotifyBeforeDays   = 366
+)
+
+func validateImportantDate(req domain.ImportantDateRequest) error {
+	if strings.TrimSpace(req.Title) == "" || utf8.RuneCountInString(req.Title) > maxImportantDateTitle {
+		return errs.ErrInvalidImportantDate
+	}
+	if req.Date.IsZero() || req.NotifyBeforeDays < 0 || req.NotifyBeforeDays > maxNotifyBeforeDays {
+		return errs.ErrInvalidImportantDate
+	}
+	return nil
+}
 
 func (uc *UseCase) AddImportantDate(ctx context.Context, userID int64, req domain.ImportantDateRequest) (*domain.ImportantDate, error) {
 	exists, err := uc.users.IsUserExists(ctx, userID)
@@ -16,6 +34,14 @@ func (uc *UseCase) AddImportantDate(ctx context.Context, userID int64, req domai
 	}
 	if !exists {
 		return nil, errs.ErrUserNotFound
+	}
+
+	if err = validateImportantDate(req); err != nil {
+		return nil, err
+	}
+	// Выбрать можно только уже случившееся событие. Сутки запаса на часовые пояса клиентов
+	if req.Date.After(time.Now().Add(24 * time.Hour)) {
+		return nil, errs.ErrInvalidImportantDate
 	}
 
 	var partnerIDNull sql.NullInt64
@@ -66,6 +92,10 @@ func (uc *UseCase) UpdateImportantDate(ctx context.Context, userID int64, id int
 	}
 	if !exists {
 		return errs.ErrUserNotFound
+	}
+
+	if err = validateImportantDate(date); err != nil {
+		return err
 	}
 
 	err = uc.importantDates.EditImportantDate(ctx, id, userID, date)
@@ -123,15 +153,20 @@ func (uc *UseCase) UpdateImportantDateSharing(ctx context.Context, dateID int64,
 	}
 
 	if makeShared {
-		partner, err := uc.users.GetPartnerID(ctx, userID)
+		var partner int64
+		partner, err = uc.users.GetPartnerID(ctx, userID)
 		if err != nil {
 			return err
 		}
 		if partner == 0 {
 			return errs.ErrPartnerNotFound
 		}
-		return uc.importantDates.MakeImportantDateShared(ctx, dateID, userID, partner)
+		err = uc.importantDates.MakeImportantDateShared(ctx, dateID, userID, partner)
 	} else {
-		return uc.importantDates.MakeImportantDatePrivate(ctx, dateID, userID)
+		err = uc.importantDates.MakeImportantDatePrivate(ctx, dateID, userID)
 	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return errs.ErrImportantDateNotFound
+	}
+	return err
 }

@@ -19,6 +19,7 @@ type client struct {
 	httpClient *http.Client
 	authClient domain.AuthClient
 	tokenCache sync.Map
+	secret     string
 }
 
 func New(cfg *config.Config) domain.ApiClient {
@@ -32,6 +33,7 @@ func New(cfg *config.Config) domain.ApiClient {
 		baseURL:    apiUrl,
 		httpClient: c,
 		authClient: authClient,
+		secret:     string(cfg.InternalSecret),
 	}
 }
 
@@ -64,6 +66,7 @@ func (c *client) doAuthRequest(ctx context.Context, method, path string, body an
 			return nil, err
 		}
 		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("X-Internal-Secret", c.secret)
 		req.Header.Set("Content-Type", "application/json")
 		return c.httpClient.Do(req)
 	}

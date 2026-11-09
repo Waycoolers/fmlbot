@@ -1,7 +1,12 @@
 package telegram
 
 import (
+	"errors"
+	"fmt"
 	"log"
+	"net/http"
+	"strings"
+	"time"
 
 	"github.com/Waycoolers/fmlbot/services/bot/internal/config"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/domain"
@@ -50,6 +55,7 @@ func convertUpdate(upd tgbotapi.Update) domain.Update {
 		return domain.Update{
 			Message: nil,
 			CallbackQuery: &domain.CallbackQuery{
+				ID:        upd.CallbackQuery.ID,
 				ChatID:    upd.CallbackQuery.Message.Chat.ID,
 				MessageID: upd.CallbackQuery.Message.MessageID,
 				Data:      upd.CallbackQuery.Data,
@@ -67,21 +73,64 @@ type TelegramClient struct {
 }
 
 func NewTelegramClient(cfg *config.Config) domain.BotClient {
-	api, err := tgbotapi.NewBotAPI(cfg.Bot.Token)
+	// Таймаут больше long polling, иначе getUpdates обрывался бы раньше времени
+	httpClient := &http.Client{Timeout: time.Duration(cfg.Bot.UpdatesTimeout+30) * time.Second}
+	api, err := tgbotapi.NewBotAPIWithClient(cfg.Bot.Token, tgbotapi.APIEndpoint, httpClient)
 	if err != nil {
 		log.Fatalf("Ошибка при создании бота: %v", err)
 	}
 	return &TelegramClient{api: api, updatesTimeout: cfg.Bot.UpdatesTimeout}
 }
 
-func (c *TelegramClient) SendMessage(chatID int64, text string) error {
-	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ParseMode = "HTML"
-	_, err := c.api.Send(msg)
-	if err != nil {
-		log.Printf("Ошибка при отправке ответа: %v", err)
+// Лимит Telegram - 4096 символов, берём с запасом
+const maxMessageLength = 4000
+
+// splitMessage делит длинный текст на части, стараясь резать по границе строки.
+func splitMessage(text string, limit int) []string {
+	runes := []rune(text)
+	var parts []string
+	for len(runes) > limit {
+		cut := limit
+		for i := limit - 1; i > 0; i-- {
+			if runes[i] == '\n' {
+				cut = i
+				break
+			}
+		}
+		if part := strings.TrimSpace(string(runes[:cut])); part != "" {
+			parts = append(parts, part)
+		}
+		runes = runes[cut:]
 	}
-	log.Printf("Бот ответил: %v", msg.Text)
+	if part := strings.TrimSpace(string(runes)); part != "" {
+		parts = append(parts, part)
+	}
+	return parts
+}
+
+// classifySendError отделяет окончательные отказы Telegram от временных сбоев.
+func classifySendError(err error) error {
+	var tgErr *tgbotapi.Error
+	if errors.As(err, &tgErr) && (tgErr.Code == 400 || tgErr.Code == 403) {
+		return fmt.Errorf("%w: %s", domain.ErrRecipientUnavailable, tgErr.Message)
+	}
+	return err
+}
+
+func (c *TelegramClient) SendMessage(chatID int64, text string) error {
+	for _, part := range splitMessage(text, maxMessageLength) {
+		msg := tgbotapi.NewMessage(chatID, part)
+		msg.ParseMode = "HTML"
+		if _, err := c.api.Send(msg); err != nil {
+			log.Printf("Ошибка при отправке ответа: %v", err)
+			return classifySendError(err)
+		}
+	}
+	return nil
+}
+
+func (c *TelegramClient) AnswerCallback(callbackID string) error {
+	_, err := c.api.Request(tgbotapi.NewCallback(callbackID, ""))
 	return err
 }
 
@@ -109,7 +158,6 @@ func (c *TelegramClient) SendWithInlineKeyboard(chatID int64, text string, keybo
 	if err != nil {
 		log.Printf("Ошибка при отправке сообщения с кнопками: %v", err)
 	}
-	log.Printf("Бот ответил: %v", msg.Text)
 	return err
 }
 

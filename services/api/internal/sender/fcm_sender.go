@@ -65,7 +65,7 @@ func (s *FCMSender) SendImportantDatesNotification(ctx context.Context, update d
 			Token: token,
 			Notification: &messaging.Notification{
 				Title: "Важная дата",
-				Body:  update.Message,
+				Body:  update.PlainMessage,
 			},
 		}
 

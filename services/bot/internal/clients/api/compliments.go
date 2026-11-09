@@ -125,7 +125,7 @@ func (c *client) ReceiveNextCompliment(ctx context.Context, chatID int64) (*doma
 			Minutes int    `json:"minutes"`
 		}
 		decodeErr := json.NewDecoder(resp.Body).Decode(&errBody)
-		if decodeErr != nil {
+		if decodeErr != nil || errBody.Error == errs.ErrLimitExceeded.Error() {
 			return nil, errs.ErrLimitExceeded
 		}
 		return nil, &errs.ErrBucketEmpty{Minutes: errBody.Minutes}

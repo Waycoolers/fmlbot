@@ -21,7 +21,7 @@ func (h *Handler) GetMyUserConfig(w http.ResponseWriter, r *http.Request) {
 
 	userConfig, err := h.uc.GetMyUserConfig(ctx, id)
 	if err != nil {
-		if errors.Is(err, errs.ErrUserNotFound) {
+		if errors.Is(err, errs.ErrUserNotFound) || errors.Is(err, errs.ErrUserConfigNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -42,7 +42,7 @@ func (h *Handler) GetPartnerUserConfig(w http.ResponseWriter, r *http.Request) {
 
 	userConfig, err := h.uc.GetPartnerUserConfig(ctx, id)
 	if err != nil {
-		if errors.Is(err, errs.ErrUserNotFound) {
+		if errors.Is(err, errs.ErrUserNotFound) || errors.Is(err, errs.ErrUserConfigNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -70,7 +70,7 @@ func (h *Handler) UpdateUserConfig(w http.ResponseWriter, r *http.Request) {
 
 	err = h.uc.UpdateUserConfig(ctx, id, &userConfig)
 	if err != nil {
-		if errors.Is(err, errs.ErrUserNotFound) {
+		if errors.Is(err, errs.ErrUserNotFound) || errors.Is(err, errs.ErrUserConfigNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -91,7 +91,7 @@ func (h *Handler) ResetMyUserConfig(w http.ResponseWriter, r *http.Request) {
 
 	err := h.uc.ResetMyUserConfig(ctx, id)
 	if err != nil {
-		if errors.Is(err, errs.ErrUserNotFound) {
+		if errors.Is(err, errs.ErrUserNotFound) || errors.Is(err, errs.ErrUserConfigNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}

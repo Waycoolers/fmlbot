@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/http"
 	"os"
@@ -95,7 +96,7 @@ func main() {
 func GivePasswords(ctx context.Context, cfg *config.Config, db *sqlx.DB) {
 	var users []userWithPasswordResponse
 	err := db.SelectContext(ctx, &users, `
-		SELECT * FROM users WHERE password_hash = '';
+		SELECT user_id, username, partner_id, password_hash FROM users WHERE password_hash = '';
 	`)
 	if err != nil {
 		slog.Error("Error selecting users", "error", err)
@@ -122,7 +123,7 @@ func GivePasswords(ctx context.Context, cfg *config.Config, db *sqlx.DB) {
 			continue
 		}
 
-		text := fmt.Sprintf("Привет! Я усилил безопасность. Твой новый пароль: %s\n\nP.S. Он тебе может пригодится для входа в мобильное приложение. Ты всегда можешь поменять пароль в настройках аккаунта.", password)
+		text := fmt.Sprintf("Привет! Я усилил безопасность. Твой новый пароль: %s\n\nP.S. Он тебе может пригодится для входа в мобильное приложение. Ты всегда можешь поменять пароль в настройках аккаунта.", html.EscapeString(password))
 
 		message := struct {
 			Text   string `json:"text"`
@@ -157,23 +158,21 @@ func GivePasswords(ctx context.Context, cfg *config.Config, db *sqlx.DB) {
 	}
 }
 
+// Пользователи бота исторически получили id из Telegram, а мобильные - time.Now().UnixMicro().
 func SetTelegramIDs(ctx context.Context, db *sqlx.DB) {
-	var users []userWithPasswordResponse
-	err := db.SelectContext(ctx, &users, `
-		SELECT * FROM users WHERE password_hash = '';
-	`)
+	const firstMobileUserID = 1_000_000_000_000_000
+
+	res, err := db.ExecContext(ctx, `
+		UPDATE users SET telegram_id = user_id WHERE telegram_id IS NULL AND user_id < $1;
+	`, firstMobileUserID)
 	if err != nil {
-		slog.Error("Error selecting users", "error", err)
+		slog.Error("Error updating users", "error", err)
 		os.Exit(1)
 	}
-
-	for _, user := range users {
-		_, err = db.ExecContext(ctx, `
-			UPDATE users SET telegram_id = $1 WHERE user_id = $1;
-		`, user.ID)
-		if err != nil {
-			slog.Error("Error updating user", "error", err)
-			continue
-		}
+	updated, err := res.RowsAffected()
+	if err != nil {
+		slog.Error("Error reading updated rows", "error", err)
+		os.Exit(1)
 	}
+	slog.Info("Telegram ids are set", "count", updated)
 }

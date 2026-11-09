@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/Waycoolers/fmlbot/pkg/middlewares"
 	"github.com/Waycoolers/fmlbot/services/bot/internal/config"
@@ -27,8 +29,12 @@ func NewHTTPServer(cfg *config.ServerConfig, h *handlers.Handler, internalSecret
 
 	return &HTTPServer{
 		s: &http.Server{
-			Addr:    addr,
-			Handler: middlewares.InternalAuthMiddlewareWithPublicPaths(string(internalSecret))(mux),
+			Addr:              addr,
+			Handler:           middlewares.LimitBody(1 << 20)(middlewares.InternalAuthMiddlewareWithPublicPaths(string(internalSecret))(mux)),
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       15 * time.Second,
+			WriteTimeout:      2 * time.Minute,
+			IdleTimeout:       2 * time.Minute,
 		},
 		cfg: cfg,
 		h:   h,
@@ -41,6 +47,7 @@ func (s *HTTPServer) Run() {
 		err := s.s.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("Server stopped with error", "error", err)
+			os.Exit(1)
 		}
 	}()
 }
